@@ -1,0 +1,7 @@
+.vs
+Debug
+*.sln
+*.vcxproj*
+s3
+glut*
+x64
