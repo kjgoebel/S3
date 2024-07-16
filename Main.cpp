@@ -37,8 +37,9 @@ void display()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(shader_program);
+	glProgramUniform4f(shader_program, glGetUniformLocation(shader_program, "baseColor"), 0, 0.5, 1, 1);
 	glBindVertexArray(vbo);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glDrawArrays(GL_TRIANGLES, 0, 3);		//This apparently generates an "invalid operation" error.
 
 	glFlush();
 	glutSwapBuffers();

@@ -96,9 +96,10 @@ void init_shaders()
 		GL_FRAGMENT_SHADER,
 		std::vector<char*> {
 			"#version 460\n"
+			"uniform vec4 baseColor;\n"
 			"out vec4 fragColor;\n"
 			"void main() {\
-				fragColor = vec4(0.5, 0, 0.5, 1);\
+				fragColor = baseColor;\
 			}\n"
 		}
 	);
