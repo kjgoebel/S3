@@ -57,7 +57,7 @@ GLuint make_new_program(GLuint vert, GLuint geom, GLuint frag)
 }
 
 
-GLuint vert, geom_triangles, frag_simple;
+GLuint vert, geom_points, geom_triangles, frag_simple;
 
 
 void init_shaders()
@@ -65,42 +65,126 @@ void init_shaders()
 	vert = make_new_shader(
 		GL_VERTEX_SHADER,
 		std::vector<char*> {
-			"#version 460\n"
-			"layout (location = 0) in vec3 position;\n"
-			"void main() {\
-				gl_Position = vec4(position.x, position.y, position.z, 1);\
-			}\n"
+			R"(
+				#version 460
+
+				layout (location = 0) in vec3 position;
+				
+				void main() {
+					gl_Position = vec4(position.x, position.y, position.z, 1);
+				}
+			)"
+		}
+	);
+
+	geom_points = make_new_shader(
+		GL_GEOMETRY_SHADER,
+		std::vector<char*> {
+			R"(
+				#version 460
+
+				layout (points, invocations = 2) in;
+				layout (triangle_strip, max_vertices = 16) out;
+
+				void main() {
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0.01, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(-0.007071, 0.007071, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(-0.01, 0, 0, 0);
+					EmitVertex();
+					EndPrimitive();
+
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(-0.01, 0, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(-0.007071, -0.007071, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, -0.01, 0, 0);
+					EmitVertex();
+					EndPrimitive();
+
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, -0.01, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0.007071, -0.007071, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0.01, 0, 0, 0);
+					EmitVertex();
+					EndPrimitive();
+
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0.01, 0, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0.007071, 0.007071, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0.01, 0, 0);
+					EmitVertex();
+					EndPrimitive();
+				}
+			)"
+
+			/*R"(
+				#version 460
+
+				layout (points, invocations = 2) in;
+				layout (triangle_strip, max_vertices = 4) out;
+
+				void main() {
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.25, -0.25, 0, 0) + vec4(0.01, 0.01, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.25, -0.25, 0, 0) + vec4(-0.01, 0.01, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.25, -0.25, 0, 0) + vec4(0.01, -0.01, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.25, -0.25, 0, 0) + vec4(-0.01, -0.01, 0, 0);
+					EmitVertex();
+					EndPrimitive();
+				}
+			)"*/
 		}
 	);
 	
 	geom_triangles = make_new_shader(
 		GL_GEOMETRY_SHADER,
 		std::vector<char*> {
-			"#version 460\n"
-			"layout (invocations = 2) in;\n"
-			"layout (triangles) in;\n"
-			"layout (triangle_strip, max_vertices = 3) out;\n"
-			"void main() {\n"
-				"gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(0.25, -0.5, 0, 0);\n"
-				"EmitVertex();\n"
-				"gl_Position = gl_in[1].gl_Position + gl_InvocationID * vec4(0.25, -0.5, 0, 0);\n"
-				"EmitVertex();\n"
-				"gl_Position = gl_in[2].gl_Position + gl_InvocationID * vec4(0.25, -0.5, 0, 0);\n"
-				"EmitVertex();\n"
-				"EndPrimitive();\n"
-			"}\n"
+			R"(
+				#version 460
+
+				layout (triangles, invocations = 2) in;
+				layout (triangle_strip, max_vertices = 3) out;
+
+				void main() {
+					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(0.25, -0.5, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[1].gl_Position + gl_InvocationID * vec4(0.25, -0.5, 0, 0);
+					EmitVertex();
+					gl_Position = gl_in[2].gl_Position + gl_InvocationID * vec4(0.25, -0.5, 0, 0);
+					EmitVertex();
+					EndPrimitive();
+				}
+			)"
 		}
 	);
 	
 	frag_simple = make_new_shader(
 		GL_FRAGMENT_SHADER,
 		std::vector<char*> {
-			"#version 460\n"
-			"uniform vec4 baseColor;\n"
-			"out vec4 fragColor;\n"
-			"void main() {\
-				fragColor = baseColor;\
-			}\n"
+			R"(
+				#version 460
+
+				uniform vec4 baseColor;
+				out vec4 fragColor;
+
+				void main() {
+					fragColor = baseColor;
+				}
+			)"
 		}
 	);
 }
