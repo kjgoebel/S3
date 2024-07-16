@@ -19,8 +19,7 @@ struct Model
 
 	bool ready_to_render;
 
-	//Note that vertex_buffer and primitive_buffer must remain next to each other.
-	GLuint shader_program, vertex_array, vertex_buffer, primitive_buffer;
+	GLuint shader_program, vertex_array;
 
 	Model(int prim, int num_verts, int num_prims, Vec4* verts = NULL, int* prims = NULL, Vec4* vert_colors = NULL)
 	{
@@ -58,7 +57,9 @@ struct Model
 		glGenVertexArrays(1, &vertex_array);
 		glBindVertexArray(vertex_array);
 
-		glGenBuffers(2, &vertex_buffer);
+		GLuint vertex_buffer, primitive_buffer;
+
+		glGenBuffers(1, &vertex_buffer);
 		glBindBuffer(GL_ARRAY_BUFFER, vertex_array);
 
 		glBufferData(GL_ARRAY_BUFFER, 4 * num_vertices * sizeof(double), vertices, GL_STATIC_DRAW);
@@ -79,6 +80,7 @@ struct Model
 
 		if(primitive != GL_POINTS)		//For points we just use the vertex array directly.
 		{
+			glGenBuffers(1, &primitive_buffer);
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, primitive_buffer);
 			glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * sizeof(int), primitives, GL_STATIC_DRAW);
 		}
@@ -112,7 +114,7 @@ struct Model
 		glProgramUniform4f(shader_program, glGetUniformLocation(shader_program, "baseColor"), baseColor.x, baseColor.y, baseColor.z, baseColor.w);
 		glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "aspectRatio"), aspect_ratio);
 		set_uniform_matrix(shader_program, "modelViewXForm", cam_mat);
-		set_uniform_matrix(shader_program, "projXForm", proj_mat);
+		set_uniform_matrix(shader_program, "projXForm", proj_mat);		//Should find a way to avoid pushing this to the GPU every frame.
 
 		glBindVertexArray(vertex_array);
 

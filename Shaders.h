@@ -2,9 +2,10 @@
 
 #include "GL/glew.h"
 #include "Vector.h"
+#include <vector>
 
 
-GLuint make_new_shader(const char** text, int count);
+GLuint make_new_shader(GLuint shader_type, const std::vector<char*> text);
 GLuint make_new_program(GLuint vert, GLuint geom, GLuint frag);
 
 extern GLuint	vert,

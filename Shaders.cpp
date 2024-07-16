@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <vector>
 
 
 GLuint make_new_shader(GLuint shader_type, const std::vector<char*> text)
@@ -106,9 +105,6 @@ void init_shaders()
 					point.xyz *= (distance - gl_InvocationID * 6.283185) / distance;
 
 					point = projXForm * point;
-
-					//Point size is all wrong, because perspective division is for Euclidean space.
-					//Maybe do manual perspective division and set w = 1?
 
 					point.xyz /= point.w;
 					point.w = 1;
