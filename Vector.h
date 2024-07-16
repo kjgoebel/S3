@@ -309,6 +309,7 @@ struct Mat4
 		return Vec4(data[row][0], data[row][1], data[row][2], data[row][3]);
 	}
 
+	//"Axial rotation" is a misnomer.
 	static Mat4 axial_rotation(int ix1, int ix2, double theta)
 	{
 		Mat4 ret = identity();

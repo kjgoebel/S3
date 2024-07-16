@@ -3,6 +3,7 @@
 #include "Vector.h"
 #include "GL/glew.h"
 #include "Shaders.h"
+#include "S3.h"
 #include <stdio.h>
 
 
@@ -109,6 +110,7 @@ struct Model
 
 		glUseProgram(shader_program);
 		glProgramUniform4f(shader_program, glGetUniformLocation(shader_program, "baseColor"), baseColor.x, baseColor.y, baseColor.z, baseColor.w);
+		set_uniform_matrix(shader_program, "fullTransform", cam_mat);
 
 		glBindVertexArray(vertex_array);
 

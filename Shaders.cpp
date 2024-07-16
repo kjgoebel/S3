@@ -68,10 +68,14 @@ void init_shaders()
 			R"(
 				#version 460
 
-				layout (location = 0) in vec3 position;
+				layout (location = 0) in vec4 position;
+
+				uniform mat4 fullTransform;
 				
 				void main() {
-					gl_Position = vec4(position.x, position.y, position.z, 1);
+					gl_Position = fullTransform * position;
+					gl_Position.w = 1;
+					//gl_Position = vec4(position.x + float(fullTransform[0][1]), position.y, position.z, 1);
 				}
 			)"
 		}
@@ -187,4 +191,14 @@ void init_shaders()
 			)"
 		}
 	);
+}
+
+
+void set_uniform_matrix(GLuint shader_program, const char* name, Mat4& mat)
+{
+	float temp[16];
+	for(int i = 0; i < 4; i++)
+		for(int j = 0; j < 4; j++)
+			temp[j * 4 + i] = mat.data[i][j];
+	glProgramUniformMatrix4fv(shader_program, glGetUniformLocation(shader_program, name), 1, false, temp);
 }
