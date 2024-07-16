@@ -40,12 +40,11 @@ void init()
 	srand(clock());
 
 	glClearColor(0, 0, 0, 0);
-
+	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_PROGRAM_POINT_SIZE);
 
-	glEnable(GL_DEPTH_TEST);
-
 	init_shaders();
+	init_models();
 
 	Vec4* dots = new Vec4[NUM_DOTS];
 	for(int i = 0; i < NUM_DOTS; i++)
@@ -56,11 +55,11 @@ void init()
 		} while(dots[i].mag2() == 0 || dots[i].mag2() > 1);
 		dots[i].normalize_in_place();
 	}
-	dots_model = new Model(GL_POINTS, NUM_DOTS, NUM_DOTS, dots);
+	dots_model = new Model(GL_POINTS, NUM_DOTS, dots);
 }
 
 
-#define NEAR		(0.01)
+#define NEAR		(0.001)
 #define FAR			(TAU)
 #define HALF_FOV	(TAU / 8)
 
@@ -83,6 +82,8 @@ void display()
 {
 	double dt = current_time() - last_fame_time;
 	printf("%f\n", 1.0 / dt);
+	print_matrix(cam_mat);
+	printf("\n");
 
 	#define CONTROL_SPEED(positive, negative, speed)	(\
 															(positive && !negative) ? speed * dt : \
@@ -103,9 +104,8 @@ void display()
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	print_matrix(cam_mat);
-	printf("\n");
 	dots_model->draw(Vec4(1, 1, 1, 1));
+	geodesic_model->draw(Vec4(0, 0.5, 1, 1));
 
 	glFlush();
 	glutSwapBuffers();

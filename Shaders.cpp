@@ -182,7 +182,7 @@ void init_shaders()
 			)"*/
 		}
 	);
-	
+
 	geom_triangles = make_new_shader(
 		GL_GEOMETRY_SHADER,
 		std::vector<char*> {
@@ -192,13 +192,23 @@ void init_shaders()
 				layout (triangles, invocations = 2) in;
 				layout (triangle_strip, max_vertices = 3) out;
 
+				uniform mat4 projXForm;
+				out float distance;
+
 				void main() {
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(0.25, -0.5, 0, 0);
-					EmitVertex();
-					gl_Position = gl_in[1].gl_Position + gl_InvocationID * vec4(0.25, -0.5, 0, 0);
-					EmitVertex();
-					gl_Position = gl_in[2].gl_Position + gl_InvocationID * vec4(0.25, -0.5, 0, 0);
-					EmitVertex();
+					for(int i = 0; i < 3; i++)
+					{
+						vec4 point = gl_in[i].gl_Position;
+
+						float dist = length(point.xyz);
+						point.xyz *= (dist - gl_InvocationID * 6.283185) / dist;
+						distance = abs(dist - gl_InvocationID * 6.283185);
+
+						point = projXForm * point;
+
+						gl_Position = point;
+						EmitVertex();
+					}
 					EndPrimitive();
 				}
 			)"
