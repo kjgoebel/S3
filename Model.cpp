@@ -4,8 +4,10 @@
 Model* geodesic_model = NULL;
 
 
+//Depth is still messed up for near-antipodal elements.
+
 #define GEODESIC_TUBE_RADIUS			(0.005)
-#define GEODESIC_LONGITUDINAL_SEGMENTS	(32)
+#define GEODESIC_LONGITUDINAL_SEGMENTS	(128)
 #define GEODESIC_TRANSVERSE_SEGMENTS	(8)
 
 void init_models()

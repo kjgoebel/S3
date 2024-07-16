@@ -104,8 +104,9 @@ void display()
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	dots_model->draw(Vec4(1, 1, 1, 1));
-	geodesic_model->draw(Vec4(0, 0.5, 1, 1));
+	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
+	geodesic_model->draw(Mat4::identity(), Vec4(0, 0.5, 1, 1));
+	geodesic_model->draw(Mat4::axial_rotation(_x, _z, TAU / 4) * Mat4::axial_rotation(_y, _w, TAU / 4), Vec4(1, 0.5, 0, 1));
 
 	glFlush();
 	glutSwapBuffers();

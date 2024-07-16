@@ -60,7 +60,7 @@ public:
 			delete vertex_colors;
 	}
 
-	void draw(Vec4 baseColor)
+	void draw(Mat4 xform, Vec4 baseColor)
 	{
 		if(!ready_to_render)
 			prepare_to_render();
@@ -69,7 +69,7 @@ public:
 		glProgramUniform4f(shader_program, glGetUniformLocation(shader_program, "baseColor"), baseColor.x, baseColor.y, baseColor.z, baseColor.w);
 		glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "aspectRatio"), aspect_ratio);
 		glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "fogScale"), fog_scale);
-		set_uniform_matrix(shader_program, "modelViewXForm", cam_mat);
+		set_uniform_matrix(shader_program, "modelViewXForm", cam_mat * xform);
 		set_uniform_matrix(shader_program, "projXForm", proj_mat);		//Should find a way to avoid pushing this to the GPU every frame.
 
 		glBindVertexArray(vertex_array);
