@@ -110,7 +110,9 @@ struct Model
 
 		glUseProgram(shader_program);
 		glProgramUniform4f(shader_program, glGetUniformLocation(shader_program, "baseColor"), baseColor.x, baseColor.y, baseColor.z, baseColor.w);
-		set_uniform_matrix(shader_program, "fullTransform", cam_mat);
+		glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "aspectRatio"), aspect_ratio);
+		set_uniform_matrix(shader_program, "modelViewXForm", cam_mat);
+		set_uniform_matrix(shader_program, "projXForm", proj_mat);
 
 		glBindVertexArray(vertex_array);
 

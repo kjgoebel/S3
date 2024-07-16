@@ -70,12 +70,14 @@ void init_shaders()
 
 				layout (location = 0) in vec4 position;
 
-				uniform mat4 fullTransform;
+				uniform mat4 modelViewXForm;
 				
 				void main() {
-					gl_Position = fullTransform * position;
+					vec4 r4_pos = modelViewXForm * position;
+					float lr4 = length(r4_pos);
+					float ls3 = 2 * asin(0.5 * lr4);
+					gl_Position.xyz = ls3 / lr4 * r4_pos.xyz;
 					gl_Position.w = 1;
-					//gl_Position = vec4(position.x + float(fullTransform[0][1]), position.y, position.z, 1);
 				}
 			)"
 		}
@@ -90,44 +92,66 @@ void init_shaders()
 				layout (points, invocations = 2) in;
 				layout (triangle_strip, max_vertices = 16) out;
 
+				uniform mat4 projXForm;
+				uniform float aspectRatio;
+
+				#define BASE_POINT_SIZE		(0.002)
+
 				void main() {
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0.01, 0, 0);
+					float card = BASE_POINT_SIZE, diag = 0.7071 * BASE_POINT_SIZE, mult = 1.0 / aspectRatio;
+
+					vec4 point = gl_in[0].gl_Position;
+
+					float distance = length(point.xyz);
+					point.xyz *= (distance - gl_InvocationID * 3.141593) / distance;
+
+					point = projXForm * point;
+
+					//Point size is all wrong, because perspective division is for Euclidean space.
+					//Maybe do manual perspective division and set w = 1?
+
+					point.xyz /= point.w;
+					point.w = 1;
+
+					float size = 1 / sin(distance);
+
+					gl_Position = point + size * vec4(0, card, 0, 0);
 					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0, 0, 0);
+					gl_Position = point + vec4(0, 0, 0, 0);
 					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(-0.007071, 0.007071, 0, 0);
+					gl_Position = point + size * vec4(-diag * mult, diag, 0, 0);
 					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(-0.01, 0, 0, 0);
+					gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
 					EmitVertex();
 					EndPrimitive();
 
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(-0.01, 0, 0, 0);
+					gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
 					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0, 0, 0);
+					gl_Position = point + vec4(0, 0, 0, 0);
 					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(-0.007071, -0.007071, 0, 0);
+					gl_Position = point + size * vec4(-diag * mult, -diag, 0, 0);
 					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, -0.01, 0, 0);
-					EmitVertex();
-					EndPrimitive();
-
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, -0.01, 0, 0);
-					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0, 0, 0);
-					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0.007071, -0.007071, 0, 0);
-					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0.01, 0, 0, 0);
+					gl_Position = point + size * vec4(0, -card, 0, 0);
 					EmitVertex();
 					EndPrimitive();
 
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0.01, 0, 0, 0);
+					gl_Position = point + size * vec4(0, -card, 0, 0);
 					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0, 0, 0);
+					gl_Position = point + vec4(0, 0, 0, 0);
 					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0.007071, 0.007071, 0, 0);
+					gl_Position = point + size * vec4(diag * mult, -diag, 0, 0);
 					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.05, -0.05, 0, 0) + vec4(0, 0.01, 0, 0);
+					gl_Position = point + size * vec4(card * mult, 0, 0, 0);
+					EmitVertex();
+					EndPrimitive();
+
+					gl_Position = point + size * vec4(card * mult, 0, 0, 0);
+					EmitVertex();
+					gl_Position = point + vec4(0, 0, 0, 0);
+					EmitVertex();
+					gl_Position = point + size * vec4(diag * mult, diag, 0, 0);
+					EmitVertex();
+					gl_Position = point + size * vec4(0, card, 0, 0);
 					EmitVertex();
 					EndPrimitive();
 				}
@@ -137,16 +161,21 @@ void init_shaders()
 				#version 460
 
 				layout (points, invocations = 2) in;
-				layout (triangle_strip, max_vertices = 4) out;
+				layout (points, max_vertices = 1) out;
+
+				uniform mat4 projXForm;
 
 				void main() {
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.25, -0.25, 0, 0) + vec4(0.01, 0.01, 0, 0);
-					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.25, -0.25, 0, 0) + vec4(-0.01, 0.01, 0, 0);
-					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.25, -0.25, 0, 0) + vec4(0.01, -0.01, 0, 0);
-					EmitVertex();
-					gl_Position = gl_in[0].gl_Position + gl_InvocationID * vec4(-0.25, -0.25, 0, 0) + vec4(-0.01, -0.01, 0, 0);
+					vec4 point = gl_in[0].gl_Position;
+
+					float distance = length(point.xyz);
+					point.xyz *= (distance - gl_InvocationID * 3.141593) / distance;
+
+					point = projXForm * point;
+
+					gl_Position = point;
+					gl_PointSize = 3 / sin(distance);
+
 					EmitVertex();
 					EndPrimitive();
 				}

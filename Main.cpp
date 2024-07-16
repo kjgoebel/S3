@@ -10,13 +10,10 @@
 #include <stdio.h>
 #include <time.h>
 
-GLuint vao;
-GLuint shader_program;
-GLuint prog_xform_location;
 
 Model *dots_model = NULL;
 
-#define NUM_DOTS		(100)
+#define NUM_DOTS		(2000)
 
 
 #define TRANSLATION_SPEED		(TAU / 16)
@@ -41,24 +38,11 @@ void init()
 {
 	srand(clock());
 
+	glClearColor(0, 0, 0, 0);
+
+	glEnable(GL_PROGRAM_POINT_SIZE);
+
 	init_shaders();
-	shader_program = make_new_program(vert, geom_triangles, frag_simple);
-
-	Vec4 vertices[] = {
-		Vec4(-0.5, -0.5),
-		Vec4(0.5, -0.5),
-		Vec4(0, 0.75)
-	};
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	GLuint vbo;
-	glGenBuffers(1, &vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, 4 * sizeof(double), (void*)0);
-	glEnableVertexAttribArray(0);
 
 	Vec4* dots = new Vec4[NUM_DOTS];
 	for(int i = 0; i < NUM_DOTS; i++)
@@ -72,16 +56,30 @@ void init()
 	dots_model = new Model(GL_POINTS, NUM_DOTS, NUM_DOTS, dots);
 }
 
+
+#define NEAR		(0.01)
+#define FAR			(TAU / 2)
+#define HALF_FOV	(TAU / 8)
+
 void reshape(int w, int h)
 {
-	double ratio = (double)w / h;
 	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
+	
+	aspect_ratio = (double)w / h;
+	double q = tan(HALF_FOV);
+
+	proj_mat = Mat4(
+		1.0 / (aspect_ratio * q),	0,					0,								0,
+		0,							1.0 / q,			0,								0,
+		0,							0,					(FAR + NEAR) / (NEAR - FAR),	2.0 * NEAR * FAR / (NEAR - FAR),
+		0,							0,					-1,								0
+	);
 }
 
 void display()
 {
 	double dt = current_time() - last_fame_time;
-	//printf("%f\n", 1.0 / dt);
+	printf("%f\n", 1.0 / dt);
 
 	#define CONTROL_SPEED(positive, negative, speed)	(\
 															(positive && !negative) ? speed * dt : \
@@ -102,15 +100,9 @@ void display()
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glUseProgram(shader_program);
-	glProgramUniform4f(shader_program, glGetUniformLocation(shader_program, "baseColor"), 0, 0.5, 1, 1);
 	print_matrix(cam_mat);
 	printf("\n");
-	set_uniform_matrix(shader_program, "fullTransform", cam_mat);
-	glBindVertexArray(vao);
-	glDrawArrays(GL_TRIANGLES, 0, 3);		//This apparently generates an "invalid operation" error.
-
-	dots_model->draw(Vec4(1, 0, 0, 1));
+	dots_model->draw(Vec4(1, 1, 1, 1));
 
 	glFlush();
 	glutSwapBuffers();
@@ -274,8 +266,6 @@ int main(int argc, char **argv)
 	glutKeyboardUpFunc(keyboard_up);
 	glutSpecialFunc(special);
 	glutSpecialUpFunc(special_up);
-
-	glClearColor(0, 0, 0, 0);
 
 	init();
 
