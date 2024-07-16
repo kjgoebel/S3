@@ -103,7 +103,7 @@ void init_shaders()
 					vec4 point = gl_in[0].gl_Position;
 
 					float distance = length(point.xyz);
-					point.xyz *= (distance - gl_InvocationID * 3.141593) / distance;
+					point.xyz *= (distance - gl_InvocationID * 6.283185) / distance;
 
 					point = projXForm * point;
 

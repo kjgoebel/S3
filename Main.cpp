@@ -58,7 +58,7 @@ void init()
 
 
 #define NEAR		(0.01)
-#define FAR			(TAU / 2)
+#define FAR			(TAU)
 #define HALF_FOV	(TAU / 8)
 
 void reshape(int w, int h)
