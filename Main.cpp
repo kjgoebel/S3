@@ -55,7 +55,7 @@ void init()
 		} while(dots[i].mag2() == 0 || dots[i].mag2() > 1);
 		dots[i].normalize_in_place();
 	}
-	dots_model = new Model(GL_POINTS, NUM_DOTS, dots);
+	dots_model = new Model(NUM_DOTS, dots);
 }
 
 
