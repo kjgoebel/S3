@@ -15,9 +15,10 @@ Model *dots_model = NULL;
 
 #define NUM_DOTS		(2000)
 
-
-#define TRANSLATION_SPEED		(TAU / 16)
+#define TRANSLATION_SPEED		(TAU / 12)
 #define ROTATION_SPEED			(TAU / 6)
+
+#define FOG_INCREMENT		(0.5)
 
 struct Controls
 {
@@ -41,6 +42,8 @@ void init()
 	glClearColor(0, 0, 0, 0);
 
 	glEnable(GL_PROGRAM_POINT_SIZE);
+
+	glEnable(GL_DEPTH_TEST);
 
 	init_shaders();
 
@@ -138,16 +141,14 @@ void keyboard(unsigned char key, int x, int y)
 			controls.roll_left = true;
 			break;
 
-		/*case '[':
-			fog_density -= FOG_INCREMENT;
-			if(fog_density < 0.0)
-				fog_density = 0.0;
-			glFogf(GL_FOG_DENSITY, fog_density / TAU);
+		case '[':
+			fog_scale -= FOG_INCREMENT;
+			if(fog_scale < 0.0)
+				fog_scale = 0.0;
 			break;
 		case ']':
-			fog_density += FOG_INCREMENT;
-			glFogf(GL_FOG_DENSITY, fog_density / TAU);
-			break;*/
+			fog_scale += FOG_INCREMENT;
+			break;
 	}
 }
 

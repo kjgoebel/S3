@@ -14,6 +14,8 @@ GLuint make_new_shader(GLuint shader_type, const std::vector<char*> text)
 	glGetShaderiv(ret, GL_COMPILE_STATUS, &success);
 	if(success == GL_FALSE)
 	{
+		for(char* temp : text)
+			printf(temp);
 		GLint log_length = 0;
 		glGetShaderiv(ret, GL_INFO_LOG_LENGTH, &log_length);
 		char* log = new char[log_length + 1];
@@ -73,9 +75,8 @@ void init_shaders()
 				
 				void main() {
 					vec4 r4_pos = modelViewXForm * position;
-					float lr4 = length(r4_pos);
-					float ls3 = 2 * asin(0.5 * lr4);
-					gl_Position.xyz = ls3 / lr4 * r4_pos.xyz;
+					float distance = acos(r4_pos.w);
+					gl_Position.xyz = distance * normalize(r4_pos.xyz);
 					gl_Position.w = 1;
 				}
 			)"
@@ -94,6 +95,8 @@ void init_shaders()
 				uniform mat4 projXForm;
 				uniform float aspectRatio;
 
+				out float distance;
+
 				#define BASE_POINT_SIZE		(0.002)
 
 				void main() {
@@ -101,15 +104,16 @@ void init_shaders()
 
 					vec4 point = gl_in[0].gl_Position;
 
-					float distance = length(point.xyz);
-					point.xyz *= (distance - gl_InvocationID * 6.283185) / distance;
+					float dist = length(point.xyz);
+					point.xyz *= (dist - gl_InvocationID * 6.283185) / dist;
+					distance = abs(dist - gl_InvocationID * 6.283185);
 
 					point = projXForm * point;
 
 					point.xyz /= point.w;
 					point.w = 1;
 
-					float size = 1 / sin(distance);
+					float size = 1 / sin(dist);
 
 					gl_Position = point + size * vec4(0, card, 0, 0);
 					EmitVertex();
@@ -208,10 +212,14 @@ void init_shaders()
 				#version 460
 
 				uniform vec4 baseColor;
+				uniform float fogScale;
+
+				in float distance;
 				out vec4 fragColor;
 
 				void main() {
-					fragColor = baseColor;
+					float fogFactor = exp(-distance * fogScale / 6.283185);
+					fragColor = baseColor * fogFactor;
 				}
 			)"
 		}

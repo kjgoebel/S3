@@ -113,6 +113,7 @@ struct Model
 		glUseProgram(shader_program);
 		glProgramUniform4f(shader_program, glGetUniformLocation(shader_program, "baseColor"), baseColor.x, baseColor.y, baseColor.z, baseColor.w);
 		glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "aspectRatio"), aspect_ratio);
+		glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "fogScale"), fog_scale);
 		set_uniform_matrix(shader_program, "modelViewXForm", cam_mat);
 		set_uniform_matrix(shader_program, "projXForm", proj_mat);		//Should find a way to avoid pushing this to the GPU every frame.
 
