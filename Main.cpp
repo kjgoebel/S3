@@ -35,6 +35,12 @@ Controls controls;
 
 double last_fame_time;
 
+bool	draw_poles = true,
+		draw_clutter = true,
+		draw_sun_paths = false,
+		draw_hopf = false,
+		draw_antihopf = false;
+
 
 void init()
 {
@@ -107,15 +113,22 @@ void display()
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	pole_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
-	pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(1, 0, 0, 1));
-	pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 1, 0, 1));
-	pole_model->draw(Mat4::axial_rotation(_w, _z, TAU / 4), Vec4(0, 0, 1, 1));
+	if(draw_poles)
+	{
+		pole_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
+		pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(1, 0, 0, 1));
+		pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 1, 0, 1));
+		pole_model->draw(Mat4::axial_rotation(_w, _z, TAU / 4), Vec4(0, 0, 1, 1));
+	}
 	
-	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
+	if(draw_clutter)
+		dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
 
-	geodesic_model->draw(Mat4::identity(), Vec4(0, 0.5, 1, 1));
-	geodesic_model->draw(Mat4::axial_rotation(_x, _z, TAU / 4) * Mat4::axial_rotation(_y, _w, TAU / 4), Vec4(1, 0.5, 0, 1));
+	if(draw_sun_paths)
+	{
+		geodesic_model->draw(Mat4::identity(), Vec4(0, 0.5, 1, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_x, _z, TAU / 4) * Mat4::axial_rotation(_y, _w, TAU / 4), Vec4(1, 0.5, 0, 1));
+	}
 
 	glFlush();
 	glutSwapBuffers();
@@ -193,7 +206,7 @@ void special(int key, int x, int y)
 {
 	switch(key)
 	{
-		/*case GLUT_KEY_F1:
+		case GLUT_KEY_F1:
 			draw_poles = !draw_poles;
 			break;
 		case GLUT_KEY_F2:
@@ -207,7 +220,7 @@ void special(int key, int x, int y)
 			break;
 		case GLUT_KEY_F8:
 			draw_antihopf = !draw_antihopf;
-			break;*/
+			break;
 
 		case GLUT_KEY_UP:
 			controls.fwd = true;
