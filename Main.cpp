@@ -16,7 +16,7 @@ Model* pole_model = NULL;
 
 #define NUM_DOTS		(2000)
 
-#define TRANSLATION_SPEED		(TAU / 12)
+#define TRANSLATION_SPEED		(TAU / 10)
 #define ROTATION_SPEED			(TAU / 6)
 
 #define FOG_INCREMENT		(0.5)
@@ -42,6 +42,11 @@ bool	draw_poles = true,
 		draw_antihopf = false;
 
 
+#define NUM_HOPF_FIBERS		(32)
+Mat4 hopf_xforms[NUM_HOPF_FIBERS];
+Mat4 antihopf_xforms[NUM_HOPF_FIBERS];
+
+
 void init()
 {
 	srand(clock());
@@ -56,8 +61,10 @@ void init()
 	init_shaders();
 	init_models();
 
+	int i;
+
 	Vec4* dots = new Vec4[NUM_DOTS];
-	for(int i = 0; i < NUM_DOTS; i++)
+	for(i = 0; i < NUM_DOTS; i++)
 	{
 		do {
 			for(int j = 0; j < 4; j++)
@@ -68,6 +75,13 @@ void init()
 	dots_model = new Model(NUM_DOTS, dots);
 
 	pole_model = Model::read_model_file("subdivided_icosahedron.model", 0.05);
+
+	for(i = 0; i < NUM_HOPF_FIBERS; i++)
+	{
+		double theta = (double)i * TAU / (2 * NUM_HOPF_FIBERS);
+		hopf_xforms[i] = Mat4::axial_rotation(_x, _w, theta) * Mat4::axial_rotation(_y, _z, theta);
+		antihopf_xforms[i] = Mat4::axial_rotation(_y, _x, theta) * Mat4::axial_rotation(_z, _w, theta) * Mat4::axial_rotation(_x, _z, TAU / 4);
+	}
 }
 
 
@@ -98,9 +112,9 @@ void display()
 	printf("\n");
 
 	#define CONTROL_SPEED(positive, negative, speed)	(\
-															(positive && !negative) ? speed * dt : \
-																(negative && !positive) ? -speed * dt : 0\
-														)
+		(positive && !negative) ? speed * dt : \
+			(negative && !positive) ? -speed * dt : 0\
+	)
 	translate_cam(
 		CONTROL_SPEED(controls.right, controls.left, TRANSLATION_SPEED),
 		CONTROL_SPEED(controls.up, controls.down, TRANSLATION_SPEED),
@@ -127,10 +141,20 @@ void display()
 	if(draw_clutter)
 		dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
 
+	if(draw_hopf)
+	{
+		for(int i = 0; i < NUM_HOPF_FIBERS; i++)
+		{
+			geodesic_model->draw(hopf_xforms[i], Vec4(1, 0.5, 0, 1));
+			if(draw_antihopf)
+				geodesic_model->draw(antihopf_xforms[i], Vec4(0, 1, 0.5, 1));
+		}
+	}
+
 	if(draw_sun_paths)
 	{
-		geodesic_model->draw(Mat4::identity(), Vec4(0, 0.5, 1, 1));
-		geodesic_model->draw(Mat4::axial_rotation(_x, _z, TAU / 4) * Mat4::axial_rotation(_y, _w, TAU / 4), Vec4(1, 0.5, 0, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_y, _w, TAU / 8) * Mat4::axial_rotation(_z, _x, TAU / 8), Vec4(1, 0, 0, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_x, _z, TAU / 8) * Mat4::axial_rotation(_w, _y, TAU / 8), Vec4(0, 0, 1, 1));
 	}
 
 	glFlush();

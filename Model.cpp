@@ -121,23 +121,6 @@ void Model::prepare_to_render()
 
 	shader_program = make_new_program(vert, geom_shader, frag_shader);
 
-	//This is the beginning of what vertex color version is gonna look like:
-	/*if(vertex_colors)
-	{
-		double *temp = new double[8 * num_vertices];
-
-		for(int i = 0; i < num_vertices; i++)
-			for(int j = 0; j < 4; j++)
-			{
-				temp[8*i + j] = vertices[i].components[j];
-				temp[8*i + 4 + j] = vertex_colors[i].components[j];
-			}
-
-		glBufferData(GL_ARRAY_BUFFER, 8 * num_vertices * sizeof(double), temp, GL_STATIC_DRAW);
-
-		delete temp;
-	}*/
-
 	ready_to_render = true;
 }
 
@@ -242,7 +225,7 @@ Model* Model::read_model_file(const char* filename, double scale)
 }
 
 
-#define GEODESIC_TUBE_RADIUS			(0.005)
+#define GEODESIC_TUBE_RADIUS			(0.004)
 #define GEODESIC_LONGITUDINAL_SEGMENTS	(128)
 #define GEODESIC_TRANSVERSE_SEGMENTS	(8)
 

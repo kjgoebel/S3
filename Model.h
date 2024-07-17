@@ -16,7 +16,7 @@ struct Model
 	Vec4 *vertices;
 	Vec4 *vertex_colors;
 
-	unsigned int *primitives;
+	unsigned int *primitives;			//Rename this to "elements" or something.
 
 private:
 	bool ready_to_render;
