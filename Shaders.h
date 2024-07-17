@@ -13,7 +13,8 @@ extern GLuint	vert,
 				geom_points,
 				geom_triangles,
 				
-				frag_simple;
+				frag_simple,
+				frag_vcolor;
 
 void init_shaders();
 

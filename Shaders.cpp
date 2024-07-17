@@ -58,7 +58,7 @@ GLuint make_new_program(GLuint vert, GLuint geom, GLuint frag)
 }
 
 
-GLuint vert, geom_points, geom_triangles, frag_simple;
+GLuint vert, geom_points, geom_triangles, frag_simple, frag_vcolor;
 
 
 void init_shaders()
@@ -70,14 +70,18 @@ void init_shaders()
 				#version 460
 
 				layout (location = 0) in vec4 position;
+				layout (location = 1) in vec4 color;
 
 				uniform mat4 modelViewXForm;
+
+				out vec4 vg_color;
 				
 				void main() {
 					vec4 r4_pos = modelViewXForm * position;
 					float distance = acos(r4_pos.w);
 					gl_Position.xyz = distance * normalize(r4_pos.xyz);
 					gl_Position.w = 1;
+					vg_color = color;
 				}
 			)"
 		}
@@ -95,7 +99,10 @@ void init_shaders()
 				uniform mat4 projXForm;
 				uniform float aspectRatio;
 
+				in vec4 vg_color[];
+
 				out float distance;
+				out vec4 gf_color;
 
 				#define BASE_POINT_SIZE		(0.002)
 
@@ -115,43 +122,45 @@ void init_shaders()
 
 					float size = 1 / sin(dist);
 
-					gl_Position = point + size * vec4(0, card, 0, 0);
+					gf_color = vg_color[0];
+					
+					gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
 					EmitVertex();
 					gl_Position = point + vec4(0, 0, 0, 0);
 					EmitVertex();
 					gl_Position = point + size * vec4(-diag * mult, diag, 0, 0);
 					EmitVertex();
-					gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
+					gl_Position = point + size * vec4(0, card, 0, 0);
 					EmitVertex();
 					EndPrimitive();
-
-					gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
+					
+					gl_Position = point + size * vec4(0, -card, 0, 0);
 					EmitVertex();
 					gl_Position = point + vec4(0, 0, 0, 0);
 					EmitVertex();
 					gl_Position = point + size * vec4(-diag * mult, -diag, 0, 0);
 					EmitVertex();
-					gl_Position = point + size * vec4(0, -card, 0, 0);
+					gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
 					EmitVertex();
 					EndPrimitive();
-
-					gl_Position = point + size * vec4(0, -card, 0, 0);
+					
+					gl_Position = point + size * vec4(card * mult, 0, 0, 0);
 					EmitVertex();
 					gl_Position = point + vec4(0, 0, 0, 0);
 					EmitVertex();
 					gl_Position = point + size * vec4(diag * mult, -diag, 0, 0);
 					EmitVertex();
-					gl_Position = point + size * vec4(card * mult, 0, 0, 0);
+					gl_Position = point + size * vec4(0, -card, 0, 0);
 					EmitVertex();
 					EndPrimitive();
-
-					gl_Position = point + size * vec4(card * mult, 0, 0, 0);
+					
+					gl_Position = point + size * vec4(0, card, 0, 0);
 					EmitVertex();
 					gl_Position = point + vec4(0, 0, 0, 0);
 					EmitVertex();
 					gl_Position = point + size * vec4(diag * mult, diag, 0, 0);
 					EmitVertex();
-					gl_Position = point + size * vec4(0, card, 0, 0);
+					gl_Position = point + size * vec4(card * mult, 0, 0, 0);
 					EmitVertex();
 					EndPrimitive();
 				}
@@ -165,16 +174,25 @@ void init_shaders()
 
 				uniform mat4 projXForm;
 
+				in vec4 vg_color[];
+
+				out float distance;
+				out vec4 gf_color;
+
+				#define BASE_POINT_SIZE		(4)		//Need a uniform for this, based on screen size.
+
 				void main() {
 					vec4 point = gl_in[0].gl_Position;
 
-					float distance = length(point.xyz);
-					point.xyz *= (distance - gl_InvocationID * 3.141593) / distance;
+					float dist = length(point.xyz);
+					point.xyz *= (dist - gl_InvocationID * 6.283185) / dist;
+					distance = abs(dist - gl_InvocationID * 6.283185);
 
 					point = projXForm * point;
 
 					gl_Position = point;
-					gl_PointSize = 3 / sin(distance);
+					gl_PointSize = 3 / sin(dist);
+					gf_color = vg_color[0];
 
 					EmitVertex();
 					EndPrimitive();
@@ -193,7 +211,11 @@ void init_shaders()
 				layout (triangle_strip, max_vertices = 3) out;
 
 				uniform mat4 projXForm;
+
+				in vec4 vg_color[];
+
 				out float distance;
+				out vec4 gf_color;
 
 				void main() {
 					for(int i = 0; i < 3; i++)
@@ -207,6 +229,7 @@ void init_shaders()
 						point = projXForm * point;
 
 						gl_Position = point;
+						gf_color = vg_color[i];
 						EmitVertex();
 					}
 					EndPrimitive();
@@ -230,6 +253,28 @@ void init_shaders()
 				void main() {
 					float fogFactor = exp(-distance * fogScale / 6.283185);
 					fragColor = baseColor * fogFactor;
+				}
+			)"
+		}
+	);
+
+	frag_vcolor = make_new_shader(
+		GL_FRAGMENT_SHADER,
+		std::vector<char*> {
+			R"(
+				#version 460
+
+				uniform vec4 baseColor;
+				uniform float fogScale;
+
+				in float distance;
+				in vec4 gf_color;
+
+				out vec4 fragColor;
+
+				void main() {
+					float fogFactor = exp(-distance * fogScale / 6.283185);
+					fragColor = (baseColor + gf_color) * fogFactor;
 				}
 			)"
 		}

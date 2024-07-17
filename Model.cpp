@@ -4,6 +4,8 @@
 #include <io.h>
 #include <stdint.h>
 
+#include "Utils.h"
+
 
 Model* geodesic_model = NULL;
 
@@ -86,6 +88,18 @@ void Model::prepare_to_render()
 	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
 	glEnableVertexAttribArray(0);
 
+	if(vertex_colors)
+	{
+		GLuint color_buffer;
+
+		glGenBuffers(1, &color_buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, color_buffer);
+
+		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertex_colors, GL_STATIC_DRAW);
+		glVertexAttribPointer(1, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
+		glEnableVertexAttribArray(1);
+	}
+
 	if(primitive != GL_POINTS)		//For points we just use the vertex array directly.
 	{
 		GLuint element_buffer;
@@ -94,7 +108,7 @@ void Model::prepare_to_render()
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), primitives, GL_STATIC_DRAW);
 	}
 
-	GLuint geom_shader, frag_shader = frag_simple;		//Fragment shader will vary in the future.
+	GLuint geom_shader, frag_shader = vertex_colors ? frag_vcolor : frag_simple;
 	switch(primitive)
 	{
 		case GL_POINTS:
@@ -220,6 +234,10 @@ Model* Model::read_model_file(const char* filename, double scale)
 
 	_close(fin);
 
+	ret->vertex_colors = new Vec4[ret->num_vertices];
+	for(i = 0; i < ret->num_vertices; i++)
+		ret->vertex_colors[i] = Vec4(0.3 * frand(), 0.3 * frand(), 0.3 * frand(), 0);
+
 	return ret;
 }
 
@@ -249,8 +267,8 @@ void init_models()
 			geodesic_model->vertices[i * GEODESIC_TRANSVERSE_SEGMENTS + j] = normalization_factor * Vec4(
 				GEODESIC_TUBE_RADIUS * cos(phi),
 				GEODESIC_TUBE_RADIUS * sin(phi),
-				sin(theta),
-				cos(theta)
+				cos(theta),
+				sin(theta)
 			);
 			
 			geodesic_model->primitives[i * verts_per_strip + 2 * j] = i * GEODESIC_TRANSVERSE_SEGMENTS + j;

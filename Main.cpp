@@ -50,6 +50,9 @@ void init()
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_PROGRAM_POINT_SIZE);
 
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
 	init_shaders();
 	init_models();
 
@@ -115,10 +118,10 @@ void display()
 
 	if(draw_poles)
 	{
-		pole_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
-		pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(1, 0, 0, 1));
-		pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 1, 0, 1));
-		pole_model->draw(Mat4::axial_rotation(_w, _z, TAU / 4), Vec4(0, 0, 1, 1));
+		pole_model->draw(Mat4::identity(), Vec4(0.7, 0.7, 0.7, 1));
+		pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
+		pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
+		pole_model->draw(Mat4::axial_rotation(_w, _z, TAU / 4), Vec4(0, 0, 0.7, 1));
 	}
 	
 	if(draw_clutter)
