@@ -35,11 +35,12 @@ Controls controls;
 
 double last_fame_time;
 
-bool	draw_poles = true,
-		draw_clutter = true,
-		draw_sun_paths = false,
-		draw_hopf = false,
-		draw_antihopf = false;
+bool	draw_poles = true,			//colored markers at each of the +x, +y, +z, +w poles of the sphere
+		draw_clutter = true,		//white dots randomly distributed through the space
+		draw_sun_paths = false,		//the great circles at the centers of the torii defined by the selected Hopf and "anti-Hopf" fibers
+		draw_hopf = false,			//selected fibers of a Hopf bundle, all passing through a selected great cirle
+		draw_antihopf = false,		//fibers of a different Hopf bundle, selected to be always orthogonal to the other set of fibers
+		draw_cross = false;			//the 16-cell {3, 3, 4}, projected onto the sphere
 
 
 #define NUM_HOPF_FIBERS		(32)
@@ -157,6 +158,16 @@ void display()
 		geodesic_model->draw(Mat4::axial_rotation(_x, _z, TAU / 8) * Mat4::axial_rotation(_w, _y, TAU / 8), Vec4(0, 0, 1, 1));
 	}
 
+	if(draw_cross)
+	{
+		geodesic_model->draw(Mat4::identity(), Vec4(1, 0, 1, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_x, _w, TAU / 4), Vec4(1, 0, 1, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_y, _w, TAU / 4), Vec4(1, 0, 1, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_x, _z, TAU / 4), Vec4(1, 0, 1, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_y, _z, TAU / 4), Vec4(1, 0, 1, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_x, _w, TAU / 4) * Mat4::axial_rotation(_y, _z, TAU / 4), Vec4(1, 0, 1, 1));
+	}
+	
 	glFlush();
 	glutSwapBuffers();
 	glutPostRedisplay();
@@ -247,6 +258,9 @@ void special(int key, int x, int y)
 			break;
 		case GLUT_KEY_F8:
 			draw_antihopf = !draw_antihopf;
+			break;
+		case GLUT_KEY_F9:
+			draw_cross = !draw_cross;
 			break;
 
 		case GLUT_KEY_UP:
