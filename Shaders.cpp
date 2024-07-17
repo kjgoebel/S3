@@ -75,11 +75,23 @@ void init_shaders()
 				uniform mat4 modelViewXForm;
 
 				out vec4 vg_color;
+
+				/*
+					Pass along the transformed position in R4, so that the fragment shader 
+					can compensate for the inaccuracy of the depth calculation for the 
+					middle of a polygon close to antipode. Note that this is not the 
+					position of the vertex relative to the camera. The camera is at 
+					(0, 0, 0, 1) in this coordinate system. The position of the vertex on 
+					screen doesn't depend on the w coordinate (once the camera has been 
+					transformed to x = y = z = 0), and it's convenient for the fragment 
+					shader to have the Sphere centered on the origin.
+				*/
+				out vec4 vg_r4pos;
 				
 				void main() {
-					vec4 r4_pos = modelViewXForm * position;
-					float distance = acos(r4_pos.w);
-					gl_Position.xyz = distance * normalize(r4_pos.xyz);
+					vg_r4pos = modelViewXForm * position;
+					float distance = acos(vg_r4pos.w);
+					gl_Position.xyz = distance * normalize(vg_r4pos.xyz);
 					gl_Position.w = 1;
 					vg_color = color;
 				}
@@ -100,9 +112,11 @@ void init_shaders()
 				uniform float aspectRatio;
 
 				in vec4 vg_color[];
+				in vec4 vg_r4pos[];
 
 				out float distance;
 				out vec4 gf_color;
+				out vec4 gf_r4pos;
 
 				#define BASE_POINT_SIZE		(0.002)
 
@@ -123,6 +137,7 @@ void init_shaders()
 					float size = 1 / sin(dist);
 
 					gf_color = vg_color[0];
+					gf_r4pos = vg_r4pos[0];
 					
 					gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
 					EmitVertex();
@@ -213,9 +228,11 @@ void init_shaders()
 				uniform mat4 projXForm;
 
 				in vec4 vg_color[];
+				in vec4 vg_r4pos[];
 
 				out float distance;
 				out vec4 gf_color;
+				out vec4 gf_r4pos;
 
 				void main() {
 					for(int i = 0; i < 3; i++)
@@ -230,6 +247,7 @@ void init_shaders()
 
 						gl_Position = point;
 						gf_color = vg_color[i];
+						gf_r4pos = vg_r4pos[i];
 						EmitVertex();
 					}
 					EndPrimitive();
@@ -248,11 +266,14 @@ void init_shaders()
 				uniform float fogScale;
 
 				in float distance;
+				in vec4 gf_r4pos;
 				out vec4 fragColor;
 
 				void main() {
-					float fogFactor = exp(-distance * fogScale / 6.283185);
+					float dist = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
+					float fogFactor = exp(-dist * fogScale);
 					fragColor = baseColor * fogFactor;
+					gl_FragDepth = dist;
 				}
 			)"
 		}
@@ -268,13 +289,16 @@ void init_shaders()
 				uniform float fogScale;
 
 				in float distance;
+				in vec4 gf_r4pos;
 				in vec4 gf_color;
 
 				out vec4 fragColor;
 
 				void main() {
-					float fogFactor = exp(-distance * fogScale / 6.283185);
+					float dist = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
+					float fogFactor = exp(-dist * fogScale);
 					fragColor = (baseColor + gf_color) * fogFactor;
+					gl_FragDepth = dist;
 				}
 			)"
 		}
