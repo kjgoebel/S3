@@ -16,7 +16,7 @@ Model* pole_model = NULL;
 
 #define NUM_DOTS		(2000)
 
-#define TRANSLATION_SPEED		(TAU / 10)
+#define TRANSLATION_SPEED		(TAU / 16)
 #define ROTATION_SPEED			(TAU / 6)
 
 #define FOG_INCREMENT		(0.5)
@@ -74,7 +74,7 @@ void init()
 	}
 	dots_model = new Model(NUM_DOTS, dots);
 
-	pole_model = Model::read_model_file("subdivided_icosahedron.model", 0.05);
+	pole_model = Model::read_model_file("subdivided_icosahedron.model", 0.05, 0.3, true);
 
 	for(i = 0; i < NUM_HOPF_FIBERS; i++)
 	{

@@ -171,7 +171,7 @@ void Model::dump() const
 }
 
 
-Model* Model::read_model_file(const char* filename, double scale)
+Model* Model::read_model_file(const char* filename, double scale, double vertex_color_scale, bool vertex_colors_per_triangle)
 {
 	int i;
 	uint32_t dummy[3];
@@ -186,12 +186,13 @@ Model* Model::read_model_file(const char* filename, double scale)
 
 	printf("%d, %d, %d\n", num_verts, num_edges, num_triangles);
 
-	Model* ret = new Model(GL_TRIANGLES, num_verts, 3, num_triangles);
+	Vec4* verts = new Vec4[num_verts];
+	int* ixes = new int[3 * num_triangles];
 
 	for(i = 0; i < num_verts; i++)
 	{
 		_read(fin, &temp.components, sizeof(temp.components));
-		ret->vertices[i] = Vec4(
+		verts[i] = Vec4(
 			temp.x * scale,
 			temp.y * scale,
 			temp.z * scale,
@@ -199,7 +200,7 @@ Model* Model::read_model_file(const char* filename, double scale)
 		).normalize();
 		printf("%d (%f %f %f) -> (%f %f %f %f)\n", i,
 			temp.x, temp.y, temp.z,
-			ret->vertices[i].x, ret->vertices[i].y, ret->vertices[i].z, ret->vertices[i].w
+			verts[i].x, verts[i].y, verts[i].z, verts[i].w
 		);
 	}
 
@@ -208,18 +209,47 @@ Model* Model::read_model_file(const char* filename, double scale)
 
 	for(i = 0; i < num_triangles; i++)
 	{
-		_read(fin, &ret->primitives[i * 3], 12);
+		_read(fin, &ixes[i * 3], 12);
 		_read(fin, dummy, 12);
 		printf("%d (%d %d %d)\n", i,
-			ret->primitives[3 * i], ret->primitives[3 * i + 1], ret->primitives[3 * i + 2]
+			ixes[3 * i], ixes[3 * i + 1], ixes[3 * i + 2]
 		);
 	}
 
 	_close(fin);
 
-	ret->vertex_colors = new Vec4[ret->num_vertices];
-	for(i = 0; i < ret->num_vertices; i++)
-		ret->vertex_colors[i] = Vec4(0.3 * frand(), 0.3 * frand(), 0.3 * frand(), 0);
+	Model *ret;
+	if(vertex_color_scale > 0)
+	{
+		if(vertex_colors_per_triangle)
+		{
+			ret = new Model(GL_TRIANGLES, num_triangles * 3, 3, num_triangles);
+			ret->vertex_colors = new Vec4[num_triangles * 3];			//This is dirty. But that's kinda why I made this a struct instead of a class. Whatever. If I go much farther with this code, it'll have to be a class and this will be impossible.
+			for(i = 0; i < num_triangles; i++)
+			{
+				Vec4 temp(vertex_color_scale * frand(), vertex_color_scale * frand(), vertex_color_scale * frand(), 0);
+				for(int j = 0; j < 3; j++)
+				{
+					int vert_index = ixes[3 * i + j];
+					ret->vertices[3 * i + j] = verts[ixes[3 * i + j]];
+					ret->vertex_colors[3 * i + j] = temp;
+					ret->primitives[3 * i + j] = 3 * i + j;
+				}
+			}
+		}
+		else
+		{
+			Vec4 *vert_colors = new Vec4[num_verts];
+			for(i = 0; i < num_verts; i++)
+				vert_colors[i] = Vec4(vertex_color_scale * frand(), vertex_color_scale * frand(), vertex_color_scale * frand(), 0);
+			ret = new Model(GL_TRIANGLES, num_verts, 3, num_triangles, verts, ixes, vert_colors);
+			delete vert_colors;
+		}
+	} else
+		ret = new Model(GL_TRIANGLES, num_verts, 3, num_triangles, verts, ixes);
+
+	delete verts;
+	delete ixes;
 
 	return ret;
 }

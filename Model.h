@@ -38,7 +38,7 @@ private:
 	void prepare_to_render();
 
 public:
-	static Model* read_model_file(const char* filename, double scale);
+	static Model* read_model_file(const char* filename, double scale, double vertex_color_scale = -1, bool vertex_colors_per_triangle = false);
 };
 
 
