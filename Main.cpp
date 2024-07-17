@@ -11,7 +11,8 @@
 #include <time.h>
 
 
-Model *dots_model = NULL;
+Model* dots_model = NULL;
+Model* pole_model = NULL;
 
 #define NUM_DOTS		(2000)
 
@@ -56,6 +57,8 @@ void init()
 		dots[i].normalize_in_place();
 	}
 	dots_model = new Model(NUM_DOTS, dots);
+
+	pole_model = Model::read_model_file("subdivided_icosahedron.model", 0.05);
 }
 
 
@@ -104,7 +107,13 @@ void display()
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	pole_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
+	pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(1, 0, 0, 1));
+	pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 1, 0, 1));
+	pole_model->draw(Mat4::axial_rotation(_w, _z, TAU / 4), Vec4(0, 0, 1, 1));
+	
 	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
+
 	geodesic_model->draw(Mat4::identity(), Vec4(0, 0.5, 1, 1));
 	geodesic_model->draw(Mat4::axial_rotation(_x, _z, TAU / 4) * Mat4::axial_rotation(_y, _w, TAU / 4), Vec4(1, 0.5, 0, 1));
 

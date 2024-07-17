@@ -1,5 +1,9 @@
 #include "Model.h"
 
+#include <fcntl.h>
+#include <io.h>
+#include <stdint.h>
+
 
 Model* geodesic_model = NULL;
 
@@ -73,32 +77,20 @@ void Model::prepare_to_render()
 	glGenVertexArrays(1, &vertex_array);
 	glBindVertexArray(vertex_array);
 
-	GLuint vertex_buffer, primitive_buffer;
+	GLuint vertex_buffer;
 
 	glGenBuffers(1, &vertex_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_array);
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
 
-	glBufferData(GL_ARRAY_BUFFER, 4 * num_vertices * sizeof(double), vertices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, 4 * sizeof(double), (void*)0);
+	glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertices, GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
 	glEnableVertexAttribArray(0);
-
-	switch(primitive)
-	{
-		case GL_POINTS:
-			shader_program = make_new_program(vert, geom_points, frag_simple);
-			break;
-		case GL_TRIANGLES:
-		case GL_QUAD_STRIP:
-			shader_program = make_new_program(vert, geom_triangles, frag_simple);
-			break;
-		default:
-			printf("Unknown primitive type %d\n", primitive);
-	}
 
 	if(primitive != GL_POINTS)		//For points we just use the vertex array directly.
 	{
-		glGenBuffers(1, &primitive_buffer);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, primitive_buffer);
+		GLuint element_buffer;
+		glGenBuffers(1, &element_buffer);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), primitives, GL_STATIC_DRAW);
 	}
 
@@ -108,15 +100,12 @@ void Model::prepare_to_render()
 		case GL_POINTS:
 			geom_shader = geom_points;
 			break;
-		case GL_TRIANGLES:
-		case GL_QUAD_STRIP:
+		default:
 			geom_shader = geom_triangles;
 			break;
-		default:
-			printf("Unknown primitive type %d\n", primitive);
-			exit(-1);
-			break;
 	}
+
+	shader_program = make_new_program(vert, geom_shader, frag_shader);
 
 	//This is the beginning of what vertex color version is gonna look like:
 	/*if(vertex_colors)
@@ -149,15 +138,91 @@ void Model::draw(Mat4 xform, Vec4 baseColor)
 	glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "fogScale"), fog_scale);
 	set_uniform_matrix(shader_program, "modelViewXForm", cam_mat * xform);
 	set_uniform_matrix(shader_program, "projXForm", proj_mat);		//Should find a way to avoid pushing this to the GPU every frame.
-
+	
 	glBindVertexArray(vertex_array);
 
-	if(primitive == GL_POINTS)
-		glDrawArrays(GL_POINTS, 0, num_vertices);
-	else
-		for(int i = 0; i < num_primitives; i++)
-			glDrawElements(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(i * vertices_per_primitive * sizeof(int)));
+	switch(primitive)
+	{
+		case GL_POINTS:
+			glDrawArrays(GL_POINTS, 0, num_vertices);
+			break;
+		case GL_LINES:
+		case GL_TRIANGLES:
+		case GL_QUADS:
+			glDrawElements(primitive, vertices_per_primitive * num_primitives, GL_UNSIGNED_INT, (void*)0);
+			break;
+		default:
+			for(int i = 0; i < num_primitives; i++)
+				glDrawElements(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(i * vertices_per_primitive * sizeof(int)));
+			break;
+	}
 }
+
+
+void Model::dump() const
+{
+	int i;
+	printf("%d %d %d %d\n", primitive, num_vertices, vertices_per_primitive, num_primitives);
+	for(i = 0; i < num_vertices; i++)
+		printf("%d: %f %f %f %f\n", i, vertices[i].x, vertices[i].y, vertices[i].z, vertices[i].w);
+	for(i = 0; i < num_primitives; i++)
+	{
+		for(int j = 0; j < vertices_per_primitive; j++)
+			printf("%d ", primitives[i * vertices_per_primitive + j]);
+		printf("\n");
+	}
+}
+
+
+Model* Model::read_model_file(const char* filename, double scale)
+{
+	int i;
+	uint32_t dummy[3];
+	uint32_t num_verts, num_edges, num_triangles;
+	Vec3 temp;
+
+	int fin = _open(filename, O_RDONLY | O_BINARY);
+	
+	_read(fin, &num_verts, 4);
+	_read(fin, &num_edges, 4);
+	_read(fin, &num_triangles, 4);
+
+	printf("%d, %d, %d\n", num_verts, num_edges, num_triangles);
+
+	Model* ret = new Model(GL_TRIANGLES, num_verts, 3, num_triangles);
+
+	for(i = 0; i < num_verts; i++)
+	{
+		_read(fin, &temp.components, sizeof(temp.components));
+		ret->vertices[i] = Vec4(
+			temp.x * scale,
+			temp.y * scale,
+			temp.z * scale,
+			1
+		).normalize();
+		printf("%d (%f %f %f) -> (%f %f %f %f)\n", i,
+			temp.x, temp.y, temp.z,
+			ret->vertices[i].x, ret->vertices[i].y, ret->vertices[i].z, ret->vertices[i].w
+		);
+	}
+
+	for(i = 0; i < num_edges; i++)
+		_read(fin, dummy, 8);
+
+	for(i = 0; i < num_triangles; i++)
+	{
+		_read(fin, &ret->primitives[i * 3], 12);
+		_read(fin, dummy, 12);
+		printf("%d (%d %d %d)\n", i,
+			ret->primitives[3 * i], ret->primitives[3 * i + 1], ret->primitives[3 * i + 2]
+		);
+	}
+
+	_close(fin);
+
+	return ret;
+}
+
 
 #define GEODESIC_TUBE_RADIUS			(0.005)
 #define GEODESIC_LONGITUDINAL_SEGMENTS	(128)
@@ -188,28 +253,11 @@ void init_models()
 				cos(theta)
 			);
 			
-			printf("%d: %d\n", i * verts_per_strip + 2 * j, i * GEODESIC_TRANSVERSE_SEGMENTS + j);
-			printf("%d: %d\n", i * verts_per_strip + 2 * j + 1, ((i + 1) % GEODESIC_LONGITUDINAL_SEGMENTS) * GEODESIC_TRANSVERSE_SEGMENTS + j);
 			geodesic_model->primitives[i * verts_per_strip + 2 * j] = i * GEODESIC_TRANSVERSE_SEGMENTS + j;
 			geodesic_model->primitives[i * verts_per_strip + 2 * j + 1] = ((i + 1) % GEODESIC_LONGITUDINAL_SEGMENTS) * GEODESIC_TRANSVERSE_SEGMENTS + j;
 		}
 		
-		printf("%d: %d\n", i * verts_per_strip + 2 * GEODESIC_TRANSVERSE_SEGMENTS, i * GEODESIC_TRANSVERSE_SEGMENTS);
-		printf("%d: %d\n", i * verts_per_strip + 2 * GEODESIC_TRANSVERSE_SEGMENTS + 1, ((i + 1) % GEODESIC_LONGITUDINAL_SEGMENTS) * GEODESIC_TRANSVERSE_SEGMENTS);
 		geodesic_model->primitives[i * verts_per_strip + 2 * GEODESIC_TRANSVERSE_SEGMENTS] = i * GEODESIC_TRANSVERSE_SEGMENTS;
 		geodesic_model->primitives[i * verts_per_strip + 2 * GEODESIC_TRANSVERSE_SEGMENTS + 1] = ((i + 1) % GEODESIC_LONGITUDINAL_SEGMENTS) * GEODESIC_TRANSVERSE_SEGMENTS;
 	}
-
-	printf("%d %d\n", geodesic_model->num_vertices, geodesic_model->num_primitives * geodesic_model->vertices_per_primitive);
-
-	for(int i = 0; i < geodesic_model->num_vertices; i++)
-		print_vector(geodesic_model->vertices[i]);
-	for(int i = 0; i < geodesic_model->num_primitives; i++)
-	{
-		for(int j = 0; j < geodesic_model->vertices_per_primitive; j++)
-			printf("%d  ", geodesic_model->primitives[i * geodesic_model->vertices_per_primitive + j]);
-		printf("\n");
-	}
-	printf("Done.\n");
-	//exit(0);
 }

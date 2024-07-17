@@ -32,8 +32,13 @@ public:
 
 	void draw(Mat4 xform, Vec4 baseColor);
 
+	void dump() const;
+
 private:
 	void prepare_to_render();
+
+public:
+	static Model* read_model_file(const char* filename, double scale);
 };
 
 
