@@ -12,7 +12,12 @@ Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
 	int i;
 	primitive = GL_POINTS;
 	num_vertices = num_verts;
-	vertices_per_primitive = num_primitives = 0;
+	//vertices_per_primitive = num_primitives = 0;
+
+	//This is to make the draw code simpler.
+	num_primitives = 1;
+	vertices_per_primitive = num_verts;
+
 	indices = NULL;
 	vertices = new Vec4[num_verts];
 	if(verts)
@@ -95,7 +100,7 @@ void Model::prepare_to_render()
 		glEnableVertexAttribArray(1);
 	}
 
-	if(primitive != GL_POINTS)		//For points we just use the vertex array directly.
+	if(indices)		//For points and models with one vertex per vertex-on-a-primitive, we just use the vertex array directly.
 	{
 		GLuint element_buffer;
 		glGenBuffers(1, &element_buffer);
@@ -130,24 +135,25 @@ void Model::draw(Mat4 xform, Vec4 baseColor)
 	glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "fogScale"), fog_scale);
 	set_uniform_matrix(shader_program, "modelViewXForm", cam_mat * xform);
 	set_uniform_matrix(shader_program, "projXForm", proj_mat);		//Should find a way to avoid pushing this to the GPU every frame.
-	
+
 	glBindVertexArray(vertex_array);
 
-	switch(primitive)
-	{
-		case GL_POINTS:
-			glDrawArrays(GL_POINTS, 0, num_vertices);
-			break;
-		case GL_LINES:
-		case GL_TRIANGLES:
-		case GL_QUADS:
-			glDrawElements(primitive, vertices_per_primitive * num_primitives, GL_UNSIGNED_INT, (void*)0);
-			break;
-		default:
-			for(int i = 0; i < num_primitives; i++)
-				glDrawElements(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(i * vertices_per_primitive * sizeof(int)));
-			break;
-	}
+	if(indices)
+		switch(primitive)
+		{
+			case GL_LINES:
+			case GL_TRIANGLES:
+			case GL_QUADS:
+				glDrawElements(primitive, vertices_per_primitive * num_primitives, GL_UNSIGNED_INT, (void*)0);
+				break;
+			default:
+				for(int i = 0; i < num_primitives; i++)
+					glDrawElements(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(i * vertices_per_primitive * sizeof(int)));
+				break;
+		}
+	else
+		for(int i = 0; i < num_primitives; i++)
+			glDrawArrays(primitive, i * vertices_per_primitive, vertices_per_primitive);
 }
 
 
@@ -157,12 +163,15 @@ void Model::dump() const
 	printf("%d %d %d %d\n", primitive, num_vertices, vertices_per_primitive, num_primitives);
 	for(i = 0; i < num_vertices; i++)
 		printf("%d: %f %f %f %f\n", i, vertices[i].x, vertices[i].y, vertices[i].z, vertices[i].w);
-	for(i = 0; i < num_primitives; i++)
-	{
-		for(int j = 0; j < vertices_per_primitive; j++)
-			printf("%d ", indices[i * vertices_per_primitive + j]);
-		printf("\n");
-	}
+	if(indices)
+		for(i = 0; i < num_primitives; i++)
+		{
+			for(int j = 0; j < vertices_per_primitive; j++)
+				printf("%d ", indices[i * vertices_per_primitive + j]);
+			printf("\n");
+		}
+	else
+		printf("no indices");
 }
 
 
@@ -240,7 +249,8 @@ void Model::generate_primitive_colors(double scale)
 	vertices = new Vec4[num_vertices];
 
 	unsigned int* old_prims = indices;
-	indices = new unsigned int[num_vertices];		//This is num_primitives * vertices_per_primitive, which happens to be equal to num_vertices right now.
+	//indices = new unsigned int[num_vertices];		//This is num_primitives * vertices_per_primitive, which happens to be equal to num_vertices right now.
+	indices = NULL;
 
 	vertex_colors = new Vec4[num_vertices];
 
@@ -252,7 +262,7 @@ void Model::generate_primitive_colors(double scale)
 			int ix = vertices_per_primitive * i + j;
 			vertices[ix] = old_verts[old_prims[ix]];
 			vertex_colors[ix] = temp;
-			indices[ix] = ix;			//This makes using glDrawElements() dumb. Need a flag to make draw() call glDrawArrays() multiple times instead.
+			//indices[ix] = ix;			//This makes using glDrawElements() dumb. Need a flag to make draw() call glDrawArrays() multiple times instead.
 		}
 	}
 
@@ -289,6 +299,14 @@ unsigned int* make_torus_quad_strip_indices(int long_segments, int trans_segment
 {
 	int verts_per_strip = 2 * (trans_segments + 1);
 	unsigned int* ret = new unsigned int[long_segments * verts_per_strip];
+
+	/*
+		Note: I was going to try making the strips run longitudinally, so that 
+		it'd be more efficient (assuming more longitudinal segments than 
+		transverse), but I found that putting rings on the geodesics made 
+		them look better and made it easier to see what they were doing, 
+		so transverse strips it is.
+	*/
 
 	for(int i = 0; i < long_segments; i++)
 	{

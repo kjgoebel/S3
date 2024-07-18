@@ -90,6 +90,7 @@ void init()
 	}
 
 	geodesic_model = Model::make_torus(128, 8, 0.004);
+	geodesic_model->generate_primitive_colors(0.5);
 	torus_model = Model::make_torus(NUM_HOPF_FIBERS, NUM_HOPF_FIBERS, 1, false);
 	torus_model->generate_primitive_colors(0.7);
 }
