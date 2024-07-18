@@ -103,15 +103,7 @@ void reshape(int w, int h)
 {
 	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
 	
-	aspect_ratio = (double)w / h;
-	double q = tan(HALF_FOV);
-
-	proj_mat = Mat4(
-		1.0 / (aspect_ratio * q),	0,					0,								0,
-		0,							1.0 / q,			0,								0,
-		0,							0,					(FAR + NEAR) / (NEAR - FAR),	2.0 * NEAR * FAR / (NEAR - FAR),
-		0,							0,					-1,								0
-	);
+	set_perspective((double)w / h);
 }
 
 void display()
