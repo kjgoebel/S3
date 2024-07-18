@@ -43,5 +43,5 @@ private:
 
 public:
 	static Model* read_model_file(const char* filename, double scale);
-	static Model* make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio);
+	static Model* make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips = true);
 };

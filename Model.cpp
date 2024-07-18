@@ -305,17 +305,43 @@ unsigned int* make_torus_quad_strip_indices(int long_segments, int trans_segment
 	return ret;
 }
 
-
-Model* Model::make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio)
+unsigned int* make_torus_quad_indices(int long_segments, int trans_segments)
 {
-	return new Model(
-		GL_QUAD_STRIP,
-		longitudinal_segments * transverse_segments,
-		2 * (transverse_segments + 1),
-		longitudinal_segments,
-		make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio),
-		make_torus_quad_strip_indices(longitudinal_segments, transverse_segments)
-	);
+	unsigned int* ret = new unsigned int[4 * long_segments * trans_segments];
+
+	for(int i = 0; i < long_segments; i++)
+		for(int j = 0; j < trans_segments; j++)
+		{
+			ret[4 * (i * trans_segments + j)] = i * trans_segments + j;
+			ret[4 * (i * trans_segments + j) + 1] = ((i + 1) % long_segments) * trans_segments + j;
+			ret[4 * (i * trans_segments + j) + 2] = ((i + 1) % long_segments) * trans_segments + ((j + 1) % trans_segments);
+			ret[4 * (i * trans_segments + j) + 3] = i * trans_segments + ((j + 1) % trans_segments);
+		}
+
+	return ret;
+}
+
+
+Model* Model::make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips)
+{
+	if(use_quad_strips)
+		return new Model(
+			GL_QUAD_STRIP,
+			longitudinal_segments * transverse_segments,
+			2 * (transverse_segments + 1),
+			longitudinal_segments,
+			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio),
+			make_torus_quad_strip_indices(longitudinal_segments, transverse_segments)
+		);
+	else
+		return new Model(
+			GL_QUADS,
+			longitudinal_segments * transverse_segments,
+			4,
+			longitudinal_segments * transverse_segments,
+			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio),
+			make_torus_quad_indices(longitudinal_segments, transverse_segments)
+		);
 }
 
 

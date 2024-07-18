@@ -39,10 +39,11 @@ double last_fame_time;
 
 bool	draw_poles = true,			//colored markers at each of the +x, +y, +z, +w poles of the sphere
 		draw_clutter = true,		//white dots randomly distributed through the space
-		draw_sun_paths = false,		//the great circles at the centers of the torii defined by the selected Hopf and "anti-Hopf" fibers
+		draw_sun_paths = false,		//the great circles at the centers of the Clifford torus defined by the selected Hopf and "anti-Hopf" fibers
 		draw_hopf = false,			//selected fibers of a Hopf bundle, all passing through a selected great cirle
 		draw_antihopf = false,		//fibers of a different Hopf bundle, selected to be always orthogonal to the other set of fibers
-		draw_cross = false;			//the 16-cell {3, 3, 4}, projected onto the sphere
+		draw_cross = false,			//the 16-cell {3, 3, 4}, projected onto the sphere
+		draw_torus = false;			//the Clifford torus defined by the selected Hopf and "anti-Hopf" fibers
 
 
 #define NUM_HOPF_FIBERS		(32)
@@ -89,7 +90,7 @@ void init()
 	}
 
 	geodesic_model = Model::make_torus(128, 8, 0.004);
-	torus_model = Model::make_torus(NUM_HOPF_FIBERS, NUM_HOPF_FIBERS, 1);
+	torus_model = Model::make_torus(NUM_HOPF_FIBERS, NUM_HOPF_FIBERS, 1, false);
 	torus_model->generate_primitive_colors(0.7);
 }
 
@@ -176,7 +177,8 @@ void display()
 		geodesic_model->draw(Mat4::axial_rotation(_x, _w, TAU / 4) * Mat4::axial_rotation(_y, _z, TAU / 4), Vec4(1, 0, 1, 1));
 	}
 	
-	torus_model->draw(Mat4::axial_rotation(_y, _w, TAU / 8) * Mat4::axial_rotation(_z, _x, TAU / 8), Vec4(0.3, 0.3, 0.3, 1));
+	if(draw_torus)
+		torus_model->draw(Mat4::axial_rotation(_y, _w, TAU / 8) * Mat4::axial_rotation(_z, _x, TAU / 8), Vec4(0.3, 0.3, 0.3, 1));
 
 	glFlush();
 	glutSwapBuffers();
@@ -271,6 +273,9 @@ void special(int key, int x, int y)
 			break;
 		case GLUT_KEY_F9:
 			draw_cross = !draw_cross;
+			break;
+		case GLUT_KEY_F10:
+			draw_torus = !draw_torus;
 			break;
 
 		case GLUT_KEY_UP:
