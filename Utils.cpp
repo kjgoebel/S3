@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 #pragma warning(disable : 4996)		//VS doesn't even like fopen()?! My God....
 
@@ -36,4 +37,17 @@ char* read_file(const char* filename)
 	}
 	fclose(fin);
 	return ret;
+}
+
+
+void error(const char* fmt, ...)
+{
+	va_list arg_list;
+	char buffer[4096];
+
+	va_start(arg_list, fmt);
+	vsprintf(buffer, fmt, arg_list);
+	fprintf(stderr, buffer);
+	va_end(arg_list);
+	exit(-1);
 }

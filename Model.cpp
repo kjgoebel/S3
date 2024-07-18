@@ -7,18 +7,13 @@
 #include "Utils.h"
 
 
-Model* geodesic_model = NULL;
-
-
-//Depth is still messed up for near-antipodal elements.
-
 Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
 {
 	int i;
 	primitive = GL_POINTS;
 	num_vertices = num_verts;
 	vertices_per_primitive = num_primitives = 0;
-	primitives = NULL;
+	indices = NULL;
 	vertices = new Vec4[num_verts];
 	if(verts)
 		for(i = 0; i < num_verts; i++)
@@ -35,7 +30,7 @@ Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
 	ready_to_render = false;
 }
 
-Model::Model(int prim, int num_verts, int verts_per_prim = 0, int num_prims = 0, const Vec4* verts, const int* prims, const Vec4* vert_colors)
+Model::Model(int prim, int num_verts, int verts_per_prim, int num_prims, const Vec4* verts, const unsigned int* ixes, const Vec4* vert_colors)
 {
 	int i;
 	primitive = prim;
@@ -48,10 +43,10 @@ Model::Model(int prim, int num_verts, int verts_per_prim = 0, int num_prims = 0,
 			vertices[i] = verts[i];
 	if(verts_per_prim)
 	{
-		primitives = new unsigned int[num_prims * verts_per_prim];
-		if(prims)
+		indices = new unsigned int[num_prims * verts_per_prim];
+		if(ixes)
 			for(i = 0; i < num_prims * verts_per_prim; i++)
-				primitives[i] = prims[i];
+				indices[i] = ixes[i];
 	}
 	if(vert_colors)
 	{
@@ -68,8 +63,8 @@ Model::Model(int prim, int num_verts, int verts_per_prim = 0, int num_prims = 0,
 Model::~Model()
 {
 	delete vertices;
-	if(primitives)
-		delete primitives;
+	if(indices)
+		delete indices;
 	if(vertex_colors)
 		delete vertex_colors;
 }
@@ -105,7 +100,7 @@ void Model::prepare_to_render()
 		GLuint element_buffer;
 		glGenBuffers(1, &element_buffer);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), primitives, GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), indices, GL_STATIC_DRAW);
 	}
 
 	GLuint geom_shader, frag_shader = vertex_colors ? frag_vcolor : frag_simple;
@@ -165,13 +160,13 @@ void Model::dump() const
 	for(i = 0; i < num_primitives; i++)
 	{
 		for(int j = 0; j < vertices_per_primitive; j++)
-			printf("%d ", primitives[i * vertices_per_primitive + j]);
+			printf("%d ", indices[i * vertices_per_primitive + j]);
 		printf("\n");
 	}
 }
 
 
-Model* Model::read_model_file(const char* filename, double scale, double vertex_color_scale, bool vertex_colors_per_triangle)
+Model* Model::read_model_file(const char* filename, double scale)
 {
 	int i;
 	uint32_t dummy[3];
@@ -187,7 +182,7 @@ Model* Model::read_model_file(const char* filename, double scale, double vertex_
 	printf("%d, %d, %d\n", num_verts, num_edges, num_triangles);
 
 	Vec4* verts = new Vec4[num_verts];
-	int* ixes = new int[3 * num_triangles];
+	unsigned int* ixes = new unsigned int[3 * num_triangles];
 
 	for(i = 0; i < num_verts; i++)
 	{
@@ -218,77 +213,110 @@ Model* Model::read_model_file(const char* filename, double scale, double vertex_
 
 	_close(fin);
 
-	Model *ret;
-	if(vertex_color_scale > 0)
-	{
-		if(vertex_colors_per_triangle)
-		{
-			ret = new Model(GL_TRIANGLES, num_triangles * 3, 3, num_triangles);
-			ret->vertex_colors = new Vec4[num_triangles * 3];			//This is dirty. But that's kinda why I made this a struct instead of a class. Whatever. If I go much farther with this code, it'll have to be a class and this will be impossible.
-			for(i = 0; i < num_triangles; i++)
-			{
-				Vec4 temp(vertex_color_scale * frand(), vertex_color_scale * frand(), vertex_color_scale * frand(), 0);
-				for(int j = 0; j < 3; j++)
-				{
-					int vert_index = ixes[3 * i + j];
-					ret->vertices[3 * i + j] = verts[ixes[3 * i + j]];
-					ret->vertex_colors[3 * i + j] = temp;
-					ret->primitives[3 * i + j] = 3 * i + j;
-				}
-			}
-		}
-		else
-		{
-			Vec4 *vert_colors = new Vec4[num_verts];
-			for(i = 0; i < num_verts; i++)
-				vert_colors[i] = Vec4(vertex_color_scale * frand(), vertex_color_scale * frand(), vertex_color_scale * frand(), 0);
-			ret = new Model(GL_TRIANGLES, num_verts, 3, num_triangles, verts, ixes, vert_colors);
-			delete vert_colors;
-		}
-	} else
-		ret = new Model(GL_TRIANGLES, num_verts, 3, num_triangles, verts, ixes);
-
+	Model* ret = new Model(GL_TRIANGLES, num_verts, 3, num_triangles, verts, ixes);
 	delete verts;
 	delete ixes;
+	return ret;
+}
+
+
+void Model::generate_vertex_colors(double scale)
+{
+	if(vertex_colors)
+		error("Model already has vertex colors.");
+	vertex_colors = new Vec4[num_vertices];
+	if(scale > 0)
+		for(int i = 0; i < num_vertices; i++)
+			vertex_colors[i] = Vec4(scale * frand(), scale * frand(), scale * frand(), 0);
+}
+
+void Model::generate_primitive_colors(double scale)
+{
+	if(vertex_colors)
+		error("Model already has vertex colors.");
+
+	Vec4* old_verts = vertices;
+	num_vertices = num_primitives * vertices_per_primitive;
+	vertices = new Vec4[num_vertices];
+
+	unsigned int* old_prims = indices;
+	indices = new unsigned int[num_vertices];		//This is num_primitives * vertices_per_primitive, which happens to be equal to num_vertices right now.
+
+	vertex_colors = new Vec4[num_vertices];
+
+	for(int i = 0; i < num_primitives; i++)
+	{
+		Vec4 temp(scale * frand(), scale * frand(), scale * frand(), 0);
+		for(int j = 0; j < vertices_per_primitive; j++)
+		{
+			int ix = vertices_per_primitive * i + j;
+			vertices[ix] = old_verts[old_prims[ix]];
+			vertex_colors[ix] = temp;
+			indices[ix] = ix;			//This makes using glDrawElements() dumb. Need a flag to make draw() call glDrawArrays() multiple times instead.
+		}
+	}
+
+	delete old_verts;
+	delete old_prims;
+}
+
+
+Vec4* make_torus_verts(int long_segments, int trans_segments, double hole_ratio)
+{
+	double normalization_factor = 1.0 / sqrt(1.0 + hole_ratio * hole_ratio);
+
+	Vec4* ret = new Vec4[long_segments * trans_segments];
+	for(int i = 0; i < long_segments; i++)
+	{
+		double theta = (double)i * TAU / long_segments;
+		for(int j = 0; j < trans_segments; j++)
+		{
+			double phi = (double)j * TAU / trans_segments;
+
+			ret[i * trans_segments + j] = normalization_factor * Vec4(
+				hole_ratio * cos(phi),
+				hole_ratio * sin(phi),
+				cos(theta),
+				sin(theta)
+			);
+		}
+	}
+
+	return ret;
+}
+
+unsigned int* make_torus_quad_strip_indices(int long_segments, int trans_segments)
+{
+	int verts_per_strip = 2 * (trans_segments + 1);
+	unsigned int* ret = new unsigned int[long_segments * verts_per_strip];
+
+	for(int i = 0; i < long_segments; i++)
+	{
+		for(int j = 0; j < trans_segments; j++)
+		{
+			ret[i * verts_per_strip + 2 * j] = i * trans_segments + j;
+			ret[i * verts_per_strip + 2 * j + 1] = ((i + 1) % long_segments) * trans_segments + j;
+		}
+
+		ret[i * verts_per_strip + 2 * trans_segments] = i * trans_segments;
+		ret[i * verts_per_strip + 2 * trans_segments + 1] = ((i + 1) % long_segments) * trans_segments;
+	}
 
 	return ret;
 }
 
 
-#define GEODESIC_TUBE_RADIUS			(0.004)
-#define GEODESIC_LONGITUDINAL_SEGMENTS	(128)
-#define GEODESIC_TRANSVERSE_SEGMENTS	(8)
-
-void init_models()
+Model* Model::make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio)
 {
-	int verts_per_strip = 2 * (GEODESIC_TRANSVERSE_SEGMENTS + 1);
-
-	geodesic_model = new Model(
+	return new Model(
 		GL_QUAD_STRIP,
-		GEODESIC_LONGITUDINAL_SEGMENTS * GEODESIC_TRANSVERSE_SEGMENTS,
-		verts_per_strip,
-		GEODESIC_LONGITUDINAL_SEGMENTS
+		longitudinal_segments * transverse_segments,
+		2 * (transverse_segments + 1),
+		longitudinal_segments,
+		make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio),
+		make_torus_quad_strip_indices(longitudinal_segments, transverse_segments)
 	);
-
-	double normalization_factor = 1.0 / sqrt(1.0 + GEODESIC_TUBE_RADIUS * GEODESIC_TUBE_RADIUS);
-	for(int i = 0; i < GEODESIC_LONGITUDINAL_SEGMENTS; i++)
-	{
-		double theta = (double)i * TAU / GEODESIC_LONGITUDINAL_SEGMENTS;
-		for(int j = 0; j < GEODESIC_TRANSVERSE_SEGMENTS; j++)
-		{
-			double phi = (double)j * TAU / GEODESIC_TRANSVERSE_SEGMENTS;
-			geodesic_model->vertices[i * GEODESIC_TRANSVERSE_SEGMENTS + j] = normalization_factor * Vec4(
-				GEODESIC_TUBE_RADIUS * cos(phi),
-				GEODESIC_TUBE_RADIUS * sin(phi),
-				cos(theta),
-				sin(theta)
-			);
-			
-			geodesic_model->primitives[i * verts_per_strip + 2 * j] = i * GEODESIC_TRANSVERSE_SEGMENTS + j;
-			geodesic_model->primitives[i * verts_per_strip + 2 * j + 1] = ((i + 1) % GEODESIC_LONGITUDINAL_SEGMENTS) * GEODESIC_TRANSVERSE_SEGMENTS + j;
-		}
-		
-		geodesic_model->primitives[i * verts_per_strip + 2 * GEODESIC_TRANSVERSE_SEGMENTS] = i * GEODESIC_TRANSVERSE_SEGMENTS;
-		geodesic_model->primitives[i * verts_per_strip + 2 * GEODESIC_TRANSVERSE_SEGMENTS + 1] = ((i + 1) % GEODESIC_LONGITUDINAL_SEGMENTS) * GEODESIC_TRANSVERSE_SEGMENTS;
-	}
 }
+
+
+

@@ -13,6 +13,8 @@
 
 Model* dots_model = NULL;
 Model* pole_model = NULL;
+Model* geodesic_model = NULL;
+Model* torus_model = NULL;
 
 #define NUM_DOTS		(2000)
 
@@ -47,6 +49,7 @@ bool	draw_poles = true,			//colored markers at each of the +x, +y, +z, +w poles 
 Mat4 hopf_xforms[NUM_HOPF_FIBERS];
 Mat4 antihopf_xforms[NUM_HOPF_FIBERS];
 
+#define TORUS_SUBDIVISIONS NUM_HOPF_FIBERS
 
 void init()
 {
@@ -60,7 +63,6 @@ void init()
 	glCullFace(GL_BACK);
 
 	init_shaders();
-	init_models();
 
 	int i;
 
@@ -74,8 +76,10 @@ void init()
 		dots[i].normalize_in_place();
 	}
 	dots_model = new Model(NUM_DOTS, dots);
+	delete dots;
 
-	pole_model = Model::read_model_file("subdivided_icosahedron.model", 0.05, 0.3, true);
+	pole_model = Model::read_model_file("subdivided_icosahedron.model", 0.05);
+	pole_model->generate_primitive_colors(0.3);
 
 	for(i = 0; i < NUM_HOPF_FIBERS; i++)
 	{
@@ -83,6 +87,10 @@ void init()
 		hopf_xforms[i] = Mat4::axial_rotation(_x, _w, theta) * Mat4::axial_rotation(_y, _z, theta);
 		antihopf_xforms[i] = Mat4::axial_rotation(_y, _x, theta) * Mat4::axial_rotation(_z, _w, theta) * Mat4::axial_rotation(_x, _z, TAU / 4);
 	}
+
+	geodesic_model = Model::make_torus(128, 8, 0.004);
+	torus_model = Model::make_torus(NUM_HOPF_FIBERS, NUM_HOPF_FIBERS, 1);
+	torus_model->generate_primitive_colors(0.7);
 }
 
 
@@ -168,6 +176,8 @@ void display()
 		geodesic_model->draw(Mat4::axial_rotation(_x, _w, TAU / 4) * Mat4::axial_rotation(_y, _z, TAU / 4), Vec4(1, 0, 1, 1));
 	}
 	
+	torus_model->draw(Mat4::axial_rotation(_y, _w, TAU / 8) * Mat4::axial_rotation(_z, _x, TAU / 8), Vec4(0.3, 0.3, 0.3, 1));
+
 	glFlush();
 	glutSwapBuffers();
 	glutPostRedisplay();
