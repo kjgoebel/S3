@@ -96,14 +96,9 @@ void init()
 }
 
 
-#define NEAR		(0.001)
-#define FAR			(TAU)
-#define HALF_FOV	(TAU / 8)
-
 void reshape(int w, int h)
 {
 	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
-	
 	set_perspective((double)w / h);
 }
 
