@@ -17,9 +17,7 @@ double last_frame_time;
 struct Controls
 {
 	bool	fwd, back,
-			left, right,
-			pitch_up, pitch_down,
-			yaw_right, yaw_left;
+			left, right;
 };
 Controls controls;
 
@@ -71,14 +69,20 @@ void init()
 	player_state.set_cam();
 }
 
+int window_width, window_height;
+
 void reshape(int w, int h)
 {
+	window_width = w;
+	window_height = h;
 	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
 	set_perspective((double)w / h);
 }
 
 void display()
 {
+	glutWarpPointer(window_width >> 1, window_height >> 1);
+
 	double dt = current_time() - last_frame_time;
 
 	#define CONTROL_SPEED(positive, negative, speed)	(\
@@ -91,9 +95,7 @@ void display()
 			cy = cos(player_state.yaw),
 			sy = sin(player_state.yaw);
 	player_state.a += fwd * cy + right * sy;
-	player_state.b += right * cy - fwd * sy; 
-	player_state.pitch += CONTROL_SPEED(controls.pitch_up, controls.pitch_down, TURN_SPEED);
-	player_state.yaw += CONTROL_SPEED(controls.yaw_right, controls.yaw_left, TURN_SPEED);
+	player_state.b += right * cy - fwd * sy;
 
 	player_state.set_cam();
 
@@ -110,6 +112,17 @@ void display()
 	glFlush();
 	glutSwapBuffers();
 	glutPostRedisplay();
+}
+
+#define PITCH_SENSITIVITY (0.001)
+#define YAW_SENSITIVITY (0.001)
+
+void mouse(int x, int y)
+{
+	y -= window_height >> 1;
+	x -= window_width >> 1;
+	player_state.pitch -= PITCH_SENSITIVITY * y;
+	player_state.yaw += YAW_SENSITIVITY * x;
 }
 
 void keyboard(unsigned char key, int x, int y)
@@ -131,19 +144,6 @@ void keyboard(unsigned char key, int x, int y)
 			break;
 		case 'd':
 			controls.right = true;
-			break;
-
-		case '2':
-			controls.pitch_up = true;
-			break;
-		case '8':
-			controls.pitch_down = true;
-			break;
-		case '6':
-			controls.yaw_right = true;
-			break;
-		case '4':
-			controls.yaw_left = true;
 			break;
 
 		case '[':
@@ -173,19 +173,6 @@ void keyboard_up(unsigned char key, int x, int y)
 		case 'd':
 			controls.right = false;
 			break;
-
-		case '2':
-			controls.pitch_up = false;
-			break;
-		case '8':
-			controls.pitch_down = false;
-			break;
-		case '6':
-			controls.yaw_right = false;
-			break;
-		case '4':
-			controls.yaw_left = false;
-			break;
 	}
 }
 
@@ -205,6 +192,8 @@ int main(int argc, char** argv)
 	glutDisplayFunc(display);
 	glutKeyboardFunc(keyboard);
 	glutKeyboardUpFunc(keyboard_up);
+	glutPassiveMotionFunc(mouse);
+	glutMotionFunc(mouse);
 
 	init();
 
