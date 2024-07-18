@@ -115,7 +115,7 @@ void display()
 	)
 	translate_cam(
 		CONTROL_SPEED(controls.right, controls.left, TRANSLATION_SPEED),
-		CONTROL_SPEED(controls.up, controls.down, TRANSLATION_SPEED),
+		CONTROL_SPEED(controls.down, controls.up, TRANSLATION_SPEED),
 		CONTROL_SPEED(controls.fwd, controls.back, TRANSLATION_SPEED)
 	);
 	rotate_cam(

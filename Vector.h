@@ -17,6 +17,11 @@
 #define INV_ROOT_2 (0.7071067811865475)
 
 
+//* is used for the dot product.
+//% is used for the cross product of Vec3s
+//~ is used for the transpose of a Mat4
+
+
 struct Vec3
 {
 	union
@@ -203,17 +208,6 @@ struct Mat4
 				data[i][j] = components[(i<<2) + j];
 	}
 
-	Mat4(const Vec4 right, const Vec4 down, const Vec4 fwd, const Vec4 pos)
-	{
-		for(int j = 0; j < 4; j++)
-		{
-			data[_right][j] = right[j];
-			data[_down][j] = down[j];
-			data[_fwd][j] = fwd[j];
-			data[_pos][j] = pos[j];
-		}
-	}
-
 	Mat4(
 		double xx, double xy, double xz, double xw,
 		double yx, double yy, double yz, double yw,
@@ -283,7 +277,7 @@ struct Mat4
 		Mat4 ret;
 		for(int i = 0; i < 4; i++)
 			for(int j = 0; j < 4; j++)
-				ret.data[i][j] = data[i][4 - j];
+				ret.data[i][j] = data[j][i];
 		return ret;
 	}
 
@@ -309,12 +303,38 @@ struct Mat4
 		return Vec4(data[row][0], data[row][1], data[row][2], data[row][3]);
 	}
 
-	//"Axial rotation" is a misnomer.
+	//"Axial rotation" is a misnomer. Maybe should call it "cardinal rotation"?
 	static Mat4 axial_rotation(int ix1, int ix2, double theta)
 	{
 		Mat4 ret = identity();
 		ret.data[ix1][ix1] = ret.data[ix2][ix2] = cos(theta);
-		ret.data[ix2][ix1] = -(ret.data[ix1][ix2] = sin(theta));
+		ret.data[ix1][ix2] = -(ret.data[ix2][ix1] = sin(theta));
+		return ret;
+	}
+
+	static Mat4 from_rows(const Vec4 right, const Vec4 down, const Vec4 fwd, const Vec4 pos)
+	{
+		Mat4 ret;
+		for(int j = 0; j < 4; j++)
+		{
+			ret.data[_right][j] = right[j];
+			ret.data[_down][j] = down[j];
+			ret.data[_fwd][j] = fwd[j];
+			ret.data[_pos][j] = pos[j];
+		}
+		return ret;
+	}
+
+	static Mat4 from_columns(const Vec4 right, const Vec4 down, const Vec4 fwd, const Vec4 pos)
+	{
+		Mat4 ret;
+		for(int i = 0; i < 4; i++)
+		{
+			ret.data[i][_right] = right[i];
+			ret.data[i][_down] = down[i];
+			ret.data[i][_fwd] = fwd[i];
+			ret.data[i][_pos] = pos[i];
+		}
 		return ret;
 	}
 

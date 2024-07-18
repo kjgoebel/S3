@@ -133,7 +133,7 @@ void Model::draw(Mat4 xform, Vec4 baseColor)
 	glProgramUniform4f(shader_program, glGetUniformLocation(shader_program, "baseColor"), baseColor.x, baseColor.y, baseColor.z, baseColor.w);
 	glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "aspectRatio"), aspect_ratio);
 	glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "fogScale"), fog_scale);
-	set_uniform_matrix(shader_program, "modelViewXForm", cam_mat * xform);
+	set_uniform_matrix(shader_program, "modelViewXForm", ~cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
 	set_uniform_matrix(shader_program, "projXForm", proj_mat);		//Should find a way to avoid pushing this to the GPU every frame.
 
 	glBindVertexArray(vertex_array);
