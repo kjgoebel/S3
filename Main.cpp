@@ -43,7 +43,8 @@ bool	draw_poles = true,			//colored markers at each of the +x, +y, +z, +w poles 
 		draw_hopf = false,			//selected fibers of a Hopf bundle, all passing through a selected great cirle
 		draw_antihopf = false,		//fibers of a different Hopf bundle, selected to be always orthogonal to the other set of fibers
 		draw_cross = false,			//the 16-cell {3, 3, 4}, projected onto the sphere
-		draw_torus = false;			//the Clifford torus defined by the selected Hopf and "anti-Hopf" fibers
+		draw_torus = false,			//the Clifford torus defined by the selected Hopf and "anti-Hopf" fibers
+		draw_superhopf = false;		//a lot of fibers from a Hopf bundle
 
 
 #define NUM_HOPF_FIBERS		(32)
@@ -51,6 +52,9 @@ Mat4 hopf_xforms[NUM_HOPF_FIBERS];
 Mat4 antihopf_xforms[NUM_HOPF_FIBERS];
 
 #define TORUS_SUBDIVISIONS NUM_HOPF_FIBERS
+
+#define NUM_SUPERHOPF_FIBERS		(1024)
+Mat4 superhopf_xforms[NUM_SUPERHOPF_FIBERS];
 
 void init()
 {
@@ -69,13 +73,7 @@ void init()
 
 	Vec4* dots = new Vec4[NUM_DOTS];
 	for(i = 0; i < NUM_DOTS; i++)
-	{
-		do {
-			for(int j = 0; j < 4; j++)
-				dots[i].components[j] = fsrand();
-		} while(dots[i].mag2() == 0 || dots[i].mag2() > 1);
-		dots[i].normalize_in_place();
-	}
+		dots[i] = rand_s3();
 	dots_model = new Model(NUM_DOTS, dots);
 	delete dots;
 
@@ -89,10 +87,22 @@ void init()
 		antihopf_xforms[i] = Mat4::axial_rotation(_y, _x, theta) * Mat4::axial_rotation(_z, _w, theta) * Mat4::axial_rotation(_x, _z, TAU / 4);
 	}
 
-	geodesic_model = Model::make_torus(128, 8, 0.004);
+	geodesic_model = Model::make_torus(32, 8, 0.004);
 	geodesic_model->generate_primitive_colors(0.5);
 	torus_model = Model::make_torus(NUM_HOPF_FIBERS, NUM_HOPF_FIBERS, 1, false);
 	torus_model->generate_primitive_colors(0.7);
+
+	for(int i = 0; i < NUM_SUPERHOPF_FIBERS; i++)
+	{
+		Vec3 temp = rand_s2();
+		double theta = 0.5 * acos(temp.z), phi = atan2(temp.y, temp.x);
+
+		superhopf_xforms[i] =
+			Mat4::axial_rotation(_x, _y, phi)
+			* Mat4::axial_rotation(_w, _x, theta)
+			* Mat4::axial_rotation(_y, _z, theta)
+			* Mat4::axial_rotation(_w, _z, frand() * TAU);		//This moves the geodesic along its length, so that the stripes don't line up on nearby ones.
+	}
 }
 
 
@@ -167,6 +177,10 @@ void display()
 	
 	if(draw_torus)
 		torus_model->draw(Mat4::axial_rotation(_y, _w, TAU / 8) * Mat4::axial_rotation(_z, _x, TAU / 8), Vec4(0.3, 0.3, 0.3, 1));
+
+	if(draw_superhopf)
+		for(int i = 0; i < NUM_SUPERHOPF_FIBERS; i++)
+			geodesic_model->draw(superhopf_xforms[i], Vec4(0.5, 1, 0.5, 1));
 
 	glFlush();
 	glutSwapBuffers();
@@ -264,6 +278,9 @@ void special(int key, int x, int y)
 			break;
 		case GLUT_KEY_F10:
 			draw_torus = !draw_torus;
+			break;
+		case GLUT_KEY_F11:
+			draw_superhopf = !draw_superhopf;
 			break;
 
 		case GLUT_KEY_UP:

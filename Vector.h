@@ -18,8 +18,8 @@
 
 
 //* is used for the dot product.
-//% is used for the cross product of Vec3s
-//~ is used for the transpose of a Mat4
+//% is used for the cross product of Vec3s.
+//~ is used for the transpose of a Mat4.
 
 
 struct Vec3

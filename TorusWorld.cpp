@@ -36,7 +36,7 @@ struct PlayerState
 		Vec4 right = Vec4(sb, -cb, 0, 0);
 
 		cam_mat = Mat4::from_columns(right, down, fwd, pos)		//location on the torus
-					* Mat4::axial_rotation(_y, _w, 0.002)		//head position above feet
+					* Mat4::axial_rotation(_y, _w, 0.001)		//head position above feet
 					* Mat4::axial_rotation(_z, _x, yaw)			//yaw
 					* Mat4::axial_rotation(_y, _z, pitch);		//pitch
 	}
@@ -64,7 +64,6 @@ void init()
 	torus_model->generate_primitive_colors(0.7);
 
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
-	//cam_mat = Mat4::axial_rotation(_w, _y, TAU / 8);
 	player_state.set_cam();
 }
 

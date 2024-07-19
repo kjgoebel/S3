@@ -249,7 +249,6 @@ void Model::generate_primitive_colors(double scale)
 	vertices = new Vec4[num_vertices];
 
 	unsigned int* old_prims = indices;
-	//indices = new unsigned int[num_vertices];		//This is num_primitives * vertices_per_primitive, which happens to be equal to num_vertices right now.
 	indices = NULL;
 
 	vertex_colors = new Vec4[num_vertices];
@@ -262,7 +261,6 @@ void Model::generate_primitive_colors(double scale)
 			int ix = vertices_per_primitive * i + j;
 			vertices[ix] = old_verts[old_prims[ix]];
 			vertex_colors[ix] = temp;
-			//indices[ix] = ix;			//This makes using glDrawElements() dumb. Need a flag to make draw() call glDrawArrays() multiple times instead.
 		}
 	}
 

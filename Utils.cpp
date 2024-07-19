@@ -23,6 +23,36 @@ double current_time()
 	return (double)clock() / CLOCKS_PER_SEC;
 }
 
+
+Vec4 rand_s3()
+{
+	for(;;)
+	{
+		Vec4 ret(fsrand(), fsrand(), fsrand(), fsrand());
+		float l2 = ret.mag2();
+		if(l2 > 0 && l2 < 1)
+		{
+			ret.normalize_in_place();
+			return ret;
+		}
+	}
+}
+
+Vec3 rand_s2()
+{
+	for(;;)
+	{
+		Vec3 ret(fsrand(), fsrand(), fsrand());
+		float l2 = ret.mag2();
+		if(l2 > 0 && l2 < 1)
+		{
+			ret.normalize_in_place();
+			return ret;
+		}
+	}
+}
+
+
 char* read_file(const char* filename)
 {
 	FILE *fin = fopen(filename, "r");
