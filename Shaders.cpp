@@ -267,6 +267,8 @@ void init_shaders()
 
 				in float distance;
 				in vec4 gf_r4pos;
+
+				layout (depth_any) out float gl_FragDepth;
 				out vec4 fragColor;
 
 				void main() {
@@ -291,13 +293,14 @@ void init_shaders()
 				in float distance;
 				in vec4 gf_r4pos;
 				in vec4 gf_color;
-
+				
+				layout (depth_any) out float gl_FragDepth;
 				out vec4 fragColor;
 
 				void main() {
 					float dist = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
 					float fogFactor = exp(-dist * fogScale);
-					fragColor = (baseColor + gf_color) * fogFactor;
+					fragColor = clamp(baseColor + gf_color, 0, 1) * fogFactor;
 					gl_FragDepth = dist;
 				}
 			)"
