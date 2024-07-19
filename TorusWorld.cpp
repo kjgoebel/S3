@@ -44,7 +44,6 @@ struct PlayerState
 PlayerState player_state;
 
 #define WALK_SPEED		(TAU / 50)
-#define TURN_SPEED		(TAU / 4)
 
 #define FOG_INCREMENT		(0.5)
 
@@ -123,6 +122,16 @@ void mouse(int x, int y)
 	x -= window_width >> 1;
 	player_state.pitch -= PITCH_SENSITIVITY * y;
 	player_state.yaw += YAW_SENSITIVITY * x;
+
+	while(player_state.yaw > TAU)
+		player_state.yaw -= TAU;
+	while(player_state.yaw < 0)
+		player_state.yaw += TAU;
+
+	if(player_state.pitch > TAU / 4)
+		player_state.pitch = TAU / 4;
+	if (player_state.pitch < -TAU / 4)
+		player_state.pitch = -TAU / 4;
 }
 
 void keyboard(unsigned char key, int x, int y)
@@ -196,6 +205,8 @@ int main(int argc, char** argv)
 	glutMotionFunc(mouse);
 
 	init();
+
+	glutSetCursor(GLUT_CURSOR_NONE);
 
 	glutMainLoop();
 	return 0;
