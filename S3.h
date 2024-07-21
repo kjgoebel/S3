@@ -33,3 +33,7 @@ void rotate_cam(double pitch, double yaw, double roll);
 //Sets proj_mat to the appropriate projection matrix. The far clipping plane will always be at tau.
 //Also sets aspect_ratio, which is exposed as a global above just so that Model.cpp can feed it to shaders.
 void set_perspective(double new_aspect_ratio, double vertical_field_of_view = TAU / 4, double near = 0.001);
+
+//a and b are assumed to be normalized but not necessarily orthogonal.
+//If distance is non-NULL, it will be filled in with the distance between a and b.
+Mat4 basis_around(Vec4 a, Vec4 b, double *distance = NULL);

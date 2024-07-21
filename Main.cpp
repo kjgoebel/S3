@@ -16,6 +16,8 @@ Model* pole_model = NULL;
 Model* geodesic_model = NULL;
 Model* torus_model = NULL;
 
+Model* tesseract_arc = NULL;
+
 #define NUM_DOTS		(2000)
 
 #define TRANSLATION_SPEED		(TAU / 16)
@@ -42,9 +44,10 @@ bool	draw_poles = true,			//colored markers at each of the +x, +y, +z, +w poles 
 		draw_sun_paths = false,		//the great circles at the centers of the Clifford torus defined by the selected Hopf and "anti-Hopf" fibers
 		draw_hopf = false,			//selected fibers of a Hopf bundle, all passing through a selected great cirle
 		draw_antihopf = false,		//fibers of a different Hopf bundle, selected to be always orthogonal to the other set of fibers
-		draw_cross = false,			//the 16-cell {3, 3, 4}, projected onto the sphere
+		draw_cross = false,			//the 16-cell {3, 3, 4}, projected onto the Sphere
 		draw_torus = false,			//the Clifford torus defined by the selected Hopf and "anti-Hopf" fibers
-		draw_superhopf = false;		//a lot of fibers from a Hopf bundle
+		draw_superhopf = false,		//a lot of fibers from a Hopf bundle
+		draw_tesseract = false;		//the tesseract {4, 3, 3}, projected onto the Sphere
 
 
 #define NUM_HOPF_FIBERS		(32)
@@ -55,6 +58,10 @@ Mat4 antihopf_xforms[NUM_HOPF_FIBERS];
 
 #define NUM_SUPERHOPF_FIBERS		(1024)
 Mat4 superhopf_xforms[NUM_SUPERHOPF_FIBERS];
+
+#define NUM_TESSERACT_EDGES			(32)
+Mat4 tesseract_edge_xforms[NUM_TESSERACT_EDGES];
+
 
 void init()
 {
@@ -101,7 +108,36 @@ void init()
 			Mat4::axial_rotation(_x, _y, phi)
 			* Mat4::axial_rotation(_w, _x, theta)
 			* Mat4::axial_rotation(_y, _z, theta)
-			* Mat4::axial_rotation(_w, _z, frand() * TAU);		//This moves the geodesic along its length, so that the stripes don't line up on nearby ones.
+			* Mat4::axial_rotation(_w, _z, frand() * TAU);		//Random longitudinal displacement so that the stripes on nearby fibers don't line up. It might be more elucidating if they do line up, come to think of it.
+	}
+
+	tesseract_arc = Model::make_torus_arc(8, 8, acos(0.5), 0.004);
+	tesseract_arc->generate_primitive_colors(0.5);
+	int edge_index = 0;
+	for(int vertex = 0; vertex < 16; vertex++)
+	{
+		Vec4 a = Vec4(
+			vertex & 1 ? 1 : -1,
+			vertex & 2 ? 1 : -1,
+			vertex & 4 ? 1 : -1,
+			vertex & 8 ? 1 : -1
+		).normalize();
+		for(int axis = 0; axis < 4; axis++)
+		{
+			if(vertex & (1 << axis))
+			{
+				int other_vertex = vertex & ~(1 << axis);
+				Vec4 b = Vec4(
+					other_vertex & 1 ? 1 : -1,
+					other_vertex & 2 ? 1 : -1,
+					other_vertex & 4 ? 1 : -1,
+					other_vertex & 8 ? 1 : -1
+				).normalize();
+
+				tesseract_edge_xforms[edge_index] = basis_around(a, b);
+				edge_index++;
+			}
+		}
 	}
 }
 
@@ -149,6 +185,10 @@ void display()
 	if(draw_clutter)
 		dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
 
+	if(draw_tesseract)
+		for(int i = 0; i < NUM_TESSERACT_EDGES; i++)
+			tesseract_arc->draw(tesseract_edge_xforms[i], Vec4(1, 0, 1, 1));
+
 	if(draw_hopf)
 	{
 		for(int i = 0; i < NUM_HOPF_FIBERS; i++)
@@ -167,12 +207,12 @@ void display()
 
 	if(draw_cross)
 	{
-		geodesic_model->draw(Mat4::identity(), Vec4(1, 0, 1, 1));
-		geodesic_model->draw(Mat4::axial_rotation(_x, _w, TAU / 4), Vec4(1, 0, 1, 1));
-		geodesic_model->draw(Mat4::axial_rotation(_y, _w, TAU / 4), Vec4(1, 0, 1, 1));
-		geodesic_model->draw(Mat4::axial_rotation(_x, _z, TAU / 4), Vec4(1, 0, 1, 1));
-		geodesic_model->draw(Mat4::axial_rotation(_y, _z, TAU / 4), Vec4(1, 0, 1, 1));
-		geodesic_model->draw(Mat4::axial_rotation(_x, _w, TAU / 4) * Mat4::axial_rotation(_y, _z, TAU / 4), Vec4(1, 0, 1, 1));
+		geodesic_model->draw(Mat4::identity(), Vec4(1, 0, 0, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_x, _w, TAU / 4), Vec4(1, 0, 0, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_y, _w, TAU / 4), Vec4(1, 0, 0, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_x, _z, TAU / 4), Vec4(1, 0, 0, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_y, _z, TAU / 4), Vec4(1, 0, 0, 1));
+		geodesic_model->draw(Mat4::axial_rotation(_x, _w, TAU / 4) * Mat4::axial_rotation(_y, _z, TAU / 4), Vec4(1, 0, 0, 1));
 	}
 	
 	if(draw_torus)
@@ -266,6 +306,9 @@ void special(int key, int x, int y)
 			break;
 		case GLUT_KEY_F3:
 			draw_sun_paths = !draw_sun_paths;
+			break;
+		case GLUT_KEY_F4:
+			draw_tesseract = ~draw_tesseract;
 			break;
 		case GLUT_KEY_F7:
 			draw_hopf = !draw_hopf;

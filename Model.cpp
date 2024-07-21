@@ -269,23 +269,23 @@ void Model::generate_primitive_colors(double scale)
 }
 
 
-Vec4* make_torus_verts(int long_segments, int trans_segments, double hole_ratio)
+Vec4* make_torus_verts(int long_segments, int trans_segments, double hole_ratio, double length = TAU, bool make_final_ring = false)
 {
 	double normalization_factor = 1.0 / sqrt(1.0 + hole_ratio * hole_ratio);
 
 	Vec4* ret = new Vec4[long_segments * trans_segments];
 	for(int i = 0; i < long_segments; i++)
 	{
-		double theta = (double)i * TAU / long_segments;
+		double theta = (double)i * length / (make_final_ring ? long_segments - 1 : long_segments);
 		for(int j = 0; j < trans_segments; j++)
 		{
 			double phi = (double)j * TAU / trans_segments;
 
 			ret[i * trans_segments + j] = normalization_factor * Vec4(
-				hole_ratio * cos(phi),
 				hole_ratio * sin(phi),
-				cos(theta),
-				sin(theta)
+				hole_ratio * cos(phi),
+				sin(theta),
+				cos(theta)
 			);
 		}
 	}
@@ -293,7 +293,7 @@ Vec4* make_torus_verts(int long_segments, int trans_segments, double hole_ratio)
 	return ret;
 }
 
-unsigned int* make_torus_quad_strip_indices(int long_segments, int trans_segments)
+unsigned int* make_torus_quad_strip_indices(int long_segments, int trans_segments, bool loop_longitudinally = true)
 {
 	int verts_per_strip = 2 * (trans_segments + 1);
 	unsigned int* ret = new unsigned int[long_segments * verts_per_strip];
@@ -308,30 +308,34 @@ unsigned int* make_torus_quad_strip_indices(int long_segments, int trans_segment
 
 	for(int i = 0; i < long_segments; i++)
 	{
+		#define NEXT_I (loop_longitudinally ? (i + 1) % long_segments : i + 1)
 		for(int j = 0; j < trans_segments; j++)
 		{
 			ret[i * verts_per_strip + 2 * j] = i * trans_segments + j;
-			ret[i * verts_per_strip + 2 * j + 1] = ((i + 1) % long_segments) * trans_segments + j;
+			ret[i * verts_per_strip + 2 * j + 1] = NEXT_I * trans_segments + j;
 		}
 
 		ret[i * verts_per_strip + 2 * trans_segments] = i * trans_segments;
-		ret[i * verts_per_strip + 2 * trans_segments + 1] = ((i + 1) % long_segments) * trans_segments;
+		ret[i * verts_per_strip + 2 * trans_segments + 1] = NEXT_I * trans_segments;
+		#undef NEXT_I
 	}
 
 	return ret;
 }
 
-unsigned int* make_torus_quad_indices(int long_segments, int trans_segments)
+unsigned int* make_torus_quad_indices(int long_segments, int trans_segments, bool loop_longitudinally = true)
 {
 	unsigned int* ret = new unsigned int[4 * long_segments * trans_segments];
 
 	for(int i = 0; i < long_segments; i++)
 		for(int j = 0; j < trans_segments; j++)
 		{
+			#define NEXT_I (loop_longitudinally ? (i + 1) % long_segments : i + 1)
 			ret[4 * (i * trans_segments + j)] = i * trans_segments + j;
-			ret[4 * (i * trans_segments + j) + 1] = ((i + 1) % long_segments) * trans_segments + j;
-			ret[4 * (i * trans_segments + j) + 2] = ((i + 1) % long_segments) * trans_segments + ((j + 1) % trans_segments);
+			ret[4 * (i * trans_segments + j) + 1] = NEXT_I * trans_segments + j;
+			ret[4 * (i * trans_segments + j) + 2] = NEXT_I * trans_segments + ((j + 1) % trans_segments);
 			ret[4 * (i * trans_segments + j) + 3] = i * trans_segments + ((j + 1) % trans_segments);
+			#undef NEXT_I
 		}
 
 	return ret;
@@ -357,6 +361,29 @@ Model* Model::make_torus(int longitudinal_segments, int transverse_segments, dou
 			longitudinal_segments * transverse_segments,
 			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio),
 			make_torus_quad_indices(longitudinal_segments, transverse_segments)
+		);
+}
+
+
+Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments, double length, double hole_ratio, bool use_quad_strips)
+{
+	if(use_quad_strips)
+		return new Model(
+			GL_QUAD_STRIP,
+			longitudinal_segments * transverse_segments,
+			2 * (transverse_segments + 1),
+			(longitudinal_segments - 1),
+			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true),
+			make_torus_quad_strip_indices(longitudinal_segments - 1, transverse_segments, false)
+		);
+	else
+		return new Model(
+			GL_QUADS,
+			longitudinal_segments * transverse_segments,
+			4,
+			(longitudinal_segments - 1) * transverse_segments,
+			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true),
+			make_torus_quad_indices(longitudinal_segments - 1, transverse_segments, false)
 		);
 }
 
