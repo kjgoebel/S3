@@ -23,7 +23,7 @@ GLuint make_new_shader(GLuint shader_type, const std::vector<char*> text)
 		log[log_length] = 0;
 		printf(log);
 
-		delete log;
+		delete[] log;
 		exit(-1);
 	}
 
@@ -50,7 +50,7 @@ GLuint make_new_program(GLuint vert, GLuint geom, GLuint frag)
 		log[log_length] = 0;
 		printf(log);
 
-		delete log;
+		delete[] log;
 		exit(-1);
 	}
 
@@ -181,39 +181,6 @@ void init_shaders()
 					EndPrimitive();
 				}
 			)"
-
-			/*R"(
-				#version 460
-
-				layout (points, invocations = 2) in;
-				layout (points, max_vertices = 1) out;
-
-				uniform mat4 projXForm;
-
-				in vec4 vg_color[];
-
-				out float distance;
-				out vec4 gf_color;
-
-				#define BASE_POINT_SIZE		(4)		//Need a uniform for this, based on screen size.
-
-				void main() {
-					vec4 point = gl_in[0].gl_Position;
-
-					float dist = length(point.xyz);
-					point.xyz *= (dist - gl_InvocationID * 6.283185) / dist;
-					distance = abs(dist - gl_InvocationID * 6.283185);
-
-					point = projXForm * point;
-
-					gl_Position = point;
-					gl_PointSize = 3 / sin(dist);
-					gf_color = vg_color[0];
-
-					EmitVertex();
-					EndPrimitive();
-				}
-			)"*/
 		}
 	);
 

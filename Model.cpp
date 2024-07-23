@@ -67,11 +67,11 @@ Model::Model(int prim, int num_verts, int verts_per_prim, int num_prims, const V
 
 Model::~Model()
 {
-	delete vertices;
+	delete[] vertices;
 	if(indices)
-		delete indices;
+		delete[] indices;
 	if(vertex_colors)
-		delete vertex_colors;
+		delete[] vertex_colors;
 }
 
 void Model::prepare_to_render()
@@ -223,8 +223,8 @@ Model* Model::read_model_file(const char* filename, double scale)
 	_close(fin);
 
 	Model* ret = new Model(GL_TRIANGLES, num_verts, 3, num_triangles, verts, ixes);
-	delete verts;
-	delete ixes;
+	delete[] verts;
+	delete[] ixes;
 	return ret;
 }
 
@@ -264,8 +264,8 @@ void Model::generate_primitive_colors(double scale)
 		}
 	}
 
-	delete old_verts;
-	delete old_prims;
+	delete[] old_verts;
+	delete[] old_prims;
 }
 
 

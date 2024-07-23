@@ -9,7 +9,7 @@ Mat4 cam_mat = Mat4::identity();
 Mat4 proj_mat = Mat4::identity();
 
 float aspect_ratio = 1;
-float fog_scale = 2;
+float fog_scale = 1.5;
 
 
 /*

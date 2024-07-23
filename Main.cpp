@@ -89,7 +89,7 @@ void init()
 	for(i = 0; i < NUM_DOTS; i++)
 		dots[i] = rand_s3();
 	dots_model = new Model(NUM_DOTS, dots);
-	delete dots;
+	delete[] dots;
 
 	pole_model = Model::read_model_file("subdivided_icosahedron.model", 0.05);
 	pole_model->generate_primitive_colors(0.3);
