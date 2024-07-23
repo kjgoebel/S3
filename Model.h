@@ -18,7 +18,7 @@ struct Model
 	Vec4 *vertices;
 	Vec4 *vertex_colors;		//If this is NULL, the model will render with frag_simple (baseColor only).
 
-	unsigned int *indices;		//If this is NULL, glDrawArrays() will be used instead of glDrawElements().
+	GLuint *indices;		//If this is NULL, glDrawArrays() will be used instead of glDrawElements().
 
 private:
 	bool ready_to_render;

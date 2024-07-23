@@ -6,6 +6,9 @@
 
 #include "Utils.h"
 
+#pragma warning(disable : 4244)		//conversion from double to float
+#pragma warning(disable : 4996)		//VS doesn't like _open().
+
 
 Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
 {
@@ -177,7 +180,7 @@ void Model::dump() const
 
 Model* Model::read_model_file(const char* filename, double scale)
 {
-	int i;
+	GLuint i;
 	uint32_t dummy[3];
 	uint32_t num_verts, num_edges, num_triangles;
 	Vec3 temp;
@@ -191,7 +194,7 @@ Model* Model::read_model_file(const char* filename, double scale)
 	printf("%d, %d, %d\n", num_verts, num_edges, num_triangles);
 
 	Vec4* verts = new Vec4[num_verts];
-	unsigned int* ixes = new unsigned int[3 * num_triangles];
+	GLuint* ixes = new GLuint[3 * num_triangles];
 
 	for(i = 0; i < num_verts; i++)
 	{
@@ -248,7 +251,7 @@ void Model::generate_primitive_colors(double scale)
 	num_vertices = num_primitives * vertices_per_primitive;
 	vertices = new Vec4[num_vertices];
 
-	unsigned int* old_prims = indices;
+	GLuint* old_prims = indices;
 	indices = NULL;
 
 	vertex_colors = new Vec4[num_vertices];
