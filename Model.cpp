@@ -111,18 +111,12 @@ void Model::prepare_to_render()
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), indices, GL_STATIC_DRAW);
 	}
 
-	Shader *geom_shader, *frag_shader = vertex_colors ? frag_vcolor : frag_simple;
-	switch(primitive)
-	{
-		case GL_POINTS:
-			geom_shader = geom_points;
-			break;
-		default:
-			geom_shader = geom_triangles;
-			break;
-	}
-
-	shader_program = ShaderProgram::get(vert, geom_shader, frag_shader);
+	std::set<const char*> options = vertex_colors ? std::set<const char*>{DEFINE_VERTEX_COLOR} : std::set<const char*>{};
+	shader_program = ShaderProgram::get(
+		Shader::get(vert, options),
+		Shader::get(primitive == GL_POINTS ? geom_points : geom_triangles, options),
+		Shader::get(frag, options)
+	);
 
 	ready_to_render = true;
 }
@@ -190,7 +184,7 @@ Model* Model::read_model_file(const char* filename, double scale)
 	_read(fin, &num_edges, 4);
 	_read(fin, &num_triangles, 4);
 
-	printf("%d, %d, %d\n", num_verts, num_edges, num_triangles);
+	//printf("%d, %d, %d\n", num_verts, num_edges, num_triangles);
 
 	Vec4* verts = new Vec4[num_verts];
 	GLuint* ixes = new GLuint[3 * num_triangles];
@@ -204,10 +198,10 @@ Model* Model::read_model_file(const char* filename, double scale)
 			temp.z * scale,
 			1
 		).normalize();
-		printf("%d (%f %f %f) -> (%f %f %f %f)\n", i,
+		/*printf("%d (%f %f %f) -> (%f %f %f %f)\n", i,
 			temp.x, temp.y, temp.z,
 			verts[i].x, verts[i].y, verts[i].z, verts[i].w
-		);
+		);*/
 	}
 
 	for(i = 0; i < num_edges; i++)
@@ -217,9 +211,9 @@ Model* Model::read_model_file(const char* filename, double scale)
 	{
 		_read(fin, &ixes[i * 3], 12);
 		_read(fin, dummy, 12);
-		printf("%d (%d %d %d)\n", i,
+		/*printf("%d (%d %d %d)\n", i,
 			ixes[3 * i], ixes[3 * i + 1], ixes[3 * i + 2]
-		);
+		);*/
 	}
 
 	_close(fin);

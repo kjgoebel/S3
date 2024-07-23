@@ -7,6 +7,9 @@
 #pragma warning(disable : 4244)		//conversion from double to float
 
 
+#define VERSION_STRING		"#version 460\n"
+
+
 void _set_uniform_matrix(GLuint program_id, const char* name, Mat4& mat)
 {
 	float temp[16];
@@ -17,9 +20,16 @@ void _set_uniform_matrix(GLuint program_id, const char* name, Mat4& mat)
 }
 
 
-Shader::Shader(GLuint shader_type, const std::vector<char*> text, ShaderPullFunc init_func, ShaderPullFunc frame_func)
+Shader::Shader(ShaderCore* core, const std::set<const char*> options) : core(core), options(options)
 {
-	id = glCreateShader(shader_type);
+	id = glCreateShader(core->shader_type);
+	//printf("new shader id = %d\n", id);
+	std::vector<const char*> text;
+	text.push_back(VERSION_STRING);
+	for(auto option: options)
+		text.push_back(option);
+	text.push_back(core->core_text);
+
 	glShaderSource(id, text.size(), &text[0], NULL);
 	glCompileShader(id);
 
@@ -27,7 +37,7 @@ Shader::Shader(GLuint shader_type, const std::vector<char*> text, ShaderPullFunc
 	glGetShaderiv(id, GL_COMPILE_STATUS, &success);
 	if(success == GL_FALSE)
 	{
-		for(char* temp : text)
+		for(const char* temp : text)
 			printf(temp);
 		GLint log_length = 0;
 		glGetShaderiv(id, GL_INFO_LOG_LENGTH, &log_length);
@@ -40,9 +50,40 @@ Shader::Shader(GLuint shader_type, const std::vector<char*> text, ShaderPullFunc
 		exit(-1);
 	}
 
-	this->init_func = init_func;
-	this->frame_func = frame_func;
+	init_func = [core, options](GLuint program_id) {
+		if(core->init_func)
+			core->init_func(program_id);
+		for(auto option : options)
+		{
+			ShaderPullFunc temp = core->options[option]->init_func;
+			if(temp)
+				temp(program_id);
+		}
+	};
+
+	frame_func = [core, options](GLuint program_id) {
+		if(core->frame_func)
+			core->frame_func(program_id);
+		for(auto option : options)
+		{
+			ShaderPullFunc temp = core->options[option]->frame_func;
+			if(temp)
+				temp(program_id);
+		}
+	};
+
+	all_shaders.push_back(this);
 }
+
+Shader* Shader::get(ShaderCore* core, std::set<const char*> options)
+{
+	for(auto shader : all_shaders)
+		if(shader->core == core && shader->options == options)
+			return shader;
+	return new Shader(core, options);
+}
+
+std::vector<Shader*> Shader::all_shaders;
 
 
 ShaderProgram::ShaderProgram(Shader* vert, Shader* geom, Shader* frag)
@@ -52,6 +93,7 @@ ShaderProgram::ShaderProgram(Shader* vert, Shader* geom, Shader* frag)
 	fragment = frag;
 
 	id = glCreateProgram();
+	//printf("new program id = %d\n", id);
 	glAttachShader(id, vertex->get_id());
 	glAttachShader(id, geometry->get_id());
 	glAttachShader(id, fragment->get_id());
@@ -106,72 +148,162 @@ void ShaderProgram::frame_all()
 std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 
 
-Shader *vert, *geom_points, *geom_triangles, *frag_simple, *frag_vcolor;
-
-
-#define VERSION_STRING		"#version 460\n"
+ShaderCore *vert, *geom_points, *geom_triangles, *frag;
 
 void init_shaders()
 {
-	vert = new Shader(
+	vert = new ShaderCore(
 		GL_VERTEX_SHADER,
-		std::vector<char*> {
-			VERSION_STRING,
-			R"(
-				layout (location = 0) in vec4 position;
-				layout (location = 1) in vec4 color;
+		R"(
+			layout (location = 0) in vec4 position;
+			layout (location = 1) in vec4 color;
 
-				uniform mat4 modelViewXForm;
+			uniform mat4 modelViewXForm;
 
+			#ifdef VERTEX_COLOR
 				out vec4 vg_color;
+			#endif
 
-				/*
-					Pass along the transformed position in R4, so that the fragment shader 
-					can compensate for the inaccuracy of the depth calculation for the 
-					middle of a polygon close to antipode. Note that this is not the 
-					position of the vertex relative to the camera. The camera is at 
-					(0, 0, 0, 1) in this coordinate system. The position of the vertex on 
-					screen doesn't depend on the w coordinate (once the camera has been 
-					transformed to x = y = z = 0), and it's convenient for the fragment 
-					shader to have the Sphere centered on the origin.
-				*/
-				out vec4 vg_r4pos;
+			/*
+				Pass along the transformed position in R4, so that the fragment shader 
+				can compensate for the inaccuracy of the depth calculation for the 
+				middle of a polygon close to antipode. Note that this is not the 
+				position of the vertex relative to the camera. The camera is at 
+				(0, 0, 0, 1) in this coordinate system. The position of the vertex on 
+				screen doesn't depend on the w coordinate (once the camera has been 
+				transformed to x = y = z = 0), and it's convenient for the fragment 
+				shader to have the Sphere centered on the origin.
+			*/
+			out vec4 vg_r4pos;
 				
-				void main() {
-					vg_r4pos = modelViewXForm * position;
-					float distance = acos(vg_r4pos.w);
-					gl_Position.xyz = distance * normalize(vg_r4pos.xyz);
-					gl_Position.w = 1;
+			void main() {
+				vg_r4pos = modelViewXForm * position;
+				float distance = acos(vg_r4pos.w);
+				gl_Position.xyz = distance * normalize(vg_r4pos.xyz);
+				gl_Position.w = 1;
+
+				#ifdef VERTEX_COLOR
 					vg_color = color;
-				}
-			)"
-		}
+				#endif
+			}
+		)",
+		NULL,
+		NULL,
+		std::vector<ShaderOption*> {new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL)}
 	);
 
-	geom_points = new Shader(
+	geom_points = new ShaderCore(
 		GL_GEOMETRY_SHADER,
-		std::vector<char*> {
-			VERSION_STRING,
-			R"(
-				layout (points, invocations = 2) in;
-				layout (triangle_strip, max_vertices = 16) out;
+		R"(
+			layout (points, invocations = 2) in;
+			layout (triangle_strip, max_vertices = 16) out;
 
-				uniform mat4 projXForm;
-				uniform float aspectRatio;
+			uniform mat4 projXForm;
+			uniform float aspectRatio;
 
+			#ifdef VERTEX_COLOR
 				in vec4 vg_color[];
-				in vec4 vg_r4pos[];
+			#endif
+			in vec4 vg_r4pos[];
 
-				out float distance;
+			out float distance;
+			out vec4 gf_r4pos;
+			#ifdef VERTEX_COLOR
 				out vec4 gf_color;
-				out vec4 gf_r4pos;
+			#endif
 
-				#define BASE_POINT_SIZE		(0.002)
+			#define BASE_POINT_SIZE		(0.002)
 
-				void main() {
-					float card = BASE_POINT_SIZE, diag = 0.7071 * BASE_POINT_SIZE, mult = 1.0 / aspectRatio;
+			void main() {
+				float card = BASE_POINT_SIZE, diag = 0.7071 * BASE_POINT_SIZE, mult = 1.0 / aspectRatio;
 
-					vec4 point = gl_in[0].gl_Position;
+				vec4 point = gl_in[0].gl_Position;
+
+				float dist = length(point.xyz);
+				float image_dist = dist - gl_InvocationID * 6.283185;
+				point.xyz *= image_dist / dist;
+				distance = abs(image_dist);
+
+				point = projXForm * point;
+
+				point.xyz /= point.w;
+				point.w = 1;
+
+				float size = 1 / sin(dist);
+
+				gf_r4pos = vg_r4pos[0];
+				#ifdef VERTEX_COLOR
+					gf_color = vg_color[0];
+				#endif
+					
+				gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
+				EmitVertex();
+				gl_Position = point + vec4(0, 0, 0, 0);
+				EmitVertex();
+				gl_Position = point + size * vec4(-diag * mult, diag, 0, 0);
+				EmitVertex();
+				gl_Position = point + size * vec4(0, card, 0, 0);
+				EmitVertex();
+				EndPrimitive();
+					
+				gl_Position = point + size * vec4(0, -card, 0, 0);
+				EmitVertex();
+				gl_Position = point + vec4(0, 0, 0, 0);
+				EmitVertex();
+				gl_Position = point + size * vec4(-diag * mult, -diag, 0, 0);
+				EmitVertex();
+				gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
+				EmitVertex();
+				EndPrimitive();
+					
+				gl_Position = point + size * vec4(card * mult, 0, 0, 0);
+				EmitVertex();
+				gl_Position = point + vec4(0, 0, 0, 0);
+				EmitVertex();
+				gl_Position = point + size * vec4(diag * mult, -diag, 0, 0);
+				EmitVertex();
+				gl_Position = point + size * vec4(0, -card, 0, 0);
+				EmitVertex();
+				EndPrimitive();
+					
+				gl_Position = point + size * vec4(0, card, 0, 0);
+				EmitVertex();
+				gl_Position = point + vec4(0, 0, 0, 0);
+				EmitVertex();
+				gl_Position = point + size * vec4(diag * mult, diag, 0, 0);
+				EmitVertex();
+				gl_Position = point + size * vec4(card * mult, 0, 0, 0);
+				EmitVertex();
+				EndPrimitive();
+			}
+		)",
+		[](int program_id) {
+			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspectRatio"), aspect_ratio);
+			_set_uniform_matrix(program_id, "projXForm", proj_mat);
+		},
+		NULL,
+		std::vector<ShaderOption*> {new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL)}
+	);
+
+	geom_triangles = new ShaderCore(
+		GL_GEOMETRY_SHADER,
+		R"(
+			layout (triangles, invocations = 2) in;
+			layout (triangle_strip, max_vertices = 3) out;
+
+			uniform mat4 projXForm;
+
+			in vec4 vg_color[];
+			in vec4 vg_r4pos[];
+
+			out float distance;
+			out vec4 gf_color;
+			out vec4 gf_r4pos;
+
+			void main() {
+				for(int i = 0; i < 3; i++)
+				{
+					vec4 point = gl_in[i].gl_Position;
 
 					float dist = length(point.xyz);
 					float image_dist = dist - gl_InvocationID * 6.283185;
@@ -180,157 +312,54 @@ void init_shaders()
 
 					point = projXForm * point;
 
-					point.xyz /= point.w;
-					point.w = 1;
-
-					float size = 1 / sin(dist);
-
-					gf_color = vg_color[0];
-					gf_r4pos = vg_r4pos[0];
-					
-					gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
+					gl_Position = point;
+					gf_color = vg_color[i];
+					gf_r4pos = vg_r4pos[i];
 					EmitVertex();
-					gl_Position = point + vec4(0, 0, 0, 0);
-					EmitVertex();
-					gl_Position = point + size * vec4(-diag * mult, diag, 0, 0);
-					EmitVertex();
-					gl_Position = point + size * vec4(0, card, 0, 0);
-					EmitVertex();
-					EndPrimitive();
-					
-					gl_Position = point + size * vec4(0, -card, 0, 0);
-					EmitVertex();
-					gl_Position = point + vec4(0, 0, 0, 0);
-					EmitVertex();
-					gl_Position = point + size * vec4(-diag * mult, -diag, 0, 0);
-					EmitVertex();
-					gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
-					EmitVertex();
-					EndPrimitive();
-					
-					gl_Position = point + size * vec4(card * mult, 0, 0, 0);
-					EmitVertex();
-					gl_Position = point + vec4(0, 0, 0, 0);
-					EmitVertex();
-					gl_Position = point + size * vec4(diag * mult, -diag, 0, 0);
-					EmitVertex();
-					gl_Position = point + size * vec4(0, -card, 0, 0);
-					EmitVertex();
-					EndPrimitive();
-					
-					gl_Position = point + size * vec4(0, card, 0, 0);
-					EmitVertex();
-					gl_Position = point + vec4(0, 0, 0, 0);
-					EmitVertex();
-					gl_Position = point + size * vec4(diag * mult, diag, 0, 0);
-					EmitVertex();
-					gl_Position = point + size * vec4(card * mult, 0, 0, 0);
-					EmitVertex();
-					EndPrimitive();
 				}
-			)"
-		},
+				EndPrimitive();
+			}
+		)",
 		[](int program_id) {
 			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspectRatio"), aspect_ratio);
 			_set_uniform_matrix(program_id, "projXForm", proj_mat);
 		},
-		NULL
+		NULL,
+		std::vector<ShaderOption*> {new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL)}
 	);
 
-	geom_triangles = new Shader(
-		GL_GEOMETRY_SHADER,
-		std::vector<char*> {
-			VERSION_STRING,
-			R"(
-				layout (triangles, invocations = 2) in;
-				layout (triangle_strip, max_vertices = 3) out;
+	frag = new ShaderCore(
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform vec4 baseColor;
+			uniform float fogScale;
 
-				uniform mat4 projXForm;
+			in float distance;
+			in vec4 gf_r4pos;
 
-				in vec4 vg_color[];
-				in vec4 vg_r4pos[];
-
-				out float distance;
-				out vec4 gf_color;
-				out vec4 gf_r4pos;
-
-				void main() {
-					for(int i = 0; i < 3; i++)
-					{
-						vec4 point = gl_in[i].gl_Position;
-
-						float dist = length(point.xyz);
-						float image_dist = dist - gl_InvocationID * 6.283185;
-						point.xyz *= image_dist / dist;
-						distance = abs(image_dist);
-
-						point = projXForm * point;
-
-						gl_Position = point;
-						gf_color = vg_color[i];
-						gf_r4pos = vg_r4pos[i];
-						EmitVertex();
-					}
-					EndPrimitive();
-				}
-			)"
-		},
-		[](int program_id) {
-			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspectRatio"), aspect_ratio);
-			_set_uniform_matrix(program_id, "projXForm", proj_mat);
-		},
-		(ShaderPullFunc)NULL
-	);
-	
-	char* frag_core = R"(
-		uniform vec4 baseColor;
-		uniform float fogScale;
-
-		in float distance;
-		in vec4 gf_r4pos;
-
-		#ifdef VERTEX_COLOR
-			in vec4 gf_color;
-		#endif
-				
-		layout (depth_any) out float gl_FragDepth;
-
-		out vec4 fragColor;
-
-		void main() {
-			float dist = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
-			float fogFactor = exp(-dist * fogScale);
 			#ifdef VERTEX_COLOR
-				fragColor = clamp(baseColor + gf_color, 0, 1) * fogFactor;
-			#else
-				fragColor = baseColor * fogFactor;
+				in vec4 gf_color;
 			#endif
-			gl_FragDepth = dist;
-		}
-	)";
+				
+			layout (depth_any) out float gl_FragDepth;
 
-	frag_simple = new Shader(
-		GL_FRAGMENT_SHADER,
-		std::vector<char*> {
-			VERSION_STRING,
-			frag_core
-		},
+			out vec4 fragColor;
+
+			void main() {
+				float dist = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
+				float fogFactor = exp(-dist * fogScale);
+				#ifdef VERTEX_COLOR
+					fragColor = clamp(baseColor + gf_color, 0, 1) * fogFactor;
+				#else
+					fragColor = baseColor * fogFactor;
+				#endif
+				gl_FragDepth = dist;
+			}
+		)",
 		NULL,
 		[](GLuint program_id) {
 			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fogScale"), fog_scale);
-		}
-	);
-
-	frag_vcolor = new Shader(
-		GL_FRAGMENT_SHADER,
-		std::vector<char*> {
-			VERSION_STRING,
-			"#define VERTEX_COLOR\n",
-			frag_core
 		},
-		NULL,
-		[](GLuint program_id) {
-			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fogScale"), fog_scale);
-		}
+		std::vector<ShaderOption*> {new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL)}
 	);
 }
