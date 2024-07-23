@@ -30,7 +30,7 @@ public:
 
 	~Model();
 
-	void draw(Mat4 xform, Vec4 baseColor);
+	void draw(Mat4 xform, Vec4 base_color);
 
 	void dump() const;
 
@@ -45,4 +45,26 @@ public:
 	static Model* read_model_file(const char* filename, double scale);
 	static Model* make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips = true);
 	static Model* make_torus_arc(int longitudinal_segments, int transverse_segments, double length, double hole_ratio, bool use_quad_strips = true);
+
+	friend class Multirenderer;
+};
+
+
+class Multirenderer
+{
+public:
+	Multirenderer(Model* model, int count, Mat4* xforms, Vec4 base_color);
+	Multirenderer(Model* model, int count, Mat4* xforms, Vec4* base_colors);
+
+	~Multirenderer();
+
+	void draw();
+
+private:
+	void prepare_instance(Mat4& xform, Vec4& base_color);
+
+	Model* model;
+	int count;
+	Mat4* xforms;
+	Vec4* base_colors;
 };

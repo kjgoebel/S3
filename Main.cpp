@@ -54,20 +54,26 @@ bool	draw_poles = true,			//colored markers at each of the +x, +y, +z, +w poles 
 
 #define STANDARD_HOLE_RATIO		(0.006)
 
+Multirenderer* pole_renderer;
+
 #define NUM_HOPF_FIBERS		(32)
-Mat4 hopf_xforms[NUM_HOPF_FIBERS];
-Mat4 antihopf_xforms[NUM_HOPF_FIBERS];
+Multirenderer* hopf_renderer;
+Multirenderer* antihopf_renderer;
 
 #define TORUS_SUBDIVISIONS NUM_HOPF_FIBERS
 
-#define NUM_SUPERHOPF_FIBERS		(512)
-Mat4 superhopf_xforms[NUM_SUPERHOPF_FIBERS];
+#define NUM_SUPERHOPF_FIBERS		(1024)
+Multirenderer* superhopf_renderer;
 
 #define NUM_TESSERACT_EDGES			(32)
-Mat4 tesseract_edge_xforms[NUM_TESSERACT_EDGES];
+Multirenderer* tesseract_renderer;
+
+#define NUM_CROSS_EDGE_LOOPS		(8)
+Multirenderer* cross_renderer;
 
 #define NUM_ITC_EDGE_LOOPS			(16)
-Mat4 itc_edge_loop_xforms[NUM_ITC_EDGE_LOOPS];
+Multirenderer* itc_renderer;
+Multirenderer* dual_itc_renderer;
 
 
 void init()
@@ -93,19 +99,37 @@ void init()
 
 	pole_model = Model::read_model_file("subdivided_icosahedron.model", 0.05);
 	pole_model->generate_primitive_colors(0.3);
+	geodesic_model = Model::make_torus(32, 8, STANDARD_HOLE_RATIO);
+	geodesic_model->generate_primitive_colors(0.5);
+	torus_model = Model::make_torus(NUM_HOPF_FIBERS, NUM_HOPF_FIBERS, 1, false);
+	torus_model->generate_primitive_colors(0.7);
 
+	Mat4 pole_xforms[4] = {
+		Mat4::identity(),
+		Mat4::axial_rotation(_w, _x, TAU / 4),
+		Mat4::axial_rotation(_w, _y, TAU / 4),
+		Mat4::axial_rotation(_w, _z, TAU / 4)
+	};
+	Vec4 pole_colors[4] = {
+		{0.7, 0.7, 0.7, 1},
+		{0.7, 0, 0, 1},
+		{0, 0.7, 0, 1},
+		{0, 0, 0.7, 1}
+	};
+	pole_renderer = new Multirenderer(pole_model, 4, pole_xforms, pole_colors);
+
+	Mat4 hopf_xforms[NUM_HOPF_FIBERS];
+	Mat4 antihopf_xforms[NUM_HOPF_FIBERS];
 	for(i = 0; i < NUM_HOPF_FIBERS; i++)
 	{
 		double theta = (double)i * TAU / (2 * NUM_HOPF_FIBERS);
 		hopf_xforms[i] = Mat4::axial_rotation(_x, _w, theta) * Mat4::axial_rotation(_y, _z, theta);
 		antihopf_xforms[i] = Mat4::axial_rotation(_y, _x, theta) * Mat4::axial_rotation(_z, _w, theta) * Mat4::axial_rotation(_x, _z, TAU / 4);
 	}
+	hopf_renderer = new Multirenderer(geodesic_model, NUM_HOPF_FIBERS, hopf_xforms, Vec4(1, 0.5, 0, 1));
+	antihopf_renderer = new Multirenderer(geodesic_model, NUM_HOPF_FIBERS, antihopf_xforms, Vec4(0, 1, 0.5, 1));
 
-	geodesic_model = Model::make_torus(32, 8, STANDARD_HOLE_RATIO);
-	geodesic_model->generate_primitive_colors(0.5);
-	torus_model = Model::make_torus(NUM_HOPF_FIBERS, NUM_HOPF_FIBERS, 1, false);
-	torus_model->generate_primitive_colors(0.7);
-
+	Mat4 superhopf_xforms[NUM_SUPERHOPF_FIBERS];
 	for(i = 0; i < NUM_SUPERHOPF_FIBERS; i++)
 	{
 		Vec3 temp = rand_s2();
@@ -117,7 +141,9 @@ void init()
 			* Mat4::axial_rotation(_y, _z, theta);
 			//* Mat4::axial_rotation(_w, _z, frand() * TAU);		//Random longitudinal displacement so that the stripes on nearby fibers don't line up. It might be more elucidating if they do line up, come to think of it.
 	}
+	superhopf_renderer = new Multirenderer(geodesic_model, NUM_SUPERHOPF_FIBERS, superhopf_xforms, Vec4(0.5, 1, 0.5, 1));
 
+	Mat4 tesseract_edge_xforms[NUM_TESSERACT_EDGES];
 	tesseract_arc = Model::make_torus_arc(8, 8, acos(0.5), STANDARD_HOLE_RATIO);
 	tesseract_arc->generate_primitive_colors(0.5);
 	int edge_index = 0;
@@ -146,8 +172,20 @@ void init()
 			}
 		}
 	}
+	tesseract_renderer = new Multirenderer(tesseract_arc, NUM_TESSERACT_EDGES, tesseract_edge_xforms, Vec4(1, 0, 1, 1));
+
+	Mat4 cross_xforms[NUM_CROSS_EDGE_LOOPS] = {
+		Mat4::identity(),
+		Mat4::axial_rotation(_x, _w, TAU / 4),
+		Mat4::axial_rotation(_y, _w, TAU / 4),
+		Mat4::axial_rotation(_x, _z, TAU / 4),
+		Mat4::axial_rotation(_y, _z, TAU / 4),
+		Mat4::axial_rotation(_x, _w, TAU / 4) * Mat4::axial_rotation(_y, _z, TAU / 4)
+	};
+	cross_renderer = new Multirenderer(geodesic_model, NUM_CROSS_EDGE_LOOPS, cross_xforms, Vec4(1, 0, 0, 1));
 
 	//Don't ask how I came up with these vectors. You don't want to know.
+	Mat4 itc_edge_loop_xforms[NUM_ITC_EDGE_LOOPS];
 	Vec4 temp[NUM_ITC_EDGE_LOOPS][2] = {
 		{Vec4(0, 1, 1, 0), Vec4(1, 0, 1, 0)},
 		{Vec4(0, 1, 1, 0), Vec4(1, 1, 0, 0)},
@@ -166,9 +204,15 @@ void init()
 		{Vec4(0, -1, 1, 0), Vec4(1, -1, 0, 0)},
 		{Vec4(1, 0, 0, 1), Vec4(0, 0, 1, 1)}
 	};
-
 	for(i = 0; i < NUM_ITC_EDGE_LOOPS; i++)
 		itc_edge_loop_xforms[i] = basis_around(temp[i][0].normalize(), temp[i][1].normalize());
+
+	itc_renderer = new Multirenderer(geodesic_model, NUM_ITC_EDGE_LOOPS, itc_edge_loop_xforms, Vec4(1, 0, 1, 1));
+
+	Mat4 dual_rotation = Mat4::axial_rotation(_w, _z, TAU / 8) * Mat4::axial_rotation(_y, _x, TAU / 8);
+	for(i = 0; i < NUM_ITC_EDGE_LOOPS; i++)
+		itc_edge_loop_xforms[i] = dual_rotation * itc_edge_loop_xforms[i];
+	dual_itc_renderer = new Multirenderer(geodesic_model, NUM_ITC_EDGE_LOOPS, itc_edge_loop_xforms, Vec4(1, 0, 0, 1));
 }
 
 
@@ -204,53 +248,30 @@ void display()
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	int i;
-
 	if(draw_poles)
-	{
-		pole_model->draw(Mat4::identity(), Vec4(0.7, 0.7, 0.7, 1));
-		pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
-		pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
-		pole_model->draw(Mat4::axial_rotation(_w, _z, TAU / 4), Vec4(0, 0, 0.7, 1));
-	}
+		pole_renderer->draw();
 	
 	if(draw_clutter)
 		dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
 
 	if(draw_tesseract)
-		for(int i = 0; i < NUM_TESSERACT_EDGES; i++)
-			tesseract_arc->draw(tesseract_edge_xforms[i], Vec4(1, 0, 1, 1));
+		tesseract_renderer->draw();
 
 	if(draw_cross)
-	{
-		geodesic_model->draw(Mat4::identity(), Vec4(1, 0, 0, 1));
-		geodesic_model->draw(Mat4::axial_rotation(_x, _w, TAU / 4), Vec4(1, 0, 0, 1));
-		geodesic_model->draw(Mat4::axial_rotation(_y, _w, TAU / 4), Vec4(1, 0, 0, 1));
-		geodesic_model->draw(Mat4::axial_rotation(_x, _z, TAU / 4), Vec4(1, 0, 0, 1));
-		geodesic_model->draw(Mat4::axial_rotation(_y, _z, TAU / 4), Vec4(1, 0, 0, 1));
-		geodesic_model->draw(Mat4::axial_rotation(_x, _w, TAU / 4) * Mat4::axial_rotation(_y, _z, TAU / 4), Vec4(1, 0, 0, 1));
-	}
+		cross_renderer->draw();
 
 	if(draw_itc)
 	{
-		for(i = 0; i < NUM_ITC_EDGE_LOOPS; i++)
-			geodesic_model->draw(itc_edge_loop_xforms[i], Vec4(1, 0, 1, 1));
+		itc_renderer->draw();
 		if(draw_dual_itc)
-		{
-			Mat4 dual_rotation = Mat4::axial_rotation(_w, _z, TAU / 8) * Mat4::axial_rotation(_y, _x, TAU / 8);
-			for(i = 0; i < NUM_ITC_EDGE_LOOPS; i++)
-				geodesic_model->draw(dual_rotation * itc_edge_loop_xforms[i], Vec4(1, 0, 0, 1));
-		}
+			dual_itc_renderer->draw();
 	}
 
 	if(draw_hopf)
 	{
-		for(int i = 0; i < NUM_HOPF_FIBERS; i++)
-		{
-			geodesic_model->draw(hopf_xforms[i], Vec4(1, 0.5, 0, 1));
-			if(draw_antihopf)
-				geodesic_model->draw(antihopf_xforms[i], Vec4(0, 1, 0.5, 1));
-		}
+		hopf_renderer->draw();
+		if(draw_antihopf)
+			antihopf_renderer->draw();
 	}
 
 	if(draw_sun_paths)
@@ -263,8 +284,7 @@ void display()
 		torus_model->draw(Mat4::axial_rotation(_y, _w, TAU / 8) * Mat4::axial_rotation(_z, _x, TAU / 8), Vec4(0.3, 0.3, 0.3, 1));
 
 	if(draw_superhopf)
-		for(i = 0; i < NUM_SUPERHOPF_FIBERS; i++)
-			geodesic_model->draw(superhopf_xforms[i], Vec4(0.5, 1, 0.5, 1));
+		superhopf_renderer->draw();
 
 	glFlush();
 	glutSwapBuffers();

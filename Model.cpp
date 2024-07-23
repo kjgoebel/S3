@@ -127,13 +127,14 @@ void Model::prepare_to_render()
 	ready_to_render = true;
 }
 
-void Model::draw(Mat4 xform, Vec4 baseColor)
+
+void Model::draw(Mat4 xform, Vec4 base_color)
 {
 	if(!ready_to_render)
 		prepare_to_render();
 
 	glUseProgram(shader_program);
-	glProgramUniform4f(shader_program, glGetUniformLocation(shader_program, "baseColor"), baseColor.x, baseColor.y, baseColor.z, baseColor.w);
+	glProgramUniform4f(shader_program, glGetUniformLocation(shader_program, "baseColor"), base_color.x, base_color.y, base_color.z, base_color.w);
 	glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "aspectRatio"), aspect_ratio);
 	glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "fogScale"), fog_scale);
 	set_uniform_matrix(shader_program, "modelViewXForm", ~cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
@@ -391,4 +392,91 @@ Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments,
 }
 
 
+Multirenderer::Multirenderer(Model* model, int count, Mat4* xforms, Vec4 base_color)
+{
+	this->model = model;
+	this->count = count;
 
+	this->xforms = new Mat4[count];
+	for(int i = 0; i < count; i++)
+		this->xforms[i] = xforms[i];
+
+	this->base_colors = new Vec4[count];
+	for(int i = 0; i < count; i++)
+		this->base_colors[i] = base_color;
+}
+
+
+Multirenderer::Multirenderer(Model* model, int count, Mat4* xforms, Vec4* base_colors)
+{
+	this->model = model;
+	this->count = count;
+
+	this->xforms = new Mat4[count];
+	for(int i = 0; i < count; i++)
+		this->xforms[i] = xforms[i];
+
+	this->base_colors = new Vec4[count];
+	for(int i = 0; i < count; i++)
+		this->base_colors[i] = base_colors[i];
+}
+
+Multirenderer::~Multirenderer()
+{
+	if(xforms)
+		delete[] xforms;
+	if(base_colors)
+		delete[] base_colors;
+}
+
+
+void Multirenderer::prepare_instance(Mat4& xform, Vec4& base_color)
+{
+	glProgramUniform4f(model->shader_program, glGetUniformLocation(model->shader_program, "baseColor"), base_color.x, base_color.y, base_color.z, base_color.w);
+	set_uniform_matrix(model->shader_program, "modelViewXForm", ~cam_mat * xform);
+}
+
+
+void Multirenderer::draw()
+{
+	if(!model->ready_to_render)
+		model->prepare_to_render();
+
+	glUseProgram(model->shader_program);
+	glProgramUniform1f(model->shader_program, glGetUniformLocation(model->shader_program, "aspectRatio"), aspect_ratio);
+	glProgramUniform1f(model->shader_program, glGetUniformLocation(model->shader_program, "fogScale"), fog_scale);
+	set_uniform_matrix(model->shader_program, "projXForm", proj_mat);		//Should find a way to avoid pushing this to the GPU every frame.
+
+	glBindVertexArray(model->vertex_array);
+
+	int i;
+
+	if(model->indices)
+		switch(model->primitive)
+		{
+			case GL_LINES:
+			case GL_TRIANGLES:
+			case GL_QUADS:
+				for(i = 0; i < count; i++)
+				{
+					prepare_instance(xforms[i], base_colors[i]);
+					glDrawElements(model->primitive, model->vertices_per_primitive * model->num_primitives, GL_UNSIGNED_INT, (void*)0);
+				}
+				break;
+			default:
+				for(i = 0; i < count; i++)
+				{
+					prepare_instance(xforms[i], base_colors[i]);
+					for(int j = 0; j < model->num_primitives; j++)
+						glDrawElements(model->primitive, model->vertices_per_primitive, GL_UNSIGNED_INT, (void*)(j * model->vertices_per_primitive * sizeof(int)));
+				}
+				break;
+		}
+	else
+		for(i = 0; i < count; i++)
+		{
+			prepare_instance(xforms[i], base_colors[i]);
+			for(int j = 0; j < model->num_primitives; j++)
+				glDrawArrays(model->primitive, j * model->vertices_per_primitive, model->vertices_per_primitive);
+		}
+}
