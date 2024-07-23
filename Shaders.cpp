@@ -109,14 +109,15 @@ std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 Shader *vert, *geom_points, *geom_triangles, *frag_simple, *frag_vcolor;
 
 
+#define VERSION_STRING		"#version 460\n"
+
 void init_shaders()
 {
 	vert = new Shader(
 		GL_VERTEX_SHADER,
 		std::vector<char*> {
+			VERSION_STRING,
 			R"(
-				#version 460
-
 				layout (location = 0) in vec4 position;
 				layout (location = 1) in vec4 color;
 
@@ -150,9 +151,8 @@ void init_shaders()
 	geom_points = new Shader(
 		GL_GEOMETRY_SHADER,
 		std::vector<char*> {
+			VERSION_STRING,
 			R"(
-				#version 460
-
 				layout (points, invocations = 2) in;
 				layout (triangle_strip, max_vertices = 16) out;
 
@@ -240,9 +240,8 @@ void init_shaders()
 	geom_triangles = new Shader(
 		GL_GEOMETRY_SHADER,
 		std::vector<char*> {
+			VERSION_STRING,
 			R"(
-				#version 460
-
 				layout (triangles, invocations = 2) in;
 				layout (triangle_strip, max_vertices = 3) out;
 
@@ -283,28 +282,38 @@ void init_shaders()
 		(ShaderPullFunc)NULL
 	);
 	
+	char* frag_core = R"(
+		uniform vec4 baseColor;
+		uniform float fogScale;
+
+		in float distance;
+		in vec4 gf_r4pos;
+
+		#ifdef VERTEX_COLOR
+			in vec4 gf_color;
+		#endif
+				
+		layout (depth_any) out float gl_FragDepth;
+
+		out vec4 fragColor;
+
+		void main() {
+			float dist = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
+			float fogFactor = exp(-dist * fogScale);
+			#ifdef VERTEX_COLOR
+				fragColor = clamp(baseColor + gf_color, 0, 1) * fogFactor;
+			#else
+				fragColor = baseColor * fogFactor;
+			#endif
+			gl_FragDepth = dist;
+		}
+	)";
+
 	frag_simple = new Shader(
 		GL_FRAGMENT_SHADER,
 		std::vector<char*> {
-			R"(
-				#version 460
-
-				uniform vec4 baseColor;
-				uniform float fogScale;
-
-				in float distance;
-				in vec4 gf_r4pos;
-
-				layout (depth_any) out float gl_FragDepth;
-				out vec4 fragColor;
-
-				void main() {
-					float dist = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
-					float fogFactor = exp(-dist * fogScale);
-					fragColor = baseColor * fogFactor;
-					gl_FragDepth = dist;
-				}
-			)"
+			VERSION_STRING,
+			frag_core
 		},
 		NULL,
 		[](GLuint program_id) {
@@ -315,26 +324,9 @@ void init_shaders()
 	frag_vcolor = new Shader(
 		GL_FRAGMENT_SHADER,
 		std::vector<char*> {
-			R"(
-				#version 460
-
-				uniform vec4 baseColor;
-				uniform float fogScale;
-
-				in float distance;
-				in vec4 gf_r4pos;
-				in vec4 gf_color;
-				
-				layout (depth_any) out float gl_FragDepth;
-				out vec4 fragColor;
-
-				void main() {
-					float dist = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
-					float fogFactor = exp(-dist * fogScale);
-					fragColor = clamp(baseColor + gf_color, 0, 1) * fogFactor;
-					gl_FragDepth = dist;
-				}
-			)"
+			VERSION_STRING,
+			"#define VERTEX_COLOR\n",
+			frag_core
 		},
 		NULL,
 		[](GLuint program_id) {
