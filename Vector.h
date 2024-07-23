@@ -17,7 +17,7 @@
 #define INV_ROOT_2 (0.7071067811865475)
 
 
-//* is used for the dot product.
+//* is used for the dot product. This is not such a good idea because now * isn't associative.
 //% is used for the cross product of Vec3s.
 //~ is used for the transpose of a Mat4.
 

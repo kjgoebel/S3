@@ -126,8 +126,9 @@ void init_shaders()
 					vec4 point = gl_in[0].gl_Position;
 
 					float dist = length(point.xyz);
-					point.xyz *= (dist - gl_InvocationID * 6.283185) / dist;
-					distance = abs(dist - gl_InvocationID * 6.283185);
+					float image_dist = dist - gl_InvocationID * 6.283185;
+					point.xyz *= image_dist / dist;
+					distance = abs(image_dist);
 
 					point = projXForm * point;
 
@@ -240,8 +241,9 @@ void init_shaders()
 						vec4 point = gl_in[i].gl_Position;
 
 						float dist = length(point.xyz);
-						point.xyz *= (dist - gl_InvocationID * 6.283185) / dist;
-						distance = abs(dist - gl_InvocationID * 6.283185);
+						float image_dist = dist - gl_InvocationID * 6.283185;
+						point.xyz *= image_dist / dist;
+						distance = abs(image_dist);
 
 						point = projXForm * point;
 
