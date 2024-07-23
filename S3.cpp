@@ -1,4 +1,5 @@
 #include "S3.h"
+#include "Utils.h"
 
 
 //const Vec4 xhat(1, 0, 0, 0), yhat(0, 1, 0, 0), zhat(0, 0, 1, 0), what(0, 0, 0, 1);
@@ -8,7 +9,7 @@ Mat4 cam_mat = Mat4::identity();
 Mat4 proj_mat = Mat4::identity();
 
 float aspect_ratio = 1;
-float fog_scale = 1;
+float fog_scale = 2;
 
 
 /*
@@ -60,27 +61,16 @@ Mat4 basis_around(Vec4 a, Vec4 b, double* length)
 	printf("\t"); print_vector(a);
 	printf("\t"); print_vector(b);*/
 
-	int smallest_indices[2];
-	double smallest_values[2] = {99, 99};
-
-	for(int ix = 0; ix < 4; ix++)
-	{
-		double value = fabs(a[ix]) + fabs(b[ix]);
-		for(int j = 0; j < 2; j++)
-			if(smallest_values[j] > value)
-			{
-				smallest_indices[j] = ix;
-				smallest_values[j] = value;
-				break;
-			}
-	}
-
-	//printf("smallest_indices = %d, %d\n", smallest_indices[0], smallest_indices[1]);
-
-	Vec4 temp1 = Vec4(smallest_indices[0]);
+	Vec4 temp1;
+	do {
+		temp1 = rand_s3();
+	}while((temp1 - a).mag2() < 0.2 || (temp1 - b).mag2() < 0.2);
 	temp1 = (temp1 - a * (a * temp1) - b * (b * temp1)).normalize();
 
-	Vec4 temp2 = Vec4(smallest_indices[1]);
+	Vec4 temp2;
+	do {
+		temp2 = rand_s3();
+	}while((temp2 - a).mag2() < 0.2 || (temp2 - b).mag2() < 0.2 || (temp2 - temp1).mag2() < 0.2);
 	temp2 = (temp2 - a * (a * temp2) - b * (b * temp2) - temp1 * (temp1 * temp2)).normalize();
 
 	Mat4 ret = Mat4::from_columns(temp1, temp2, b, a);
