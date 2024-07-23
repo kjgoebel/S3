@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#pragma warning(disable : 4244)
+
 
 GLuint make_new_shader(GLuint shader_type, const std::vector<char*> text)
 {

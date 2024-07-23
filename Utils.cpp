@@ -6,6 +6,7 @@
 #include <stdarg.h>
 
 #pragma warning(disable : 4996)		//VS doesn't even like fopen()?! My God....
+#pragma warning(disable : 4244)
 
 
 double frand()
