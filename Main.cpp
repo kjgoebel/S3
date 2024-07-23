@@ -220,6 +220,7 @@ void reshape(int w, int h)
 {
 	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
 	set_perspective((double)w / h);
+	ShaderProgram::init_all();
 }
 
 void display()
@@ -247,6 +248,8 @@ void display()
 	last_fame_time += dt;
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	ShaderProgram::frame_all();
 
 	if(draw_poles)
 		pole_renderer->draw();

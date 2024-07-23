@@ -22,7 +22,8 @@ struct Model
 
 private:
 	bool ready_to_render;
-	GLuint shader_program, vertex_array;
+	GLuint vertex_array;
+	ShaderProgram* shader_program;
 
 public:
 	Model(int num_verts, const Vec4* verts = NULL, const Vec4* vert_colors = NULL);

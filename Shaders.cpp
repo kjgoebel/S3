@@ -1,27 +1,38 @@
 #include "Shaders.h"
 
+#include "S3.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-#pragma warning(disable : 4244)
+#pragma warning(disable : 4244)		//conversion from double to float
 
 
-GLuint make_new_shader(GLuint shader_type, const std::vector<char*> text)
+void _set_uniform_matrix(GLuint program_id, const char* name, Mat4& mat)
 {
-	GLuint ret = glCreateShader(shader_type);
-	glShaderSource(ret, text.size(), &text[0], NULL);
-	glCompileShader(ret);
+	float temp[16];
+	for(int i = 0; i < 4; i++)
+		for(int j = 0; j < 4; j++)
+			temp[j * 4 + i] = mat.data[i][j];
+	glProgramUniformMatrix4fv(program_id, glGetUniformLocation(program_id, name), 1, false, temp);
+}
+
+
+Shader::Shader(GLuint shader_type, const std::vector<char*> text, ShaderPullFunc init_func, ShaderPullFunc frame_func)
+{
+	id = glCreateShader(shader_type);
+	glShaderSource(id, text.size(), &text[0], NULL);
+	glCompileShader(id);
 
 	GLint success = 0;
-	glGetShaderiv(ret, GL_COMPILE_STATUS, &success);
+	glGetShaderiv(id, GL_COMPILE_STATUS, &success);
 	if(success == GL_FALSE)
 	{
 		for(char* temp : text)
 			printf(temp);
 		GLint log_length = 0;
-		glGetShaderiv(ret, GL_INFO_LOG_LENGTH, &log_length);
+		glGetShaderiv(id, GL_INFO_LOG_LENGTH, &log_length);
 		char* log = new char[log_length + 1];
-		glGetShaderInfoLog(ret, log_length, &log_length, log);
+		glGetShaderInfoLog(id, log_length, &log_length, log);
 		log[log_length] = 0;
 		printf(log);
 
@@ -29,26 +40,31 @@ GLuint make_new_shader(GLuint shader_type, const std::vector<char*> text)
 		exit(-1);
 	}
 
-	return ret;
+	this->init_func = init_func;
+	this->frame_func = frame_func;
 }
 
 
-GLuint make_new_program(GLuint vert, GLuint geom, GLuint frag)
+ShaderProgram::ShaderProgram(Shader* vert, Shader* geom, Shader* frag)
 {
-	GLuint ret = glCreateProgram();
-	glAttachShader(ret, vert);
-	glAttachShader(ret, geom);
-	glAttachShader(ret, frag);
-	glLinkProgram(ret);
+	vertex = vert;
+	geometry = geom;
+	fragment = frag;
+
+	id = glCreateProgram();
+	glAttachShader(id, vertex->get_id());
+	glAttachShader(id, geometry->get_id());
+	glAttachShader(id, fragment->get_id());
+	glLinkProgram(id);
 
 	GLint success;
-	glGetProgramiv(ret, GL_LINK_STATUS, &success);
+	glGetProgramiv(id, GL_LINK_STATUS, &success);
 	if(success == GL_FALSE)
 	{
 		GLint log_length = 0;
-		glGetProgramiv(ret, GL_INFO_LOG_LENGTH, &log_length);
+		glGetProgramiv(id, GL_INFO_LOG_LENGTH, &log_length);
 		char* log = new char[log_length + 1];
-		glGetProgramInfoLog(ret, log_length, &log_length, log);
+		glGetProgramInfoLog(id, log_length, &log_length, log);
 		log[log_length] = 0;
 		printf(log);
 
@@ -56,16 +72,46 @@ GLuint make_new_program(GLuint vert, GLuint geom, GLuint frag)
 		exit(-1);
 	}
 
-	return ret;
+	init();
+
+	all_shader_programs.push_back(this);
 }
 
+void ShaderProgram::set_uniform_matrix(const char* name, Mat4& mat)
+{
+	//Don't like the function call overhead....
+	_set_uniform_matrix(id, name, mat);
+}
 
-GLuint vert, geom_points, geom_triangles, frag_simple, frag_vcolor;
+ShaderProgram* ShaderProgram::get(Shader* vert, Shader* geom, Shader* frag)
+{
+	for(ShaderProgram* temp : all_shader_programs)
+		if(temp->vertex == vert && temp->geometry == geom && temp->fragment == frag)
+			return temp;
+	return new ShaderProgram(vert, geom, frag);
+}
+
+void ShaderProgram::init_all()
+{
+	for(ShaderProgram* temp : all_shader_programs)
+		temp->init();
+}
+
+void ShaderProgram::frame_all()
+{
+	for(ShaderProgram* temp : all_shader_programs)
+		temp->frame();
+}
+
+std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
+
+
+Shader *vert, *geom_points, *geom_triangles, *frag_simple, *frag_vcolor;
 
 
 void init_shaders()
 {
-	vert = make_new_shader(
+	vert = new Shader(
 		GL_VERTEX_SHADER,
 		std::vector<char*> {
 			R"(
@@ -101,7 +147,7 @@ void init_shaders()
 		}
 	);
 
-	geom_points = make_new_shader(
+	geom_points = new Shader(
 		GL_GEOMETRY_SHADER,
 		std::vector<char*> {
 			R"(
@@ -183,10 +229,15 @@ void init_shaders()
 					EndPrimitive();
 				}
 			)"
-		}
+		},
+		[](int program_id) {
+			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspectRatio"), aspect_ratio);
+			_set_uniform_matrix(program_id, "projXForm", proj_mat);
+		},
+		NULL
 	);
 
-	geom_triangles = make_new_shader(
+	geom_triangles = new Shader(
 		GL_GEOMETRY_SHADER,
 		std::vector<char*> {
 			R"(
@@ -224,10 +275,15 @@ void init_shaders()
 					EndPrimitive();
 				}
 			)"
-		}
+		},
+		[](int program_id) {
+			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspectRatio"), aspect_ratio);
+			_set_uniform_matrix(program_id, "projXForm", proj_mat);
+		},
+		(ShaderPullFunc)NULL
 	);
 	
-	frag_simple = make_new_shader(
+	frag_simple = new Shader(
 		GL_FRAGMENT_SHADER,
 		std::vector<char*> {
 			R"(
@@ -249,10 +305,14 @@ void init_shaders()
 					gl_FragDepth = dist;
 				}
 			)"
+		},
+		NULL,
+		[](GLuint program_id) {
+			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fogScale"), fog_scale);
 		}
 	);
 
-	frag_vcolor = make_new_shader(
+	frag_vcolor = new Shader(
 		GL_FRAGMENT_SHADER,
 		std::vector<char*> {
 			R"(
@@ -275,16 +335,10 @@ void init_shaders()
 					gl_FragDepth = dist;
 				}
 			)"
+		},
+		NULL,
+		[](GLuint program_id) {
+			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fogScale"), fog_scale);
 		}
 	);
-}
-
-
-void set_uniform_matrix(GLuint shader_program, const char* name, Mat4& mat)
-{
-	float temp[16];
-	for(int i = 0; i < 4; i++)
-		for(int j = 0; j < 4; j++)
-			temp[j * 4 + i] = mat.data[i][j];
-	glProgramUniformMatrix4fv(shader_program, glGetUniformLocation(shader_program, name), 1, false, temp);
 }

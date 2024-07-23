@@ -111,7 +111,7 @@ void Model::prepare_to_render()
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), indices, GL_STATIC_DRAW);
 	}
 
-	GLuint geom_shader, frag_shader = vertex_colors ? frag_vcolor : frag_simple;
+	Shader *geom_shader, *frag_shader = vertex_colors ? frag_vcolor : frag_simple;
 	switch(primitive)
 	{
 		case GL_POINTS:
@@ -122,7 +122,7 @@ void Model::prepare_to_render()
 			break;
 	}
 
-	shader_program = make_new_program(vert, geom_shader, frag_shader);
+	shader_program = ShaderProgram::get(vert, geom_shader, frag_shader);
 
 	ready_to_render = true;
 }
@@ -132,13 +132,11 @@ void Model::draw(Mat4 xform, Vec4 base_color)
 {
 	if(!ready_to_render)
 		prepare_to_render();
-
-	glUseProgram(shader_program);
-	glProgramUniform4f(shader_program, glGetUniformLocation(shader_program, "baseColor"), base_color.x, base_color.y, base_color.z, base_color.w);
-	glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "aspectRatio"), aspect_ratio);
-	glProgramUniform1f(shader_program, glGetUniformLocation(shader_program, "fogScale"), fog_scale);
-	set_uniform_matrix(shader_program, "modelViewXForm", ~cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
-	set_uniform_matrix(shader_program, "projXForm", proj_mat);		//Should find a way to avoid pushing this to the GPU every frame.
+		
+	shader_program->use();
+	GLuint program_id = shader_program->get_id();
+	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "baseColor"), base_color.x, base_color.y, base_color.z, base_color.w);
+	shader_program->set_uniform_matrix("modelViewXForm", ~cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
 
 	glBindVertexArray(vertex_array);
 
@@ -432,8 +430,9 @@ Multirenderer::~Multirenderer()
 
 void Multirenderer::prepare_instance(Mat4& xform, Vec4& base_color)
 {
-	glProgramUniform4f(model->shader_program, glGetUniformLocation(model->shader_program, "baseColor"), base_color.x, base_color.y, base_color.z, base_color.w);
-	set_uniform_matrix(model->shader_program, "modelViewXForm", ~cam_mat * xform);
+	GLuint program_id = model->shader_program->get_id();
+	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "baseColor"), base_color.x, base_color.y, base_color.z, base_color.w);
+	model->shader_program->set_uniform_matrix("modelViewXForm", ~cam_mat * xform);
 }
 
 
@@ -442,11 +441,7 @@ void Multirenderer::draw()
 	if(!model->ready_to_render)
 		model->prepare_to_render();
 
-	glUseProgram(model->shader_program);
-	glProgramUniform1f(model->shader_program, glGetUniformLocation(model->shader_program, "aspectRatio"), aspect_ratio);
-	glProgramUniform1f(model->shader_program, glGetUniformLocation(model->shader_program, "fogScale"), fog_scale);
-	set_uniform_matrix(model->shader_program, "projXForm", proj_mat);		//Should find a way to avoid pushing this to the GPU every frame.
-
+	model->shader_program->use();
 	glBindVertexArray(model->vertex_array);
 
 	int i;
