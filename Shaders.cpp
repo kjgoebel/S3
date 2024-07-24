@@ -3,6 +3,7 @@
 #include "S3.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "Utils.h"
 
 #pragma warning(disable : 4244)		//conversion from double to float
 
@@ -23,7 +24,16 @@ void _set_uniform_matrix(GLuint program_id, const char* name, Mat4& mat)
 Shader::Shader(ShaderCore* core, const std::set<const char*> options) : core(core), options(options)
 {
 	id = glCreateShader(core->shader_type);
-	//printf("new shader id = %d\n", id);
+
+	printf("new shader id = %d\n", id);
+	fprintf(stderr, "%s\n", core->name);
+	for(auto option : options)
+		fprintf(stderr, "\t%s", option);
+
+	for(auto option : options)
+		if(!core->options.count(option))
+			error("ShaderCore %s doesn't have option %s", core->name, option);
+
 	std::vector<const char*> text;
 	text.push_back(VERSION_STRING);
 	for(auto option: options)
@@ -49,7 +59,7 @@ Shader::Shader(ShaderCore* core, const std::set<const char*> options) : core(cor
 		delete[] log;
 		exit(-1);
 	}
-
+	
 	init_func = [core, options](GLuint program_id) {
 		if(core->init_func)
 			core->init_func(program_id);
@@ -93,7 +103,7 @@ ShaderProgram::ShaderProgram(Shader* vert, Shader* geom, Shader* frag)
 	fragment = frag;
 
 	id = glCreateProgram();
-	//printf("new program id = %d\n", id);
+	printf("new program id = %d (%d, %d, %d)\n", id, vertex->get_id(), geometry->get_id(), fragment->get_id());
 	glAttachShader(id, vertex->get_id());
 	glAttachShader(id, geometry->get_id());
 	glAttachShader(id, fragment->get_id());
@@ -113,7 +123,7 @@ ShaderProgram::ShaderProgram(Shader* vert, Shader* geom, Shader* frag)
 		delete[] log;
 		exit(-1);
 	}
-
+	
 	init();
 
 	all_shader_programs.push_back(this);
@@ -153,15 +163,26 @@ ShaderCore *vert, *geom_points, *geom_triangles, *frag;
 void init_shaders()
 {
 	vert = new ShaderCore(
+		"vert",
 		GL_VERTEX_SHADER,
 		R"(
 			layout (location = 0) in vec4 position;
-			layout (location = 1) in vec4 color;
-
-			uniform mat4 modelViewXForm;
 
 			#ifdef VERTEX_COLOR
+				layout (location = 1) in vec4 color;
 				out vec4 vg_color;
+			#endif
+
+			#ifdef INSTANCED_XFORM
+				layout (location = 2) in mat4 modelXForm;
+				uniform mat4 viewXForm;
+			#else
+				uniform mat4 modelViewXForm;
+			#endif
+			
+			#ifdef INSTANCED_BASE_COLOR
+				layout (location = 6) in vec4 base_color;
+				out vec4 vg_base_color;
 			#endif
 
 			/*
@@ -177,11 +198,17 @@ void init_shaders()
 			out vec4 vg_r4pos;
 				
 			void main() {
+				#ifdef INSTANCED_XFORM
+					mat4 modelViewXForm = transpose(viewXForm) * modelXForm;
+				#endif
 				vg_r4pos = modelViewXForm * position;
 				float distance = acos(vg_r4pos.w);
 				gl_Position.xyz = distance * normalize(vg_r4pos.xyz);
 				gl_Position.w = 1;
 
+				#ifdef INSTANCED_BASE_COLOR
+					vg_base_color = base_color;
+				#endif
 				#ifdef VERTEX_COLOR
 					vg_color = color;
 				#endif
@@ -189,10 +216,21 @@ void init_shaders()
 		)",
 		NULL,
 		NULL,
-		std::vector<ShaderOption*> {new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL)}
+		std::vector<ShaderOption*> {
+			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
+			new ShaderOption(
+				DEFINE_INSTANCED_XFORM,
+				NULL,
+				[](int program_id) {
+					_set_uniform_matrix(program_id, "viewXForm", cam_mat);
+				}
+			),
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
+		}
 	);
 
 	geom_points = new ShaderCore(
+		"geom_points",
 		GL_GEOMETRY_SHADER,
 		R"(
 			layout (points, invocations = 2) in;
@@ -203,14 +241,18 @@ void init_shaders()
 
 			#ifdef VERTEX_COLOR
 				in vec4 vg_color[];
-			#endif
-			in vec4 vg_r4pos[];
-
-			out float distance;
-			out vec4 gf_r4pos;
-			#ifdef VERTEX_COLOR
 				out vec4 gf_color;
 			#endif
+
+			#ifdef INSTANCED_BASE_COLOR
+				in vec4 vg_base_color[];
+				out vec4 gf_base_color;
+			#endif
+
+			in vec4 vg_r4pos[];
+			out vec4 gf_r4pos;
+
+			out float distance;
 
 			#define BASE_POINT_SIZE		(0.002)
 
@@ -234,6 +276,9 @@ void init_shaders()
 				gf_r4pos = vg_r4pos[0];
 				#ifdef VERTEX_COLOR
 					gf_color = vg_color[0];
+				#endif
+				#ifdef INSTANCED_BASE_COLOR
+					gf_base_color = vg_base_color[0];
 				#endif
 					
 				gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
@@ -282,10 +327,14 @@ void init_shaders()
 			_set_uniform_matrix(program_id, "projXForm", proj_mat);
 		},
 		NULL,
-		std::vector<ShaderOption*> {new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL)}
+		std::vector<ShaderOption*> {
+			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
+		}
 	);
 
 	geom_triangles = new ShaderCore(
+		"geom_triangles",
 		GL_GEOMETRY_SHADER,
 		R"(
 			layout (triangles, invocations = 2) in;
@@ -293,12 +342,19 @@ void init_shaders()
 
 			uniform mat4 projXForm;
 
-			in vec4 vg_color[];
-			in vec4 vg_r4pos[];
+			#ifdef VERTEX_COLOR
+				in vec4 vg_color[];
+				out vec4 gf_color;
+			#endif
 
-			out float distance;
-			out vec4 gf_color;
+			#ifdef INSTANCED_BASE_COLOR
+				in vec4 vg_base_color[];
+				out vec4 gf_base_color;
+			#endif
+
+			in vec4 vg_r4pos[];
 			out vec4 gf_r4pos;
+			out float distance;
 
 			void main() {
 				for(int i = 0; i < 3; i++)
@@ -313,7 +369,12 @@ void init_shaders()
 					point = projXForm * point;
 
 					gl_Position = point;
-					gf_color = vg_color[i];
+					#ifdef VERTEX_COLOR
+						gf_color = vg_color[i];
+					#endif
+					#ifdef INSTANCED_BASE_COLOR
+						gf_base_color = vg_base_color[i];
+					#endif
 					gf_r4pos = vg_r4pos[i];
 					EmitVertex();
 				}
@@ -325,29 +386,41 @@ void init_shaders()
 			_set_uniform_matrix(program_id, "projXForm", proj_mat);
 		},
 		NULL,
-		std::vector<ShaderOption*> {new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL)}
+		std::vector<ShaderOption*> {
+			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
+		}
 	);
 
 	frag = new ShaderCore(
+		"frag",
 		GL_FRAGMENT_SHADER,
 		R"(
-			uniform vec4 baseColor;
 			uniform float fogScale;
-
-			in float distance;
-			in vec4 gf_r4pos;
 
 			#ifdef VERTEX_COLOR
 				in vec4 gf_color;
 			#endif
+
+			#ifdef INSTANCED_BASE_COLOR
+				in vec4 gf_base_color;
+			#else
+				uniform vec4 baseColor;
+			#endif
+			
+			in vec4 gf_r4pos;
+			in float distance;
 				
+			out vec4 fragColor;
 			layout (depth_any) out float gl_FragDepth;
 
-			out vec4 fragColor;
 
 			void main() {
 				float dist = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
 				float fogFactor = exp(-dist * fogScale);
+				#ifdef INSTANCED_BASE_COLOR
+					vec4 baseColor = gf_base_color;
+				#endif
 				#ifdef VERTEX_COLOR
 					fragColor = clamp(baseColor + gf_color, 0, 1) * fogFactor;
 				#else
@@ -360,6 +433,9 @@ void init_shaders()
 		[](GLuint program_id) {
 			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fogScale"), fog_scale);
 		},
-		std::vector<ShaderOption*> {new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL)}
+		std::vector<ShaderOption*> {
+			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
+		}
 	);
 }

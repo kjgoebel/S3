@@ -34,7 +34,9 @@
 typedef std::function<void(int)> ShaderPullFunc;
 
 
-#define DEFINE_VERTEX_COLOR		"#define VERTEX_COLOR\n"
+#define DEFINE_VERTEX_COLOR			"#define VERTEX_COLOR\n"
+#define DEFINE_INSTANCED_XFORM		"#define INSTANCED_XFORM\n"
+#define DEFINE_INSTANCED_BASE_COLOR	"#define INSTANCED_BASE_COLOR\n"
 
 
 struct ShaderOption
@@ -49,13 +51,14 @@ struct ShaderOption
 
 struct ShaderCore
 {
-	ShaderCore(GLuint shader_type, const char* core_text, ShaderPullFunc init_func, ShaderPullFunc frame_func, std::vector<ShaderOption*> options)
-		: shader_type(shader_type), core_text(core_text), init_func(init_func), frame_func(frame_func), options()
+	ShaderCore(const char* name, GLuint shader_type, const char* core_text, ShaderPullFunc init_func, ShaderPullFunc frame_func, std::vector<ShaderOption*> options)
+		: name(name), shader_type(shader_type), core_text(core_text), init_func(init_func), frame_func(frame_func), options()
 	{
 		for(auto option : options)
 			this->options[option->def_name] = option;
 	}
 
+	const char* name;
 	GLuint shader_type;
 	const char* core_text;
 	ShaderPullFunc init_func, frame_func;
@@ -70,6 +73,9 @@ public:
 
 	void init(GLuint program_id) {init_func(program_id);}
 	void frame(GLuint program_id) {frame_func(program_id);}
+
+	ShaderCore* get_core() {return core;}
+	const std::set<const char*> get_options() {return options;}
 
 private:
 	Shader(ShaderCore* core, const std::set<const char*> options);
@@ -103,6 +109,10 @@ public:
 	void frame() {vertex->frame(id); geometry->frame(id); fragment->frame(id);}
 
 	void set_uniform_matrix(const char* name, Mat4& mat);
+
+	Shader* get_vertex() {return vertex;}
+	Shader* get_geometry() {return geometry;}
+	Shader* get_fragment() {return fragment;}
 
 private:
 	ShaderProgram(Shader* vert, Shader* geom, Shader* frag);

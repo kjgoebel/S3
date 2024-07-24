@@ -15,13 +15,12 @@ Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
 	int i;
 	primitive = GL_POINTS;
 	num_vertices = num_verts;
-	//vertices_per_primitive = num_primitives = 0;
 
 	//This is to make the draw code simpler.
 	num_primitives = 1;
 	vertices_per_primitive = num_verts;
 
-	indices = NULL;
+	elements = NULL;
 	vertices = new Vec4[num_verts];
 	if(verts)
 		for(i = 0; i < num_verts; i++)
@@ -35,7 +34,9 @@ Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
 	else
 		vertex_colors = NULL;
 
-	ready_to_render = false;
+	vertex_buffer = vertex_color_buffer = element_buffer = 0;
+	raw_program = instanced_xform_program = instanced_xform_and_color_program = NULL;
+	raw_vertex_array = 0;
 }
 
 Model::Model(int prim, int num_verts, int verts_per_prim, int num_prims, const Vec4* verts, const unsigned int* ixes, const Vec4* vert_colors)
@@ -51,10 +52,10 @@ Model::Model(int prim, int num_verts, int verts_per_prim, int num_prims, const V
 			vertices[i] = verts[i];
 	if(verts_per_prim)
 	{
-		indices = new unsigned int[num_prims * verts_per_prim];
+		elements = new unsigned int[num_prims * verts_per_prim];
 		if(ixes)
 			for(i = 0; i < num_prims * verts_per_prim; i++)
-				indices[i] = ixes[i];
+				elements[i] = ixes[i];
 	}
 	if(vert_colors)
 	{
@@ -65,76 +66,100 @@ Model::Model(int prim, int num_verts, int verts_per_prim, int num_prims, const V
 	else
 		vertex_colors = NULL;
 
-	ready_to_render = false;
+	vertex_buffer = vertex_color_buffer = element_buffer = 0;
+	raw_program = instanced_xform_program = instanced_xform_and_color_program = NULL;
+	raw_vertex_array = 0;
 }
 
 Model::~Model()
 {
 	delete[] vertices;
-	if(indices)
-		delete[] indices;
+	if(elements)
+		delete[] elements;
 	if(vertex_colors)
 		delete[] vertex_colors;
+	if(vertex_buffer)
+		glDeleteBuffers(1, &vertex_buffer);
+	if(vertex_color_buffer)
+		glDeleteBuffers(1, &vertex_color_buffer);
+	if(element_buffer)
+		glDeleteBuffers(1, &element_buffer);
+	if(raw_vertex_array)
+		glDeleteVertexArrays(1, &raw_vertex_array);
 }
 
 void Model::prepare_to_render()
 {
-	glGenVertexArrays(1, &vertex_array);
-	glBindVertexArray(vertex_array);
+	if(vertex_buffer)
+		error("Mesh was already prepared for rendering.\n");
 
-	GLuint vertex_buffer;
+	glGenVertexArrays(1, &raw_vertex_array);
+	glBindVertexArray(raw_vertex_array);
 
 	glGenBuffers(1, &vertex_buffer);
 	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-
+	
+	glEnableVertexAttribArray(0);
 	glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertices, GL_STATIC_DRAW);
 	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
-	glEnableVertexAttribArray(0);
 
 	if(vertex_colors)
 	{
-		GLuint color_buffer;
-
-		glGenBuffers(1, &color_buffer);
-		glBindBuffer(GL_ARRAY_BUFFER, color_buffer);
-
+		glGenBuffers(1, &vertex_color_buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, vertex_color_buffer);
+		
+		glEnableVertexAttribArray(1);
 		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertex_colors, GL_STATIC_DRAW);
 		glVertexAttribPointer(1, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
-		glEnableVertexAttribArray(1);
 	}
 
-	if(indices)		//For points and models with one vertex per vertex-on-a-primitive, we just use the vertex array directly.
+	if(elements)
 	{
-		GLuint element_buffer;
 		glGenBuffers(1, &element_buffer);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), indices, GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), elements, GL_STATIC_DRAW);
 	}
 
-	std::set<const char*> options = vertex_colors ? std::set<const char*>{DEFINE_VERTEX_COLOR} : std::set<const char*>{};
-	shader_program = ShaderProgram::get(
+	auto options = vertex_colors ? std::set<const char*>{DEFINE_VERTEX_COLOR} : std::set<const char*>{};
+	raw_program = ShaderProgram::get(
 		Shader::get(vert, options),
 		Shader::get(primitive == GL_POINTS ? geom_points : geom_triangles, options),
 		Shader::get(frag, options)
 	);
 
-	ready_to_render = true;
+	auto vert_options = options;
+	vert_options.insert(DEFINE_INSTANCED_XFORM);
+	instanced_xform_program = ShaderProgram::get(
+		Shader::get(vert, vert_options),
+		Shader::get(primitive == GL_POINTS ? geom_points : geom_triangles, options),
+		Shader::get(frag, options)
+	);
+
+	vert_options.insert(DEFINE_INSTANCED_BASE_COLOR);
+	options.insert(DEFINE_INSTANCED_BASE_COLOR);
+	instanced_xform_and_color_program = ShaderProgram::get(
+		Shader::get(vert, vert_options),
+		Shader::get(primitive == GL_POINTS ? geom_points : geom_triangles, options),
+		Shader::get(frag, options)
+	);
+
+	glBindVertexArray(0);
 }
 
 
-void Model::draw(Mat4 xform, Vec4 base_color)
+void Model::draw(Mat4& xform, Vec4& base_color)
 {
-	if(!ready_to_render)
+	if(!vertex_buffer)
 		prepare_to_render();
 		
-	shader_program->use();
-	GLuint program_id = shader_program->get_id();
+	raw_program->use();
+	GLuint program_id = raw_program->get_id();
 	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "baseColor"), base_color.x, base_color.y, base_color.z, base_color.w);
-	shader_program->set_uniform_matrix("modelViewXForm", ~cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
+	raw_program->set_uniform_matrix("modelViewXForm", ~cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
 
-	glBindVertexArray(vertex_array);
+	glBindVertexArray(raw_vertex_array);
 
-	if(indices)
+	if(elements)
 		switch(primitive)
 		{
 			case GL_LINES:
@@ -153,21 +178,172 @@ void Model::draw(Mat4 xform, Vec4 base_color)
 }
 
 
+DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4 base_color)
+{
+	if(!vertex_buffer)
+		prepare_to_render();
+
+	GLuint vertex_array;
+	glGenVertexArrays(1, &vertex_array);
+	glBindVertexArray(vertex_array);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), 0);
+	glEnableVertexAttribArray(0);
+
+	if(vertex_color_buffer)
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, vertex_color_buffer);
+		glVertexAttribPointer(1, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), 0);
+		glEnableVertexAttribArray(1);
+	}
+
+	if(element_buffer)
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
+
+	GLuint xform_buffer;
+	glGenBuffers(1, &xform_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, xform_buffer);
+	float* temp = new float[16 * count];
+	for(int mat = 0; mat < count; mat++)
+		for(int i = 0; i < 4; i++)
+			for(int j = 0; j < 4; j++)
+				temp[mat * 16 + j * 4 + i] = xforms[mat].data[i][j];
+	glBufferData(GL_ARRAY_BUFFER, count * 16 * sizeof(float), temp, GL_STATIC_DRAW);
+	delete[] temp;
+	for(int i = 0; i < 4; i++)
+	{
+		glEnableVertexAttribArray(2 + i);
+		glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, 16 * sizeof(float), (void*)(4 * i * sizeof(float)));
+		glVertexAttribDivisor(2 + i, 1);
+	}
+
+	glBindVertexArray(0);
+
+	return [count, vertex_array, base_color, this]() {
+		instanced_xform_program->use();
+		glBindVertexArray(vertex_array);
+
+		glProgramUniform4f(
+			instanced_xform_program->get_id(),
+			glGetUniformLocation(instanced_xform_program->get_id(), "baseColor"),
+			base_color.x, base_color.y, base_color.z, base_color.w
+		);
+
+		if(elements)
+			switch(primitive)
+			{
+				case GL_LINES:
+				case GL_TRIANGLES:
+				case GL_QUADS:
+					glDrawElementsInstanced(primitive, vertices_per_primitive * num_primitives, GL_UNSIGNED_INT, (void*)0, count);
+					break;
+				default:
+					for(int j = 0; j < num_primitives; j++)
+						glDrawElementsInstanced(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(j * vertices_per_primitive * sizeof(int)), count);
+					break;
+			}
+		else
+			for(int j = 0; j < num_primitives; j++)
+				glDrawArraysInstanced(primitive, j * vertices_per_primitive, vertices_per_primitive, count);
+
+		glBindVertexArray(0);
+	};
+}
+
+
+//I HATE THIS CODE DUPLICATION
+DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4* base_colors)
+{
+	if(!vertex_buffer)
+		prepare_to_render();
+
+	GLuint vertex_array;
+	glGenVertexArrays(1, &vertex_array);
+	glBindVertexArray(vertex_array);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), 0);
+	glEnableVertexAttribArray(0);
+
+	if(vertex_color_buffer)
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, vertex_color_buffer);
+		glVertexAttribPointer(1, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), 0);
+		glEnableVertexAttribArray(1);
+	}
+
+	if(element_buffer)
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
+
+	GLuint xform_buffer;
+	glGenBuffers(1, &xform_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, xform_buffer);
+	float* temp = new float[16 * count];
+	for(int mat = 0; mat < count; mat++)
+		for(int i = 0; i < 4; i++)
+			for(int j = 0; j < 4; j++)
+				temp[mat * 16 + j * 4 + i] = xforms[mat].data[i][j];
+	glBufferData(GL_ARRAY_BUFFER, count * 16 * sizeof(float), temp, GL_STATIC_DRAW);
+	delete[] temp;
+	for(int i = 0; i < 4; i++)
+	{
+		glEnableVertexAttribArray(2 + i);
+		glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, 16 * sizeof(float), (void*)(4 * i * sizeof(float)));
+		glVertexAttribDivisor(2 + i, 1);
+	}
+
+	GLuint base_color_buffer;
+	glGenBuffers(1, &base_color_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, base_color_buffer);
+	glBufferData(GL_ARRAY_BUFFER, count * sizeof(Vec4), base_colors, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(6);
+	glVertexAttribPointer(6, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
+	glVertexAttribDivisor(6, 1);
+
+	glBindVertexArray(0);
+
+	return [count, vertex_array, this]() {
+		instanced_xform_and_color_program->use();
+		glBindVertexArray(vertex_array);
+
+		if(elements)
+			switch(primitive)
+			{
+				case GL_LINES:
+				case GL_TRIANGLES:
+				case GL_QUADS:
+					glDrawElementsInstanced(primitive, vertices_per_primitive * num_primitives, GL_UNSIGNED_INT, (void*)0, count);
+					break;
+				default:
+					for(int j = 0; j < num_primitives; j++)
+						glDrawElementsInstanced(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(j * vertices_per_primitive * sizeof(int)), count);
+					break;
+			}
+		else
+			for(int j = 0; j < num_primitives; j++)
+				glDrawArraysInstanced(primitive, j * vertices_per_primitive, vertices_per_primitive, count);
+
+		glBindVertexArray(0);
+	};
+}
+
+
 void Model::dump() const
 {
 	int i;
 	printf("%d %d %d %d\n", primitive, num_vertices, vertices_per_primitive, num_primitives);
 	for(i = 0; i < num_vertices; i++)
 		printf("%d: %f %f %f %f\n", i, vertices[i].x, vertices[i].y, vertices[i].z, vertices[i].w);
-	if(indices)
+	if(elements)
 		for(i = 0; i < num_primitives; i++)
 		{
 			for(int j = 0; j < vertices_per_primitive; j++)
-				printf("%d ", indices[i * vertices_per_primitive + j]);
+				printf("%d ", elements[i * vertices_per_primitive + j]);
 			printf("\n");
 		}
 	else
-		printf("no indices");
+		printf("no elements");
 }
 
 
@@ -244,8 +420,8 @@ void Model::generate_primitive_colors(double scale)
 	num_vertices = num_primitives * vertices_per_primitive;
 	vertices = new Vec4[num_vertices];
 
-	GLuint* old_prims = indices;
-	indices = NULL;
+	GLuint* old_elements = elements;
+	elements = NULL;
 
 	vertex_colors = new Vec4[num_vertices];
 
@@ -255,13 +431,13 @@ void Model::generate_primitive_colors(double scale)
 		for(int j = 0; j < vertices_per_primitive; j++)
 		{
 			int ix = vertices_per_primitive * i + j;
-			vertices[ix] = old_verts[old_prims[ix]];
+			vertices[ix] = old_verts[old_elements[ix]];
 			vertex_colors[ix] = temp;
 		}
 	}
 
 	delete[] old_verts;
-	delete[] old_prims;
+	delete[] old_elements;
 }
 
 
@@ -381,91 +557,4 @@ Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments,
 			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true),
 			make_torus_quad_indices(longitudinal_segments - 1, transverse_segments, false)
 		);
-}
-
-
-Multirenderer::Multirenderer(Model* model, int count, Mat4* xforms, Vec4 base_color)
-{
-	this->model = model;
-	this->count = count;
-
-	this->xforms = new Mat4[count];
-	for(int i = 0; i < count; i++)
-		this->xforms[i] = xforms[i];
-
-	this->base_colors = new Vec4[count];
-	for(int i = 0; i < count; i++)
-		this->base_colors[i] = base_color;
-}
-
-
-Multirenderer::Multirenderer(Model* model, int count, Mat4* xforms, Vec4* base_colors)
-{
-	this->model = model;
-	this->count = count;
-
-	this->xforms = new Mat4[count];
-	for(int i = 0; i < count; i++)
-		this->xforms[i] = xforms[i];
-
-	this->base_colors = new Vec4[count];
-	for(int i = 0; i < count; i++)
-		this->base_colors[i] = base_colors[i];
-}
-
-Multirenderer::~Multirenderer()
-{
-	if(xforms)
-		delete[] xforms;
-	if(base_colors)
-		delete[] base_colors;
-}
-
-
-void Multirenderer::prepare_instance(Mat4& xform, Vec4& base_color)
-{
-	GLuint program_id = model->shader_program->get_id();
-	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "baseColor"), base_color.x, base_color.y, base_color.z, base_color.w);
-	model->shader_program->set_uniform_matrix("modelViewXForm", ~cam_mat * xform);
-}
-
-
-void Multirenderer::draw()
-{
-	if(!model->ready_to_render)
-		model->prepare_to_render();
-
-	model->shader_program->use();
-	glBindVertexArray(model->vertex_array);
-
-	int i;
-
-	if(model->indices)
-		switch(model->primitive)
-		{
-			case GL_LINES:
-			case GL_TRIANGLES:
-			case GL_QUADS:
-				for(i = 0; i < count; i++)
-				{
-					prepare_instance(xforms[i], base_colors[i]);
-					glDrawElements(model->primitive, model->vertices_per_primitive * model->num_primitives, GL_UNSIGNED_INT, (void*)0);
-				}
-				break;
-			default:
-				for(i = 0; i < count; i++)
-				{
-					prepare_instance(xforms[i], base_colors[i]);
-					for(int j = 0; j < model->num_primitives; j++)
-						glDrawElements(model->primitive, model->vertices_per_primitive, GL_UNSIGNED_INT, (void*)(j * model->vertices_per_primitive * sizeof(int)));
-				}
-				break;
-		}
-	else
-		for(i = 0; i < count; i++)
-		{
-			prepare_instance(xforms[i], base_colors[i]);
-			for(int j = 0; j < model->num_primitives; j++)
-				glDrawArrays(model->primitive, j * model->vertices_per_primitive, model->vertices_per_primitive);
-		}
 }
