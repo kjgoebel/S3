@@ -135,6 +135,18 @@ void ShaderProgram::set_uniform_matrix(const char* name, Mat4& mat)
 	_set_uniform_matrix(id, name, mat);
 }
 
+void ShaderProgram::dump() const
+{
+	printf("Shader program id %d:\n", id);
+	for(auto shader : std::vector<Shader*> {vertex, geometry, fragment})
+	{
+		printf("\tShader id %d:\n", shader->get_id());
+		printf("\t\t%s\n", shader->get_core()->name);
+		for(auto option : shader->get_options())
+			printf("\t\t\t%s", option);
+	}
+}
+
 ShaderProgram* ShaderProgram::get(Shader* vert, Shader* geom, Shader* frag)
 {
 	for(ShaderProgram* temp : all_shader_programs)
@@ -413,7 +425,6 @@ void init_shaders()
 				
 			out vec4 fragColor;
 			layout (depth_any) out float gl_FragDepth;
-
 
 			void main() {
 				float dist = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);

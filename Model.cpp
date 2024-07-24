@@ -88,29 +88,21 @@ Model::~Model()
 		glDeleteVertexArrays(1, &raw_vertex_array);
 }
 
+
 void Model::prepare_to_render()
 {
 	if(vertex_buffer)
-		error("Mesh was already prepared for rendering.\n");
-
-	glGenVertexArrays(1, &raw_vertex_array);
-	glBindVertexArray(raw_vertex_array);
+		error("Model was already prepared for rendering.\n");
 
 	glGenBuffers(1, &vertex_buffer);
 	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-	
-	glEnableVertexAttribArray(0);
 	glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertices, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
 
 	if(vertex_colors)
 	{
 		glGenBuffers(1, &vertex_color_buffer);
 		glBindBuffer(GL_ARRAY_BUFFER, vertex_color_buffer);
-		
-		glEnableVertexAttribArray(1);
 		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertex_colors, GL_STATIC_DRAW);
-		glVertexAttribPointer(1, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
 	}
 
 	if(elements)
@@ -143,7 +135,32 @@ void Model::prepare_to_render()
 		Shader::get(frag, options)
 	);
 
+	raw_vertex_array = make_vertex_array();
+}
+
+GLuint Model::make_vertex_array()
+{
+	GLuint vertex_array;
+	glGenVertexArrays(1, &vertex_array);
+	glBindVertexArray(vertex_array);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	if(vertex_color_buffer)
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, vertex_color_buffer);
+		glVertexAttribPointer(1, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
+		glEnableVertexAttribArray(1);
+	}
+
+	if(elements)
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
+
 	glBindVertexArray(0);
+
+	return vertex_array;
 }
 
 
@@ -178,28 +195,9 @@ void Model::draw(Mat4& xform, Vec4& base_color)
 }
 
 
-GLuint Model::make_vertex_array(int count, Mat4* xforms)
+void Model::bind_xform_array(GLuint vertex_array, int count, Mat4* xforms)
 {
-	if(!vertex_buffer)
-		prepare_to_render();
-
-	GLuint vertex_array;
-	glGenVertexArrays(1, &vertex_array);
 	glBindVertexArray(vertex_array);
-
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), 0);
-	glEnableVertexAttribArray(0);
-
-	if(vertex_color_buffer)
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vertex_color_buffer);
-		glVertexAttribPointer(1, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), 0);
-		glEnableVertexAttribArray(1);
-	}
-
-	if(element_buffer)
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
 
 	GLuint xform_buffer;
 	glGenBuffers(1, &xform_buffer);
@@ -218,7 +216,7 @@ GLuint Model::make_vertex_array(int count, Mat4* xforms)
 		glVertexAttribDivisor(2 + i, 1);
 	}
 
-	return vertex_array;
+	glBindVertexArray(0);
 }
 
 void Model::draw_instanced(int count)
@@ -247,7 +245,8 @@ DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4 base_color)
 	if(!vertex_buffer)
 		prepare_to_render();
 
-	GLuint vertex_array = make_vertex_array(count, xforms);
+	GLuint vertex_array = make_vertex_array();
+	bind_xform_array(vertex_array, count, xforms);
 
 	glBindVertexArray(0);
 
@@ -259,6 +258,7 @@ DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4 base_color)
 			glGetUniformLocation(instanced_xform_program->get_id(), "baseColor"),
 			base_color.x, base_color.y, base_color.z, base_color.w
 		);
+		//instanced_xform_program->dump();
 		draw_instanced(count);
 		glBindVertexArray(0);
 	};
@@ -270,7 +270,10 @@ DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4* base_colors)
 	if(!vertex_buffer)
 		prepare_to_render();
 
-	GLuint vertex_array = make_vertex_array(count, xforms);
+	GLuint vertex_array = make_vertex_array();
+	bind_xform_array(vertex_array, count, xforms);
+
+	glBindVertexArray(vertex_array);
 
 	GLuint base_color_buffer;
 	glGenBuffers(1, &base_color_buffer);
@@ -285,6 +288,7 @@ DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4* base_colors)
 	return [count, vertex_array, this]() {
 		instanced_xform_and_color_program->use();
 		glBindVertexArray(vertex_array);
+		//instanced_xform_and_color_program->dump();
 		draw_instanced(count);
 		glBindVertexArray(0);
 	};

@@ -114,6 +114,8 @@ public:
 	Shader* get_geometry() {return geometry;}
 	Shader* get_fragment() {return fragment;}
 
+	void dump() const;
+
 private:
 	ShaderProgram(Shader* vert, Shader* geom, Shader* frag);
 

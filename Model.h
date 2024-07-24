@@ -39,18 +39,19 @@ private:
 	int vertices_per_primitive;
 	int num_vertices, num_primitives;
 
-	GLuint vertex_buffer, vertex_color_buffer, element_buffer;
-
 	Vec4* vertices;
 	Vec4* vertex_colors;				//If this is NULL, the model will render with base color only.
 	GLuint* elements;					//If this is NULL, use glDrawArrays() instead of glDrawElements().
 
-	void prepare_to_render();
-
+	GLuint vertex_buffer, vertex_color_buffer, element_buffer;
 	ShaderProgram *raw_program, *instanced_xform_program, *instanced_xform_and_color_program;		//I don't like having this many programs....
+	
 	GLuint raw_vertex_array;
 
-	//These are most of code shared between the two versions of make_draw_func().
-	GLuint make_vertex_array(int count, Mat4* xforms);
+	GLuint make_vertex_array();			//Creates a VAO and binds vertex, vertex color and element buffer objects to it as appropriate.
+	void prepare_to_render();			//Creates vertex, vertex color and element buffer objects as appropriate, creates 
+										//shader programs, and creates raw_vertex_array with make_vertex_array().
+
+	void bind_xform_array(GLuint vertex_array, int count, Mat4* xforms);		//Creates a vertex buffer for the given xforms and binds it the given VAO.
 	void draw_instanced(int count);
 };
