@@ -49,4 +49,8 @@ private:
 
 	ShaderProgram *raw_program, *instanced_xform_program, *instanced_xform_and_color_program;		//I don't like having this many programs....
 	GLuint raw_vertex_array;
+
+	//These are most of code shared between the two versions of make_draw_func().
+	GLuint make_vertex_array(int count, Mat4* xforms);
+	void draw_instanced(int count);
 };

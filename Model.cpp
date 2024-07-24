@@ -178,7 +178,7 @@ void Model::draw(Mat4& xform, Vec4& base_color)
 }
 
 
-DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4 base_color)
+GLuint Model::make_vertex_array(int count, Mat4* xforms)
 {
 	if(!vertex_buffer)
 		prepare_to_render();
@@ -217,81 +217,60 @@ DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4 base_color)
 		glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, 16 * sizeof(float), (void*)(4 * i * sizeof(float)));
 		glVertexAttribDivisor(2 + i, 1);
 	}
+
+	return vertex_array;
+}
+
+void Model::draw_instanced(int count)
+{
+	if(elements)
+		switch(primitive)
+		{
+			case GL_LINES:
+			case GL_TRIANGLES:
+			case GL_QUADS:
+				glDrawElementsInstanced(primitive, vertices_per_primitive * num_primitives, GL_UNSIGNED_INT, (void*)0, count);
+				break;
+			default:
+				for(int j = 0; j < num_primitives; j++)
+					glDrawElementsInstanced(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(j * vertices_per_primitive * sizeof(int)), count);
+				break;
+		}
+	else
+		for(int j = 0; j < num_primitives; j++)
+			glDrawArraysInstanced(primitive, j * vertices_per_primitive, vertices_per_primitive, count);
+}
+
+
+DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4 base_color)
+{
+	if(!vertex_buffer)
+		prepare_to_render();
+
+	GLuint vertex_array = make_vertex_array(count, xforms);
 
 	glBindVertexArray(0);
 
 	return [count, vertex_array, base_color, this]() {
 		instanced_xform_program->use();
 		glBindVertexArray(vertex_array);
-
 		glProgramUniform4f(
 			instanced_xform_program->get_id(),
 			glGetUniformLocation(instanced_xform_program->get_id(), "baseColor"),
 			base_color.x, base_color.y, base_color.z, base_color.w
 		);
-
-		if(elements)
-			switch(primitive)
-			{
-				case GL_LINES:
-				case GL_TRIANGLES:
-				case GL_QUADS:
-					glDrawElementsInstanced(primitive, vertices_per_primitive * num_primitives, GL_UNSIGNED_INT, (void*)0, count);
-					break;
-				default:
-					for(int j = 0; j < num_primitives; j++)
-						glDrawElementsInstanced(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(j * vertices_per_primitive * sizeof(int)), count);
-					break;
-			}
-		else
-			for(int j = 0; j < num_primitives; j++)
-				glDrawArraysInstanced(primitive, j * vertices_per_primitive, vertices_per_primitive, count);
-
+		draw_instanced(count);
 		glBindVertexArray(0);
 	};
 }
 
 
-//I HATE THIS CODE DUPLICATION
 DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4* base_colors)
 {
 	if(!vertex_buffer)
 		prepare_to_render();
 
-	GLuint vertex_array;
-	glGenVertexArrays(1, &vertex_array);
-	glBindVertexArray(vertex_array);
-
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), 0);
-	glEnableVertexAttribArray(0);
-
-	if(vertex_color_buffer)
-	{
-		glBindBuffer(GL_ARRAY_BUFFER, vertex_color_buffer);
-		glVertexAttribPointer(1, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), 0);
-		glEnableVertexAttribArray(1);
-	}
-
-	if(element_buffer)
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
-
-	GLuint xform_buffer;
-	glGenBuffers(1, &xform_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER, xform_buffer);
-	float* temp = new float[16 * count];
-	for(int mat = 0; mat < count; mat++)
-		for(int i = 0; i < 4; i++)
-			for(int j = 0; j < 4; j++)
-				temp[mat * 16 + j * 4 + i] = xforms[mat].data[i][j];
-	glBufferData(GL_ARRAY_BUFFER, count * 16 * sizeof(float), temp, GL_STATIC_DRAW);
-	delete[] temp;
-	for(int i = 0; i < 4; i++)
-	{
-		glEnableVertexAttribArray(2 + i);
-		glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, 16 * sizeof(float), (void*)(4 * i * sizeof(float)));
-		glVertexAttribDivisor(2 + i, 1);
-	}
+	GLuint vertex_array = make_vertex_array(count, xforms);
 
 	GLuint base_color_buffer;
 	glGenBuffers(1, &base_color_buffer);
@@ -306,24 +285,7 @@ DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4* base_colors)
 	return [count, vertex_array, this]() {
 		instanced_xform_and_color_program->use();
 		glBindVertexArray(vertex_array);
-
-		if(elements)
-			switch(primitive)
-			{
-				case GL_LINES:
-				case GL_TRIANGLES:
-				case GL_QUADS:
-					glDrawElementsInstanced(primitive, vertices_per_primitive * num_primitives, GL_UNSIGNED_INT, (void*)0, count);
-					break;
-				default:
-					for(int j = 0; j < num_primitives; j++)
-						glDrawElementsInstanced(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(j * vertices_per_primitive * sizeof(int)), count);
-					break;
-			}
-		else
-			for(int j = 0; j < num_primitives; j++)
-				glDrawArraysInstanced(primitive, j * vertices_per_primitive, vertices_per_primitive, count);
-
+		draw_instanced(count);
 		glBindVertexArray(0);
 	};
 }
