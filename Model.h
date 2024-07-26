@@ -28,6 +28,7 @@ public:
 
 	void draw(const Mat4& xform, const Vec4& base_color);
 
+	//Note: Instancing is broken. Dunno why, but passing use_instancing = true makes rendering much slower.
 	DrawFunc make_draw_func(int count, const Mat4* xforms, Vec4 base_color, bool use_instancing = false);
 	DrawFunc make_draw_func(int count, const Mat4* xforms, const Vec4* base_colors, bool use_instancing = false);
 

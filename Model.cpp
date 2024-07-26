@@ -278,13 +278,14 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 			raw_program->use();
 			GLuint program_id = raw_program->get_id();
 			glProgramUniform4f(program_id, glGetUniformLocation(program_id, "baseColor"), base_color.x, base_color.y, base_color.z, base_color.w);
+			glBindVertexArray(raw_vertex_array);
 
 			for(int i = 0; i < count; i++)
 			{
 				raw_program->set_uniform_matrix("modelViewXForm", ~cam_mat * temp_xforms[i]);
-				glBindVertexArray(raw_vertex_array);
 				draw_raw();
 			}
+			glBindVertexArray(0);
 		};
 	}
 }
@@ -332,14 +333,15 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 		return [count, temp_xforms, temp_colors, this]() {
 			raw_program->use();
 			GLuint program_id = raw_program->get_id();
+			glBindVertexArray(raw_vertex_array);
 			for(int i = 0; i < count; i++)
 			{
 				Vec4 base_color = temp_colors[i];
 				glProgramUniform4f(program_id, glGetUniformLocation(program_id, "baseColor"), base_color.x, base_color.y, base_color.z, base_color.w);
 				raw_program->set_uniform_matrix("modelViewXForm", ~cam_mat * temp_xforms[i]);
-				glBindVertexArray(raw_vertex_array);
 				draw_raw();
 			}
+			glBindVertexArray(0);
 		};
 	}
 }
