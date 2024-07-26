@@ -5,6 +5,7 @@
 #include "Shaders.h"
 #include "Utils.h"
 #include "Model.h"
+#include "PoleModel.h"
 #include "S3.h"
 
 #include <stdio.h>
@@ -94,7 +95,14 @@ void init()
 	dots_model = new Model(NUM_DOTS, dots);
 	delete[] dots;
 
-	pole_model = Model::read_model_file("subdivided_icosahedron.model", 0.05);
+	pole_model = new Model(
+		GL_TRIANGLES,
+		NUM_POLE_VERTS,
+		3,
+		NUM_POLE_TRIANGLES,
+		Model::s3ify(NUM_POLE_VERTS, 0.05, pole_model_vertices),
+		pole_model_primitives
+	);
 	pole_model->generate_primitive_colors(0.3);
 	geodesic_model = Model::make_torus(32, 8, STANDARD_HOLE_RATIO);
 	geodesic_model->generate_primitive_colors(0.5);

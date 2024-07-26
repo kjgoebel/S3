@@ -7,7 +7,6 @@
 #include "Utils.h"
 
 #pragma warning(disable : 4244)		//conversion from double to float
-#pragma warning(disable : 4996)		//VS doesn't like _open().
 
 
 Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
@@ -364,60 +363,6 @@ void Model::dump() const
 }
 
 
-Model* Model::read_model_file(const char* filename, double scale)
-{
-	GLuint i;
-	uint32_t dummy[3];
-	uint32_t num_verts, num_edges, num_triangles;
-	Vec3 temp;
-
-	int fin = _open(filename, O_RDONLY | O_BINARY);
-	
-	_read(fin, &num_verts, 4);
-	_read(fin, &num_edges, 4);
-	_read(fin, &num_triangles, 4);
-
-	//printf("%d, %d, %d\n", num_verts, num_edges, num_triangles);
-
-	Vec4* verts = new Vec4[num_verts];
-	GLuint* ixes = new GLuint[3 * num_triangles];
-
-	for(i = 0; i < num_verts; i++)
-	{
-		_read(fin, &temp.components, sizeof(temp.components));
-		verts[i] = Vec4(
-			temp.x * scale,
-			temp.y * scale,
-			temp.z * scale,
-			1
-		).normalize();
-		/*printf("%d (%f %f %f) -> (%f %f %f %f)\n", i,
-			temp.x, temp.y, temp.z,
-			verts[i].x, verts[i].y, verts[i].z, verts[i].w
-		);*/
-	}
-
-	for(i = 0; i < num_edges; i++)
-		_read(fin, dummy, 8);
-
-	for(i = 0; i < num_triangles; i++)
-	{
-		_read(fin, &ixes[i * 3], 12);
-		_read(fin, dummy, 12);
-		/*printf("%d (%d %d %d)\n", i,
-			ixes[3 * i], ixes[3 * i + 1], ixes[3 * i + 2]
-		);*/
-	}
-
-	_close(fin);
-
-	Model* ret = new Model(GL_TRIANGLES, num_verts, 3, num_triangles, verts, ixes);
-	delete[] verts;
-	delete[] ixes;
-	return ret;
-}
-
-
 void Model::generate_vertex_colors(double scale)
 {
 	if(vertex_colors)
@@ -574,4 +519,22 @@ Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments,
 			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true),
 			make_torus_quad_indices(longitudinal_segments - 1, transverse_segments, false)
 		);
+}
+
+
+Vec4* Model::s3ify(int count, double scale, Vec3* vertices)
+{
+	Vec4* ret = new Vec4[count];
+	for(int i = 0; i < count; i++)
+	{
+		Vec3& temp = vertices[i];
+		ret[i] = Vec4(
+			temp.x * scale,
+			temp.y * scale,
+			temp.z * scale,
+			1
+		).normalize();
+	}
+
+	return ret;
 }

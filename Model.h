@@ -33,6 +33,7 @@ public:
 	static Model* read_model_file(const char* filename, double scale);
 	static Model* make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips = true);
 	static Model* make_torus_arc(int longitudinal_segments, int transverse_segments, double length, double hole_ratio, bool use_quad_strips = true);
+	static Vec4* s3ify(int count, double scale, Vec3* vertices);		//Project a list of R3 vertices onto S3.
 
 private:
 	int primitive;						//GL_POINTS, GL_TRIANGLES, etc.
