@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include "GL/glew.h"
-#include "glut.h"
+#include "GL/glut.h"
 
 #include "Model.h"
 #include "Shaders.h"

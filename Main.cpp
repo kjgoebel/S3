@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include "GL/glew.h"
-#include "glut.h"
+#include "gl/glut.h"
 #include "Vector.h"
 #include "Shaders.h"
 #include "Utils.h"
@@ -50,7 +50,6 @@ bool	draw_poles = true,			//colored markers at each of the +x, +y, +z, +w poles 
 		draw_tesseract = false,		//the tesseract {4, 3, 3}, projected onto the Sphere
 		draw_itc = false,			//the regular icositetrachoron {3, 4, 3}, projected onto the Sphere
 		draw_dual_itc = false;		//the icositetrachoron dual to the one above
-
 
 #define STANDARD_HOLE_RATIO		(0.006)
 

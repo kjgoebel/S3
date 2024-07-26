@@ -4,5 +4,7 @@ Debug
 *.vcxproj*
 s3
 glut*
+freeglut*
 x64
 WrangleITCEdgeLoops.py
+TorusWorld
