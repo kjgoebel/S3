@@ -27,8 +27,8 @@ public:
 
 	void draw(Mat4& xform, Vec4& base_color);
 
-	DrawFunc make_draw_func(int count, Mat4* xforms, Vec4 base_color);
-	DrawFunc make_draw_func(int count, Mat4* xforms, Vec4* base_colors);
+	DrawFunc make_draw_func(int count, Mat4* xforms, Vec4 base_color, bool use_instancing = false);
+	DrawFunc make_draw_func(int count, Mat4* xforms, Vec4* base_colors, bool use_instancing = false);
 
 	static Model* read_model_file(const char* filename, double scale);
 	static Model* make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips = true);
@@ -53,5 +53,7 @@ private:
 										//shader programs, and creates raw_vertex_array with make_vertex_array().
 
 	void bind_xform_array(GLuint vertex_array, int count, Mat4* xforms);		//Creates a vertex buffer for the given xforms and binds it the given VAO.
+	
+	void draw_raw();
 	void draw_instanced(int count);
 };
