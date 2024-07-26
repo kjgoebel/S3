@@ -8,3 +8,5 @@ freeglut*
 x64
 WrangleITCEdgeLoops.py
 TorusWorld
+GL
+glew*
