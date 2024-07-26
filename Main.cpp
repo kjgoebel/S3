@@ -100,8 +100,8 @@ void init()
 		NUM_POLE_VERTS,
 		3,
 		NUM_POLE_TRIANGLES,
-		Model::s3ify(NUM_POLE_VERTS, 0.05, pole_model_vertices),
-		pole_model_primitives
+		Model::s3ify(NUM_POLE_VERTS, 0.05, pole_model_vertices).get(),
+		pole_model_elements
 	);
 	pole_model->generate_primitive_colors(0.3);
 	geodesic_model = Model::make_torus(32, 8, STANDARD_HOLE_RATIO);

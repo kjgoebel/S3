@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <io.h>
 #include <stdint.h>
+#include <memory>
 
 #include "Utils.h"
 
@@ -20,13 +21,13 @@ Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
 	vertices_per_primitive = num_verts;
 
 	elements = NULL;
-	vertices = new Vec4[num_verts];
+	vertices = std::unique_ptr<Vec4[]>(new Vec4[num_verts]);
 	if(verts)
 		for(i = 0; i < num_verts; i++)
 			vertices[i] = verts[i];
 	if(vert_colors)
 	{
-		vertex_colors = new Vec4[num_verts];
+		vertex_colors = std::unique_ptr<Vec4[]>(new Vec4[num_verts]);
 		for(i = 0; i < num_verts; i++)
 			vertex_colors[i] = vert_colors[i];
 	}
@@ -45,20 +46,22 @@ Model::Model(int prim, int num_verts, int verts_per_prim, int num_prims, const V
 	num_vertices = num_verts;
 	vertices_per_primitive = verts_per_prim;
 	num_primitives = num_prims;
-	vertices = new Vec4[num_verts];
+	vertices = std::unique_ptr<Vec4[]>(new Vec4[num_verts]);
 	if(verts)
 		for(i = 0; i < num_verts; i++)
 			vertices[i] = verts[i];
 	if(verts_per_prim)
 	{
-		elements = new unsigned int[num_prims * verts_per_prim];
+		elements = std::unique_ptr<GLuint[]>(new GLuint[num_prims * verts_per_prim]);
 		if(ixes)
 			for(i = 0; i < num_prims * verts_per_prim; i++)
 				elements[i] = ixes[i];
 	}
+	else
+		elements = NULL;
 	if(vert_colors)
 	{
-		vertex_colors = new Vec4[num_verts];
+		vertex_colors = std::unique_ptr<Vec4[]>(new Vec4[num_verts]);
 		for(i = 0; i < num_verts; i++)
 			vertex_colors[i] = vert_colors[i];
 	}
@@ -72,11 +75,6 @@ Model::Model(int prim, int num_verts, int verts_per_prim, int num_prims, const V
 
 Model::~Model()
 {
-	delete[] vertices;
-	if(elements)
-		delete[] elements;
-	if(vertex_colors)
-		delete[] vertex_colors;
 	if(vertex_buffer)
 		glDeleteBuffers(1, &vertex_buffer);
 	if(vertex_color_buffer)
@@ -95,20 +93,20 @@ void Model::prepare_to_render()
 
 	glGenBuffers(1, &vertex_buffer);
 	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-	glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertices.get(), GL_STATIC_DRAW);
 
 	if(vertex_colors)
 	{
 		glGenBuffers(1, &vertex_color_buffer);
 		glBindBuffer(GL_ARRAY_BUFFER, vertex_color_buffer);
-		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertex_colors, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertex_colors.get(), GL_STATIC_DRAW);
 	}
 
 	if(elements)
 	{
 		glGenBuffers(1, &element_buffer);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), elements, GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), elements.get(), GL_STATIC_DRAW);
 	}
 
 	auto options = vertex_colors ? std::set<const char*>{DEFINE_VERTEX_COLOR} : std::set<const char*>{};
@@ -163,7 +161,7 @@ GLuint Model::make_vertex_array()
 }
 
 
-void Model::draw(Mat4& xform, Vec4& base_color)
+void Model::draw(const Mat4& xform, const Vec4& base_color)
 {
 	if(!vertex_buffer)
 		prepare_to_render();
@@ -179,13 +177,14 @@ void Model::draw(Mat4& xform, Vec4& base_color)
 }
 
 
-void Model::bind_xform_array(GLuint vertex_array, int count, Mat4* xforms)
+void Model::bind_xform_array(GLuint vertex_array, int count, const Mat4* xforms)
 {
 	glBindVertexArray(vertex_array);
 
 	GLuint xform_buffer;
 	glGenBuffers(1, &xform_buffer);
 	glBindBuffer(GL_ARRAY_BUFFER, xform_buffer);
+
 	float* temp = new float[16 * count];
 	for(int mat = 0; mat < count; mat++)
 		for(int i = 0; i < 4; i++)
@@ -193,6 +192,7 @@ void Model::bind_xform_array(GLuint vertex_array, int count, Mat4* xforms)
 				temp[mat * 16 + j * 4 + i] = xforms[mat].data[i][j];
 	glBufferData(GL_ARRAY_BUFFER, count * 16 * sizeof(float), temp, GL_STATIC_DRAW);
 	delete[] temp;
+
 	for(int i = 0; i < 4; i++)
 	{
 		glEnableVertexAttribArray(2 + i);
@@ -244,7 +244,7 @@ void Model::draw_instanced(int count)
 }
 
 
-DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4 base_color, bool use_instancing)
+DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, bool use_instancing)
 {
 	if(!vertex_buffer)
 		prepare_to_render();
@@ -270,7 +270,7 @@ DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4 base_color, bool us
 	}
 	else
 	{
-		Mat4* temp_xforms = new Mat4[count];
+		std::shared_ptr<Mat4[]> temp_xforms(new Mat4[count]);
 		for(int i = 0; i < count; i++)
 			temp_xforms[i] = xforms[i];
 
@@ -290,7 +290,7 @@ DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4 base_color, bool us
 }
 
 
-DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4* base_colors, bool use_instancing)
+DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_colors, bool use_instancing)
 {
 	if(!vertex_buffer)
 		prepare_to_render();
@@ -321,8 +321,8 @@ DrawFunc Model::make_draw_func(int count, Mat4* xforms, Vec4* base_colors, bool 
 	}
 	else
 	{
-		Mat4* temp_xforms = new Mat4[count];
-		Vec4* temp_colors = new Vec4[count];
+		std::shared_ptr<Mat4[]> temp_xforms(new Mat4[count]);
+		std::shared_ptr<Vec4[]> temp_colors(new Vec4[count]);
 		for(int i = 0; i < count; i++)
 		{
 			temp_xforms[i] = xforms[i];
@@ -367,7 +367,7 @@ void Model::generate_vertex_colors(double scale)
 {
 	if(vertex_colors)
 		error("Model already has vertex colors.");
-	vertex_colors = new Vec4[num_vertices];
+	vertex_colors = std::unique_ptr<Vec4[]>(new Vec4[num_vertices]);
 	if(scale > 0)
 		for(int i = 0; i < num_vertices; i++)
 			vertex_colors[i] = Vec4(scale * frand(), scale * frand(), scale * frand(), 0);
@@ -378,14 +378,14 @@ void Model::generate_primitive_colors(double scale)
 	if(vertex_colors)
 		error("Model already has vertex colors.");
 
-	Vec4* old_verts = vertices;
+	std::unique_ptr<Vec4[]> old_verts = std::move(vertices);
 	num_vertices = num_primitives * vertices_per_primitive;
-	vertices = new Vec4[num_vertices];
+	vertices.reset(new Vec4[num_vertices]);
 
-	GLuint* old_elements = elements;
+	std::unique_ptr<GLuint[]> old_elements = std::move(elements);
 	elements = NULL;
 
-	vertex_colors = new Vec4[num_vertices];
+	vertex_colors = std::unique_ptr<Vec4[]>(new Vec4[num_vertices]);
 
 	for(int i = 0; i < num_primitives; i++)
 	{
@@ -397,17 +397,14 @@ void Model::generate_primitive_colors(double scale)
 			vertex_colors[ix] = temp;
 		}
 	}
-
-	delete[] old_verts;
-	delete[] old_elements;
 }
 
 
-Vec4* make_torus_verts(int long_segments, int trans_segments, double hole_ratio, double length = TAU, bool make_final_ring = false)
+std::shared_ptr<Vec4[]> make_torus_verts(int long_segments, int trans_segments, double hole_ratio, double length = TAU, bool make_final_ring = false)
 {
 	double normalization_factor = 1.0 / sqrt(1.0 + hole_ratio * hole_ratio);
 
-	Vec4* ret = new Vec4[long_segments * trans_segments];
+	std::shared_ptr<Vec4[]> ret(new Vec4[long_segments * trans_segments]);
 	for(int i = 0; i < long_segments; i++)
 	{
 		double theta = (double)i * length / (make_final_ring ? long_segments - 1 : long_segments);
@@ -427,10 +424,10 @@ Vec4* make_torus_verts(int long_segments, int trans_segments, double hole_ratio,
 	return ret;
 }
 
-unsigned int* make_torus_quad_strip_indices(int long_segments, int trans_segments, bool loop_longitudinally = true)
+std::shared_ptr<GLuint[]> make_torus_quad_strip_indices(int long_segments, int trans_segments, bool loop_longitudinally = true)
 {
 	int verts_per_strip = 2 * (trans_segments + 1);
-	unsigned int* ret = new unsigned int[long_segments * verts_per_strip];
+	std::shared_ptr<GLuint[]> ret(new GLuint[long_segments * verts_per_strip]);
 
 	/*
 		Note: I was going to try making the strips run longitudinally, so that 
@@ -457,9 +454,9 @@ unsigned int* make_torus_quad_strip_indices(int long_segments, int trans_segment
 	return ret;
 }
 
-unsigned int* make_torus_quad_indices(int long_segments, int trans_segments, bool loop_longitudinally = true)
+std::shared_ptr<GLuint[]> make_torus_quad_indices(int long_segments, int trans_segments, bool loop_longitudinally = true)
 {
-	unsigned int* ret = new unsigned int[4 * long_segments * trans_segments];
+	std::shared_ptr<GLuint[]> ret(new GLuint[4 * long_segments * trans_segments]);
 
 	for(int i = 0; i < long_segments; i++)
 		for(int j = 0; j < trans_segments; j++)
@@ -484,8 +481,8 @@ Model* Model::make_torus(int longitudinal_segments, int transverse_segments, dou
 			longitudinal_segments * transverse_segments,
 			2 * (transverse_segments + 1),
 			longitudinal_segments,
-			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio),
-			make_torus_quad_strip_indices(longitudinal_segments, transverse_segments)
+			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio).get(),
+			make_torus_quad_strip_indices(longitudinal_segments, transverse_segments).get()
 		);
 	else
 		return new Model(
@@ -493,8 +490,8 @@ Model* Model::make_torus(int longitudinal_segments, int transverse_segments, dou
 			longitudinal_segments * transverse_segments,
 			4,
 			longitudinal_segments * transverse_segments,
-			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio),
-			make_torus_quad_indices(longitudinal_segments, transverse_segments)
+			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio).get(),
+			make_torus_quad_indices(longitudinal_segments, transverse_segments).get()
 		);
 }
 
@@ -507,8 +504,8 @@ Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments,
 			longitudinal_segments * transverse_segments,
 			2 * (transverse_segments + 1),
 			(longitudinal_segments - 1),
-			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true),
-			make_torus_quad_strip_indices(longitudinal_segments - 1, transverse_segments, false)
+			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true).get(),
+			make_torus_quad_strip_indices(longitudinal_segments - 1, transverse_segments, false).get()
 		);
 	else
 		return new Model(
@@ -516,18 +513,22 @@ Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments,
 			longitudinal_segments * transverse_segments,
 			4,
 			(longitudinal_segments - 1) * transverse_segments,
-			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true),
-			make_torus_quad_indices(longitudinal_segments - 1, transverse_segments, false)
+			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true).get(),
+			make_torus_quad_indices(longitudinal_segments - 1, transverse_segments, false).get()
 		);
 }
 
 
-Vec4* Model::s3ify(int count, double scale, Vec3* vertices)
+std::shared_ptr<Vec4[]> Model::s3ify(int count, double scale, const Vec3* vertices)
 {
-	Vec4* ret = new Vec4[count];
+	std::shared_ptr<Vec4[]> ret(new Vec4[count]);
 	for(int i = 0; i < count; i++)
 	{
-		Vec3& temp = vertices[i];
+		/*
+			This is the most straightforward way to project onto S3. We could also 
+			get the magnitude and take its secent to preserve distance from the origin.
+		*/
+		const Vec3& temp = vertices[i];
 		ret[i] = Vec4(
 			temp.x * scale,
 			temp.y * scale,
