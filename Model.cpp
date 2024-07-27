@@ -152,10 +152,8 @@ GLuint Model::make_vertex_array()
 		glEnableVertexAttribArray(1);
 	}
 
-	if(elements)
+	if(element_buffer)
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
-
-	glBindVertexArray(0);
 
 	return vertex_array;
 }
@@ -199,8 +197,6 @@ void Model::bind_xform_array(GLuint vertex_array, int count, const Mat4* xforms)
 		glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, 16 * sizeof(float), (void*)(4 * i * sizeof(float)));
 		glVertexAttribDivisor(2 + i, 1);
 	}
-
-	glBindVertexArray(0);
 }
 
 void Model::draw_raw()
@@ -234,13 +230,13 @@ void Model::draw_instanced(int count)
 				glDrawElementsInstanced(primitive, vertices_per_primitive * num_primitives, GL_UNSIGNED_INT, (void*)0, count);
 				break;
 			default:
-				for(int j = 0; j < num_primitives; j++)
-					glDrawElementsInstanced(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(j * vertices_per_primitive * sizeof(int)), count);
+				for(int i = 0; i < num_primitives; i++)
+					glDrawElementsInstanced(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(i * vertices_per_primitive * sizeof(int)), count);
 				break;
 		}
 	else
-		for(int j = 0; j < num_primitives; j++)
-			glDrawArraysInstanced(primitive, j * vertices_per_primitive, vertices_per_primitive, count);
+		for(int i = 0; i < num_primitives; i++)
+			glDrawArraysInstanced(primitive, i * vertices_per_primitive, vertices_per_primitive, count);
 }
 
 
@@ -254,8 +250,6 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 		GLuint vertex_array = make_vertex_array();
 		bind_xform_array(vertex_array, count, xforms);
 
-		glBindVertexArray(0);
-
 		return [count, vertex_array, base_color, this]() {
 			instanced_xform_program->use();
 			glBindVertexArray(vertex_array);
@@ -265,7 +259,6 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 				base_color.x, base_color.y, base_color.z, base_color.w
 			);
 			draw_instanced(count);
-			glBindVertexArray(0);
 		};
 	}
 	else
@@ -285,7 +278,6 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 				raw_program->set_uniform_matrix("modelViewXForm", ~cam_mat * temp_xforms[i]);
 				draw_raw();
 			}
-			glBindVertexArray(0);
 		};
 	}
 }
@@ -311,13 +303,10 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 		glVertexAttribPointer(6, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
 		glVertexAttribDivisor(6, 1);
 
-		glBindVertexArray(0);
-
 		return [count, vertex_array, this]() {
 			instanced_xform_and_color_program->use();
 			glBindVertexArray(vertex_array);
 			draw_instanced(count);
-			glBindVertexArray(0);
 		};
 	}
 	else
@@ -341,7 +330,6 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 				raw_program->set_uniform_matrix("modelViewXForm", ~cam_mat * temp_xforms[i]);
 				draw_raw();
 			}
-			glBindVertexArray(0);
 		};
 	}
 }
