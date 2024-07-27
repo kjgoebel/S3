@@ -103,9 +103,10 @@ ShaderProgram::ShaderProgram(Shader* vert, Shader* geom, Shader* frag)
 	fragment = frag;
 
 	id = glCreateProgram();
-	printf("new program id = %d (%d, %d, %d)\n", id, vertex->get_id(), geometry->get_id(), fragment->get_id());
+	printf("new program id = %d (%d, %d, %d)\n", id, vertex->get_id(), geometry ? geometry->get_id() : -1, fragment->get_id());
 	glAttachShader(id, vertex->get_id());
-	glAttachShader(id, geometry->get_id());
+	if(geometry)
+		glAttachShader(id, geometry->get_id());
 	glAttachShader(id, fragment->get_id());
 	glLinkProgram(id);
 
@@ -139,12 +140,15 @@ void ShaderProgram::dump() const
 {
 	printf("Shader program id %d:\n", id);
 	for(auto shader : std::vector<Shader*> {vertex, geometry, fragment})
-	{
-		printf("\tShader id %d:\n", shader->get_id());
-		printf("\t\t%s\n", shader->get_core()->name);
-		for(auto option : shader->get_options())
-			printf("\t\t\t%s", option);
-	}
+		if(shader)
+		{
+			printf("\tShader id %d:\n", shader->get_id());
+			printf("\t\t%s\n", shader->get_core()->name);
+			for(auto option : shader->get_options())
+				printf("\t\t\t%s", option);
+		}
+		else
+			printf("None");
 }
 
 ShaderProgram* ShaderProgram::get(Shader* vert, Shader* geom, Shader* frag)
@@ -171,6 +175,7 @@ std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 
 
 ShaderCore *vert, *geom_points, *geom_triangles, *frag;
+ShaderCore *vert_screenspace, *frag_copy_texture;
 
 void init_shaders()
 {
@@ -228,7 +233,7 @@ void init_shaders()
 		)",
 		NULL,
 		NULL,
-		std::vector<ShaderOption*> {
+		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(
 				DEFINE_INSTANCED_XFORM,
@@ -339,7 +344,7 @@ void init_shaders()
 			_set_uniform_matrix(program_id, "projXForm", proj_mat);
 		},
 		NULL,
-		std::vector<ShaderOption*> {
+		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
 		}
@@ -398,7 +403,7 @@ void init_shaders()
 			_set_uniform_matrix(program_id, "projXForm", proj_mat);
 		},
 		NULL,
-		std::vector<ShaderOption*> {
+		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
 		}
@@ -423,7 +428,7 @@ void init_shaders()
 			in vec4 gf_r4pos;
 			in float distance;
 				
-			out vec4 fragColor;
+			layout (location = 0) out vec4 fragColor;
 			layout (depth_any) out float gl_FragDepth;
 
 			void main() {
@@ -444,9 +449,46 @@ void init_shaders()
 		[](GLuint program_id) {
 			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fogScale"), fog_scale);
 		},
-		std::vector<ShaderOption*> {
+		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
 		}
+	);
+
+
+	vert_screenspace = new ShaderCore(
+		"vert_screenspace",
+		GL_VERTEX_SHADER,
+		R"(
+			layout (location = 0) in vec4 position;
+
+			void main() {
+				gl_Position = position;
+			}
+		)",
+		NULL,
+		NULL,
+		{}
+	);
+
+	frag_copy_texture = new ShaderCore(
+		"frag_copy_textures",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform sampler2D color_tex;
+			
+			out vec4 frag_color;
+
+			void main() {
+				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
+				if(((pixel_coords.x & 16) ^ (pixel_coords.y & 16)) != 0)
+					frag_color = texelFetch(color_tex, ivec2(gl_FragCoord.xy), 0);
+				else
+					frag_color = vec4(0.5, 0.5, 0.5, 1);
+			}
+		)",
+		NULL,
+		NULL,
+		{}
 	);
 }

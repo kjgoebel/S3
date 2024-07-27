@@ -47,18 +47,47 @@ PlayerState player_state;
 
 #define FOG_INCREMENT		(0.5)
 
+GLuint gbuffer = 0, color_tex = 0, depth_buffer = 0;
+
+Vec4 fsq_vertices[4] = {
+	{1, 1, 0, 1},
+	{-1, 1, 0, 1},
+	{-1, -1, 0, 1},
+	{1, -1, 0, 1}
+};
+GLuint fsq_vertex_array;
+
+ShaderProgram* fsq_program = NULL;
+
 
 void init()
 {
 	srand(clock());
+
+	init_shaders();
+
+	fsq_program = ShaderProgram::get(
+		Shader::get(vert_screenspace, {}),
+		NULL,
+		Shader::get(frag_copy_texture, {})
+	);
+
+	glGenVertexArrays(1, &fsq_vertex_array);
+	glBindVertexArray(fsq_vertex_array);
+
+	GLuint fsq_vertex_buffer;
+	glGenBuffers(1, &fsq_vertex_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, fsq_vertex_buffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(fsq_vertices), fsq_vertices, GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
+	glEnableVertexAttribArray(0);
 
 	glClearColor(0, 0, 0, 0);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_PROGRAM_POINT_SIZE);
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
-
-	init_shaders();
 
 	torus_model = Model::make_torus(128, 128, 1, false);
 	torus_model->generate_primitive_colors(0.7);
@@ -73,8 +102,40 @@ void reshape(int w, int h)
 {
 	window_width = w;
 	window_height = h;
+
+	ShaderProgram::init_all();
+
 	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
 	set_perspective((double)w / h);
+
+	if(gbuffer)
+	{
+		glBindFramebuffer(GL_FRAMEBUFFER, gbuffer);
+		glBindTexture(GL_TEXTURE_2D, color_tex);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, NULL);
+		glBindRenderbuffer(GL_RENDERBUFFER, depth_buffer);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+	}
+	else
+	{
+		glGenFramebuffers(1, &gbuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, gbuffer);
+
+		glGenTextures(1, &color_tex);
+		glBindTexture(GL_TEXTURE_2D, color_tex);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glNamedFramebufferTexture(gbuffer, GL_COLOR_ATTACHMENT0, color_tex, 0);
+
+		glGenRenderbuffers(1, &depth_buffer);
+		glBindRenderbuffer(GL_RENDERBUFFER, depth_buffer);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_buffer);
+	}
+
+	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		error("Framebuffer status is %d\n", glCheckFramebufferStatus(GL_FRAMEBUFFER));
 }
 
 void display()
@@ -98,14 +159,40 @@ void display()
 	player_state.set_cam();
 
 	last_frame_time += dt;
-
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
-
 	printf("%f\n", 1.0 / dt);
 	print_matrix(cam_mat);
 	printf("\n");
+
+	glBindFramebuffer(GL_FRAMEBUFFER, gbuffer);
+
+	glClearColor(0, 0, 0, 0);
+	glEnable(GL_DEPTH_TEST);
+
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	ShaderProgram::frame_all();
+
+	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	
+	glDisable(GL_DEPTH_TEST);
+
+	glDisable(GL_CULL_FACE);
+
+	glClearColor(0, 0.5, 0, 0);
+
+	fsq_program->use();
+	GLuint color_location = glGetUniformLocation(fsq_program->get_id(), "color_tex");
+	glUniform1i(color_location, 0);
+	glActiveTexture(GL_TEXTURE0 + 0);
+	glBindTexture(GL_TEXTURE_2D, color_tex);
+	
+	glBindVertexArray(fsq_vertex_array);
+	glDrawArrays(GL_QUADS, 0, 4);
 
 	glFlush();
 	glutSwapBuffers();

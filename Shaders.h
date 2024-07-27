@@ -95,6 +95,7 @@ private:
 
 
 extern ShaderCore *vert, *geom_points, *geom_triangles, *frag;
+extern ShaderCore *vert_screenspace, *frag_copy_texture;
 
 void init_shaders();
 
@@ -105,8 +106,20 @@ class ShaderProgram
 public:
 	GLuint get_id() {return id;}
 	void use() {glUseProgram(id);}
-	void init() {vertex->init(id); geometry->init(id); fragment->init(id);}
-	void frame() {vertex->frame(id); geometry->frame(id); fragment->frame(id);}
+	void init()
+	{
+		vertex->init(id);
+		if(geometry)
+			geometry->init(id);
+		fragment->init(id);
+	}
+	void frame()
+	{
+		vertex->frame(id);
+		if(geometry)
+			geometry->frame(id);
+		fragment->frame(id);
+	}
 
 	void set_uniform_matrix(const char* name, Mat4& mat);
 
