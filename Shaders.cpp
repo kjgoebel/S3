@@ -187,7 +187,7 @@ std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 
 
 ShaderCore *vert, *geom_points, *geom_triangles, *frag;
-ShaderCore *vert_screenspace, *frag_copy_texture;
+ShaderCore *vert_screenspace, *frag_copy_texture, *frag_fog;
 
 void init_shaders()
 {
@@ -428,8 +428,6 @@ void init_shaders()
 		"frag",
 		GL_FRAGMENT_SHADER,
 		R"(
-			uniform float fogScale;
-
 			#ifdef VERTEX_COLOR
 				in vec4 gf_color;
 			#endif
@@ -447,24 +445,20 @@ void init_shaders()
 			layout (depth_any) out float gl_FragDepth;
 
 			void main() {
-				float dist = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
-				float fogFactor = exp(-dist * fogScale);
 				#ifdef INSTANCED_BASE_COLOR
 					vec4 baseColor = gf_base_color;
 				#endif
 				#ifdef VERTEX_COLOR
-					fragColor = clamp(baseColor + gf_color, 0, 1) * fogFactor;
+					fragColor = clamp(baseColor + gf_color, 0, 1);
 				#else
-					fragColor = baseColor * fogFactor;
+					fragColor = baseColor;
 				#endif
-				gl_FragDepth = dist;
+				gl_FragDepth = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
 			}
 		)",
 		NULL,
 		NULL,
-		[](GLuint program_id) {
-			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fogScale"), fog_scale);
-		},
+		NULL,
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
@@ -500,13 +494,46 @@ void init_shaders()
 			void main() {
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
 				if(((pixel_coords.x & 16) ^ (pixel_coords.y & 16)) != 0)
-					frag_color = texelFetch(color_tex, ivec2(gl_FragCoord.xy), 0);
+					frag_color = texelFetch(color_tex, pixel_coords, 0);
 				else
-					frag_color = texelFetch(depth_tex, ivec2(gl_FragCoord.xy), 0);
+					frag_color = texelFetch(depth_tex, pixel_coords, 0);
 			}
 		)",
 		NULL,
 		NULL,
+		[](GLuint program_id) {
+			glUniform1i(glGetUniformLocation(program_id, "color_tex"), 0);
+			glActiveTexture(GL_TEXTURE0 + 0);
+			glBindTexture(GL_TEXTURE_2D, gbuffer_color);
+			glUniform1i(glGetUniformLocation(program_id, "depth_tex"), 1);
+			glActiveTexture(GL_TEXTURE0 + 1);
+			glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
+		},
+		{}
+	);
+
+	frag_fog = new ShaderCore(
+		"frag_fog",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform sampler2D color_tex;
+			uniform sampler2D depth_tex;
+
+			uniform float fog_scale;
+			
+			out vec4 frag_color;
+
+			void main() {
+				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
+				float distance = texelFetch(depth_tex, pixel_coords, 0).r;
+				vec4 color = texelFetch(color_tex, pixel_coords, 0);
+				frag_color = exp(-distance * fog_scale) * color;
+			}
+		)",
+		NULL,
+		[](GLuint program_id) {
+			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fog_scale"), fog_scale);
+		},
 		[](GLuint program_id) {
 			glUniform1i(glGetUniformLocation(program_id, "color_tex"), 0);
 			glActiveTexture(GL_TEXTURE0 + 0);

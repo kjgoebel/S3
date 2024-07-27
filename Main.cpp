@@ -7,6 +7,7 @@
 #include "Model.h"
 #include "PoleModel.h"
 #include "S3.h"
+#include "Framebuffer.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -18,6 +19,8 @@ Model* geodesic_model = NULL;
 Model* torus_model = NULL;
 
 Model* tesseract_arc = NULL;
+
+ShaderProgram* fog_quad_program = NULL;
 
 #define NUM_DOTS		(2000)
 
@@ -87,6 +90,12 @@ void init()
 	glCullFace(GL_BACK);
 
 	init_shaders();
+
+	fog_quad_program = ShaderProgram::get(
+		Shader::get(vert_screenspace, {}),
+		NULL,
+		Shader::get(frag_fog, {})
+	);
 
 	int i;
 
@@ -226,6 +235,7 @@ void reshape(int w, int h)
 {
 	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
 	set_perspective((double)w / h);
+	init_framebuffer(w, h);
 	ShaderProgram::init_all();
 }
 
@@ -252,6 +262,8 @@ void display()
 	);
 
 	last_fame_time += dt;
+
+	use_gbuffer();
 
 	ShaderProgram::frame_all();
 
@@ -294,6 +306,10 @@ void display()
 
 	if(draw_superhopf)
 		render_superhopf();
+
+	use_default_framebuffer();
+	fog_quad_program->use();
+	draw_fsq();
 
 	glFlush();
 	glutSwapBuffers();

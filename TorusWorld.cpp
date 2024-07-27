@@ -61,7 +61,7 @@ void init()
 	fsq_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
 		NULL,
-		Shader::get(frag_copy_texture, {})
+		Shader::get(frag_fog, {})
 	);
 
 	torus_model = Model::make_torus(128, 128, 1, false);
