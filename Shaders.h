@@ -42,17 +42,25 @@ typedef std::function<void(int)> ShaderPullFunc;
 struct ShaderOption
 {
 	ShaderOption(const char* def_name, ShaderPullFunc init_func = NULL, ShaderPullFunc frame_func = NULL)
-		: def_name(def_name), init_func(init_func), frame_func(frame_func) {}
+		: def_name(def_name), init_func(init_func), frame_func(frame_func), use_func(use_func) {}
 
 	const char* def_name;
-	ShaderPullFunc init_func, frame_func;
+	ShaderPullFunc init_func, frame_func, use_func;
 };
 
 
 struct ShaderCore
 {
-	ShaderCore(const char* name, GLuint shader_type, const char* core_text, ShaderPullFunc init_func, ShaderPullFunc frame_func, std::vector<ShaderOption*> options)
-		: name(name), shader_type(shader_type), core_text(core_text), init_func(init_func), frame_func(frame_func), options()
+	ShaderCore(
+		const char* name,
+		GLuint shader_type,
+		const char* core_text,
+		ShaderPullFunc init_func,
+		ShaderPullFunc frame_func,
+		ShaderPullFunc use_func,
+		std::vector<ShaderOption*> options
+	)
+		: name(name), shader_type(shader_type), core_text(core_text), init_func(init_func), frame_func(frame_func), use_func(use_func), options()
 	{
 		for(auto option : options)
 			this->options[option->def_name] = option;
@@ -61,7 +69,7 @@ struct ShaderCore
 	const char* name;
 	GLuint shader_type;
 	const char* core_text;
-	ShaderPullFunc init_func, frame_func;
+	ShaderPullFunc init_func, frame_func, use_func;
 	std::map<const char*, ShaderOption*> options;
 };
 
@@ -73,6 +81,7 @@ public:
 
 	void init(GLuint program_id) {init_func(program_id);}
 	void frame(GLuint program_id) {frame_func(program_id);}
+	void use(GLuint program_id) {use_func(program_id);}
 
 	ShaderCore* get_core() {return core;}
 	const std::set<const char*> get_options() {return options;}
@@ -84,7 +93,7 @@ private:
 	const std::set<const char*> options;
 
 	GLuint id;
-	ShaderPullFunc init_func, frame_func;
+	ShaderPullFunc init_func, frame_func, use_func;
 
 public:
 	static Shader* get(ShaderCore* core, const std::set<const char*> options);
@@ -105,7 +114,14 @@ class ShaderProgram
 {
 public:
 	GLuint get_id() {return id;}
-	void use() {glUseProgram(id);}
+	void use()
+	{
+		glUseProgram(id);
+		vertex->use(id);
+		if(geometry)
+			geometry->use(id);
+		fragment->use(id);
+	}
 	void init()
 	{
 		vertex->init(id);

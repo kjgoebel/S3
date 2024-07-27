@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "Utils.h"
+#include "Framebuffer.h"
 
 #pragma warning(disable : 4244)		//conversion from double to float
 
@@ -77,6 +78,17 @@ Shader::Shader(ShaderCore* core, const std::set<const char*> options) : core(cor
 		for(auto option : options)
 		{
 			ShaderPullFunc temp = core->options[option]->frame_func;
+			if(temp)
+				temp(program_id);
+		}
+	};
+
+	use_func = [core, options](GLuint program_id) {
+		if(core->use_func)
+			core->use_func(program_id);
+		for(auto option : options)
+		{
+			ShaderPullFunc temp = core->options[option]->use_func;
 			if(temp)
 				temp(program_id);
 		}
@@ -233,6 +245,7 @@ void init_shaders()
 		)",
 		NULL,
 		NULL,
+		NULL,
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(
@@ -344,6 +357,7 @@ void init_shaders()
 			_set_uniform_matrix(program_id, "projXForm", proj_mat);
 		},
 		NULL,
+		NULL,
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
@@ -403,6 +417,7 @@ void init_shaders()
 			_set_uniform_matrix(program_id, "projXForm", proj_mat);
 		},
 		NULL,
+		NULL,
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
@@ -446,6 +461,7 @@ void init_shaders()
 			}
 		)",
 		NULL,
+		NULL,
 		[](GLuint program_id) {
 			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fogScale"), fog_scale);
 		},
@@ -468,6 +484,7 @@ void init_shaders()
 		)",
 		NULL,
 		NULL,
+		NULL,
 		{}
 	);
 
@@ -476,6 +493,7 @@ void init_shaders()
 		GL_FRAGMENT_SHADER,
 		R"(
 			uniform sampler2D color_tex;
+			uniform sampler2D depth_tex;
 			
 			out vec4 frag_color;
 
@@ -484,11 +502,19 @@ void init_shaders()
 				if(((pixel_coords.x & 16) ^ (pixel_coords.y & 16)) != 0)
 					frag_color = texelFetch(color_tex, ivec2(gl_FragCoord.xy), 0);
 				else
-					frag_color = vec4(0.5, 0.5, 0.5, 1);
+					frag_color = texelFetch(depth_tex, ivec2(gl_FragCoord.xy), 0);
 			}
 		)",
 		NULL,
 		NULL,
+		[](GLuint program_id) {
+			glUniform1i(glGetUniformLocation(program_id, "color_tex"), 0);
+			glActiveTexture(GL_TEXTURE0 + 0);
+			glBindTexture(GL_TEXTURE_2D, gbuffer_color);
+			glUniform1i(glGetUniformLocation(program_id, "depth_tex"), 1);
+			glActiveTexture(GL_TEXTURE0 + 1);
+			glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
+		},
 		{}
 	);
 }
