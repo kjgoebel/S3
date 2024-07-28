@@ -202,15 +202,20 @@ void init_shaders()
 				out vec4 vg_color;
 			#endif
 
+			#ifdef VERTEX_NORMAL
+				layout (location = 2) in vec4 normal;
+				out vec4 vg_normal;
+			#endif
+
 			#ifdef INSTANCED_XFORM
-				layout (location = 2) in mat4 modelXForm;
+				layout (location = 3) in mat4 modelXForm;
 				uniform mat4 viewXForm;
 			#else
 				uniform mat4 modelViewXForm;
 			#endif
 			
 			#ifdef INSTANCED_BASE_COLOR
-				layout (location = 6) in vec4 base_color;
+				layout (location = 7) in vec4 base_color;
 				out vec4 vg_base_color;
 			#endif
 
@@ -241,6 +246,9 @@ void init_shaders()
 				#ifdef VERTEX_COLOR
 					vg_color = color;
 				#endif
+				#ifdef VERTEX_NORMAL
+					vg_normal = modelViewXForm * normal;
+				#endif
 			}
 		)",
 		NULL,
@@ -248,6 +256,7 @@ void init_shaders()
 		NULL,
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_VERTEX_NORMAL, NULL, NULL),
 			new ShaderOption(
 				DEFINE_INSTANCED_XFORM,
 				NULL,
@@ -272,6 +281,11 @@ void init_shaders()
 			#ifdef VERTEX_COLOR
 				in vec4 vg_color[];
 				out vec4 gf_color;
+			#endif
+
+			#ifdef VERTEX_NORMAL
+				in vec4 vg_normal[];
+				out vec4 gf_normal;
 			#endif
 
 			#ifdef INSTANCED_BASE_COLOR
@@ -306,6 +320,9 @@ void init_shaders()
 				gf_r4pos = vg_r4pos[0];
 				#ifdef VERTEX_COLOR
 					gf_color = vg_color[0];
+				#endif
+				#ifdef VERTEX_NORMAL
+					gf_normal = vg_normal[0];
 				#endif
 				#ifdef INSTANCED_BASE_COLOR
 					gf_base_color = vg_base_color[0];
@@ -360,6 +377,7 @@ void init_shaders()
 		NULL,
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_VERTEX_NORMAL, NULL, NULL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
 		}
 	);
@@ -376,6 +394,11 @@ void init_shaders()
 			#ifdef VERTEX_COLOR
 				in vec4 vg_color[];
 				out vec4 gf_color;
+			#endif
+
+			#ifdef VERTEX_NORMAL
+				in vec4 vg_normal[];
+				out vec4 gf_normal;
 			#endif
 
 			#ifdef INSTANCED_BASE_COLOR
@@ -403,6 +426,9 @@ void init_shaders()
 					#ifdef VERTEX_COLOR
 						gf_color = vg_color[i];
 					#endif
+					#ifdef VERTEX_NORMAL
+						gf_normal = vg_normal[i];
+					#endif
 					#ifdef INSTANCED_BASE_COLOR
 						gf_base_color = vg_base_color[i];
 					#endif
@@ -420,6 +446,7 @@ void init_shaders()
 		NULL,
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_VERTEX_NORMAL, NULL, NULL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
 		}
 	);
@@ -430,6 +457,10 @@ void init_shaders()
 		R"(
 			#ifdef VERTEX_COLOR
 				in vec4 gf_color;
+			#endif
+
+			#ifdef VERTEX_NORMAL
+				in vec4 gf_normal;
 			#endif
 
 			#ifdef INSTANCED_BASE_COLOR
@@ -456,10 +487,14 @@ void init_shaders()
 					frag_albedo = baseColor;
 				#endif
 
-				float bulge_factor = length(gf_r4pos);
+				float bulge_factor = length(gf_r4pos);		//I'm pretty sure this is wrong.
 				frag_position = gf_r4pos / bulge_factor;
 
-				frag_normal = vec4(0, 0, 0, 1);
+				#ifdef VERTEX_NORMAL
+					frag_normal = normalize(gf_normal);
+				#else
+					frag_normal = vec4(0, 0, 1, 0);
+				#endif
 
 				gl_FragDepth = clamp(distance / (bulge_factor * 6.283185), 0, 1);
 			}
@@ -469,6 +504,7 @@ void init_shaders()
 		NULL,
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_VERTEX_NORMAL, NULL, NULL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
 		}
 	);
@@ -579,6 +615,7 @@ void init_shaders()
 		R"(
 			uniform sampler2D albedo_tex;
 			uniform sampler2D position_tex;
+			uniform sampler2D normal_tex;
 
 			uniform vec4 light_pos;
 			uniform vec3 light_emission;
@@ -589,8 +626,16 @@ void init_shaders()
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
 				vec4 color = texelFetch(albedo_tex, pixel_coords, 0);
 				vec4 position = texelFetch(position_tex, pixel_coords, 0);
-				float temp = sin(2 * asin(0.5 * length(position - light_pos)));
-				frag_color.rgb = color.rgb * light_emission / (temp * temp);
+				vec4 normal = texelFetch(normal_tex, pixel_coords, 0);
+
+				vec4 frag_to_light = light_pos - position;
+				float r4_distance = length(frag_to_light);
+				frag_to_light = normalize(frag_to_light - position);
+				float intensity_factor = sin(2 * asin(0.5 * r4_distance));
+				intensity_factor = 1 / (intensity_factor * intensity_factor);
+				float normal_factor = clamp(dot(normal, frag_to_light), 0, 1);
+
+				frag_color.rgb = color.rgb * light_emission * normal_factor * intensity_factor;
 				frag_color.a = 1;
 			}
 		)",
@@ -604,6 +649,10 @@ void init_shaders()
 			glUniform1i(glGetUniformLocation(program_id, "position_tex"), 1);
 			glActiveTexture(GL_TEXTURE0 + 1);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_position);
+			
+			glUniform1i(glGetUniformLocation(program_id, "normal_tex"), 2);
+			glActiveTexture(GL_TEXTURE0 + 2);
+			glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
 		},
 		{}
 	);

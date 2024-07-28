@@ -37,6 +37,7 @@ typedef std::function<void(int)> ShaderPullFunc;
 #define DEFINE_VERTEX_COLOR			"#define VERTEX_COLOR\n"
 #define DEFINE_INSTANCED_XFORM		"#define INSTANCED_XFORM\n"
 #define DEFINE_INSTANCED_BASE_COLOR	"#define INSTANCED_BASE_COLOR\n"
+#define DEFINE_VERTEX_NORMAL		"#define VERTEX_NORMAL\n"
 
 
 struct ShaderOption

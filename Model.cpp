@@ -20,7 +20,6 @@ Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
 	num_primitives = 1;
 	vertices_per_primitive = num_verts;
 
-	elements = NULL;
 	vertices = std::unique_ptr<Vec4[]>(new Vec4[num_verts]);
 	if(verts)
 		for(i = 0; i < num_verts; i++)
@@ -33,14 +32,24 @@ Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
 	}
 	else
 		vertex_colors = NULL;
+	elements = NULL;
+	normals = NULL;
 
-	vertex_buffer = vertex_color_buffer = element_buffer = 0;
+	vertex_buffer = vertex_color_buffer = element_buffer = normal_buffer = 0;
 	raw_program = instanced_xform_program = instanced_xform_and_color_program = NULL;
 	raw_vertex_array = 0;
 }
 
-Model::Model(int prim, int num_verts, int verts_per_prim, int num_prims, const Vec4* verts, const unsigned int* ixes, const Vec4* vert_colors)
-{
+Model::Model(
+	int prim,
+	int num_verts,
+	int verts_per_prim,
+	int num_prims,
+	const Vec4* verts,
+	const unsigned int* ixes,
+	const Vec4* vert_colors,
+	const Vec4* norms
+) {
 	int i;
 	primitive = prim;
 	num_vertices = num_verts;
@@ -67,8 +76,17 @@ Model::Model(int prim, int num_verts, int verts_per_prim, int num_prims, const V
 	}
 	else
 		vertex_colors = NULL;
+	if(norms)
+	{
+		printf("Normals in Model::Model()\n");
+		normals = std::unique_ptr<Vec4[]>(new Vec4[num_verts]);
+		for(i = 0; i < num_verts; i++)
+			normals[i] = norms[i];
+	}
+	else
+		normals = NULL;
 
-	vertex_buffer = vertex_color_buffer = element_buffer = 0;
+	vertex_buffer = vertex_color_buffer = element_buffer = normal_buffer = 0;
 	raw_program = instanced_xform_program = instanced_xform_and_color_program = NULL;
 	raw_vertex_array = 0;
 }
@@ -109,7 +127,18 @@ void Model::prepare_to_render()
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), elements.get(), GL_STATIC_DRAW);
 	}
 
-	auto options = vertex_colors ? std::set<const char*>{DEFINE_VERTEX_COLOR} : std::set<const char*>{};
+	if(normals)
+	{
+		glGenBuffers(1, &normal_buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, normal_buffer);
+		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), normals.get(), GL_STATIC_DRAW);
+	}
+
+	auto options = std::set<const char*>();
+	if(vertex_colors)
+		options.insert(DEFINE_VERTEX_COLOR);
+	if(normals)
+		options.insert(DEFINE_VERTEX_NORMAL);
 	raw_program = ShaderProgram::get(
 		Shader::get(vert, options),
 		Shader::get(primitive == GL_POINTS ? geom_points : geom_triangles, options),
@@ -155,6 +184,13 @@ GLuint Model::make_vertex_array()
 	if(element_buffer)
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
 
+	if(normals)
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, normal_buffer);
+		glVertexAttribPointer(2, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
+		glEnableVertexAttribArray(2);
+	}
+
 	return vertex_array;
 }
 
@@ -193,9 +229,9 @@ void Model::bind_xform_array(GLuint vertex_array, int count, const Mat4* xforms)
 
 	for(int i = 0; i < 4; i++)
 	{
-		glEnableVertexAttribArray(2 + i);
-		glVertexAttribPointer(2 + i, 4, GL_FLOAT, GL_FALSE, 16 * sizeof(float), (void*)(4 * i * sizeof(float)));
-		glVertexAttribDivisor(2 + i, 1);
+		glEnableVertexAttribArray(3 + i);
+		glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, 16 * sizeof(float), (void*)(4 * i * sizeof(float)));
+		glVertexAttribDivisor(3 + i, 1);
 	}
 }
 
@@ -299,9 +335,9 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 		glGenBuffers(1, &base_color_buffer);
 		glBindBuffer(GL_ARRAY_BUFFER, base_color_buffer);
 		glBufferData(GL_ARRAY_BUFFER, count * sizeof(Vec4), base_colors, GL_STATIC_DRAW);
-		glEnableVertexAttribArray(6);
-		glVertexAttribPointer(6, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
-		glVertexAttribDivisor(6, 1);
+		glEnableVertexAttribArray(7);
+		glVertexAttribPointer(7, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
+		glVertexAttribDivisor(7, 1);
 
 		return [count, vertex_array, this]() {
 			instanced_xform_and_color_program->use();
@@ -367,6 +403,8 @@ void Model::generate_primitive_colors(double scale)
 {
 	if(vertex_colors)
 		error("Model already has vertex colors.");
+	if(!elements)
+		error("Model has no primitives to color.");
 
 	std::unique_ptr<Vec4[]> old_verts = std::move(vertices);
 	num_vertices = num_primitives * vertices_per_primitive;
@@ -374,6 +412,14 @@ void Model::generate_primitive_colors(double scale)
 
 	std::unique_ptr<GLuint[]> old_elements = std::move(elements);
 	elements = NULL;
+
+	std::unique_ptr<Vec4[]> old_normals;
+	if(normals)
+	{
+		printf("Normals in generate_primitive_colors()\n");
+		old_normals = std::move(normals);
+		normals.reset(new Vec4[num_vertices]);
+	}
 
 	vertex_colors = std::unique_ptr<Vec4[]>(new Vec4[num_vertices]);
 
@@ -385,6 +431,8 @@ void Model::generate_primitive_colors(double scale)
 			int ix = vertices_per_primitive * i + j;
 			vertices[ix] = old_verts[old_elements[ix]];
 			vertex_colors[ix] = temp;
+			if(normals)
+				normals[ix] = old_normals[old_elements[ix]];
 		}
 	}
 }
@@ -407,6 +455,28 @@ std::shared_ptr<Vec4[]> make_torus_verts(int long_segments, int trans_segments, 
 				hole_ratio * cos(phi),
 				sin(theta),
 				cos(theta)
+			);
+		}
+	}
+
+	return ret;
+}
+
+std::shared_ptr<Vec4[]> make_torus_normals(int long_segments, int trans_segments, double hole_ratio, double length = TAU, bool make_final_ring = false)
+{
+	std::shared_ptr<Vec4[]> ret(new Vec4[long_segments * trans_segments]);
+	for(int i = 0; i < long_segments; i++)
+	{
+		double theta = (double)i * length / (make_final_ring ? long_segments - 1 : long_segments);
+		for(int j = 0; j < trans_segments; j++)
+		{
+			double phi = (double)j * TAU / trans_segments;
+
+			ret[i * trans_segments + j] = INV_ROOT_2 * Vec4(
+				sin(phi),
+				cos(phi),
+				-sin(theta),
+				-cos(theta)
 			);
 		}
 	}
@@ -472,7 +542,9 @@ Model* Model::make_torus(int longitudinal_segments, int transverse_segments, dou
 			2 * (transverse_segments + 1),
 			longitudinal_segments,
 			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio).get(),
-			make_torus_quad_strip_indices(longitudinal_segments, transverse_segments).get()
+			make_torus_quad_strip_indices(longitudinal_segments, transverse_segments).get(),
+			NULL,
+			make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio).get()
 		);
 	else
 		return new Model(
@@ -481,7 +553,9 @@ Model* Model::make_torus(int longitudinal_segments, int transverse_segments, dou
 			4,
 			longitudinal_segments * transverse_segments,
 			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio).get(),
-			make_torus_quad_indices(longitudinal_segments, transverse_segments).get()
+			make_torus_quad_indices(longitudinal_segments, transverse_segments).get(),
+			NULL,
+			make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio).get()
 		);
 }
 
@@ -495,7 +569,9 @@ Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments,
 			2 * (transverse_segments + 1),
 			(longitudinal_segments - 1),
 			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true).get(),
-			make_torus_quad_strip_indices(longitudinal_segments - 1, transverse_segments, false).get()
+			make_torus_quad_strip_indices(longitudinal_segments - 1, transverse_segments, false).get(),
+			NULL,
+			make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio, length, true).get()
 		);
 	else
 		return new Model(
@@ -504,7 +580,9 @@ Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments,
 			4,
 			(longitudinal_segments - 1) * transverse_segments,
 			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true).get(),
-			make_torus_quad_indices(longitudinal_segments - 1, transverse_segments, false).get()
+			make_torus_quad_indices(longitudinal_segments - 1, transverse_segments, false).get(),
+			NULL,
+			make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio, length, true).get()
 		);
 }
 

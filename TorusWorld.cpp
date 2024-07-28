@@ -13,6 +13,9 @@
 #include <time.h>
 
 
+//#define COPY_TEXTURES
+
+
 Model* torus_model;
 Model* pole_model;
 ShaderProgram* fsq_program = NULL;
@@ -52,7 +55,7 @@ PlayerState player_state;
 
 #define FOG_INCREMENT		(0.5)
 
-#define COPY_TEXTURES
+#define SUN_SPEED		(TAU / 30)
 
 
 void init()
@@ -130,9 +133,9 @@ void display()
 	player_state.set_cam();
 
 	last_frame_time += dt;
-	printf("%f\n", 1.0 / dt);
+	/*printf("%f\n", 1.0 / dt);
 	print_matrix(cam_mat);
-	printf("\n");
+	printf("\n");*/
 
 	use_gbuffer();
 
@@ -158,21 +161,15 @@ void display()
 	
 	GLuint program_id = fsq_program->get_id();
 
-	Vec4 light_pos = ~cam_mat * Vec4(0, 1, 0, 0);
-	Vec4 light_emission = Vec3(0.3, 0.3, 0.15);
+	double theta = SUN_SPEED * last_frame_time;
+	Vec4 light_pos = ~cam_mat * Vec4(-sin(theta), cos(theta), 0, 0);
+	Vec4 light_emission = Vec3(1, 1, 1);
 	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
 	glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
 	draw_fsq();
 
-	//glBlendEquationSeparate(GL_FUNC_REVERSE_SUBTRACT, GL_MAX);
 	light_pos = ~cam_mat * Vec4(2, 1, 0, 1).normalize();
-	light_emission = -Vec3(0.1, 0.1, 0.2);
-	/*
-		This doesn't work because the output framebuffer in this case is the default framebuffer, which 
-		isn't using a GL_RGBA16F texture. Welp, there's always subtraction.... If we ever do HDR, there 
-		will have to be another framebuffer layer (gbuffer -> accumulation buffer -> default framebuffer), 
-		so then we'll be able to get unlight for free.
-	*/
+	light_emission = Vec3(0.3, 0.1, 0.0);
 	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
 	glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
 	draw_fsq();
