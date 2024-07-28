@@ -52,6 +52,8 @@ PlayerState player_state;
 
 #define FOG_INCREMENT		(0.5)
 
+#define COPY_TEXTURES
+
 
 void init()
 {
@@ -61,11 +63,19 @@ void init()
 
 	init_shaders();
 
+#ifdef COPY_TEXTURES
+	fsq_program = ShaderProgram::get(
+		Shader::get(vert_screenspace, {}),
+		NULL,
+		Shader::get(frag_copy_textures, {})
+	);
+#else
 	fsq_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
 		NULL,
 		Shader::get(frag_point_light, {})
 	);
+#endif
 
 	torus_model = Model::make_torus(128, 128, 1, false);
 	torus_model->generate_primitive_colors(0.7);
@@ -139,7 +149,11 @@ void display()
 	glClear(GL_COLOR_BUFFER_BIT);
 	fsq_program->use();
 
+#ifdef COPY_TEXTURES
+	draw_fsq();
+#else
 	glEnable(GL_BLEND);
+	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_ONE);
 	
 	GLuint program_id = fsq_program->get_id();
@@ -150,11 +164,19 @@ void display()
 	glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
 	draw_fsq();
 
-	light_pos = ~cam_mat * Vec4(1, 0, 0, 1).normalize();
-	light_emission = Vec3(0.1, 0.1, 0.2);
+	//glBlendEquationSeparate(GL_FUNC_REVERSE_SUBTRACT, GL_MAX);
+	light_pos = ~cam_mat * Vec4(2, 1, 0, 1).normalize();
+	light_emission = -Vec3(0.1, 0.1, 0.2);
+	/*
+		This doesn't work because the output framebuffer in this case is the default framebuffer, which 
+		isn't using a GL_RGBA16F texture. Welp, there's always subtraction.... If we ever do HDR, there 
+		will have to be another framebuffer layer (gbuffer -> accumulation buffer -> default framebuffer), 
+		so then we'll be able to get unlight for free.
+	*/
 	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
 	glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
 	draw_fsq();
+#endif
 	
 	glFlush();
 	glutSwapBuffers();
