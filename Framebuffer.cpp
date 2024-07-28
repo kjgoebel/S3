@@ -59,27 +59,16 @@ void init_framebuffer(int w, int h)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glNamedFramebufferTexture(gbuffer, GL_COLOR_ATTACHMENT0, gbuffer_albedo, 0);
 
-		GLubyte* temp = new GLubyte[4 * w * h];
-		for(int i = 0; i < h; i++)
-			for(int j = 0; j < w; j++)
-			{
-				int ix = 4 * (i * w + j);
-				temp[ix + 0] = i | j;
-				temp[ix + 1] = i & j;
-				temp[ix + 2] = i ^ j;
-				temp[ix + 3] = 255;
-			}
-
 		glGenTextures(1, &gbuffer_position);
 		glBindTexture(GL_TEXTURE_2D, gbuffer_position);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, temp);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glNamedFramebufferTexture(gbuffer, GL_COLOR_ATTACHMENT1, gbuffer_position, 0);
 
 		glGenTextures(1, &gbuffer_normal);
 		glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, temp);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glNamedFramebufferTexture(gbuffer, GL_COLOR_ATTACHMENT2, gbuffer_normal, 0);
@@ -93,8 +82,6 @@ void init_framebuffer(int w, int h)
 
 		GLuint attachments[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
 		glDrawBuffers(3, attachments);
-
-		delete[] temp;
 	}
 
 	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)

@@ -7,11 +7,14 @@
 #include "Utils.h"
 #include "Framebuffer.h"
 
+#include "PoleModel.h"
+
 #include <stdio.h>
 #include <time.h>
 
 
 Model* torus_model;
+Model* pole_model;
 ShaderProgram* fsq_program = NULL;
 
 double last_frame_time;
@@ -61,11 +64,21 @@ void init()
 	fsq_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
 		NULL,
-		Shader::get(frag_fog, {})
+		Shader::get(frag_point_light, {})
 	);
 
 	torus_model = Model::make_torus(128, 128, 1, false);
 	torus_model->generate_primitive_colors(0.7);
+
+	pole_model =  new Model(
+		GL_TRIANGLES,
+		NUM_POLE_VERTS,
+		3,
+		NUM_POLE_TRIANGLES,
+		Model::s3ify(NUM_POLE_VERTS, 0.05, pole_model_vertices).get(),
+		pole_model_elements
+	);
+	pole_model->generate_primitive_colors(0.3);
 
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
 	player_state.set_cam();
@@ -113,13 +126,34 @@ void display()
 
 	use_gbuffer();
 
+	glDisable(GL_BLEND);
+
 	ShaderProgram::frame_all();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
+	pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
+	pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
 
 	use_default_framebuffer();
 
+	glClear(GL_COLOR_BUFFER_BIT);
 	fsq_program->use();
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE);
+	
+	GLuint program_id = fsq_program->get_id();
+
+	Vec4 light_pos = ~cam_mat * Vec4(0, 1, 0, 0);
+	Vec4 light_emission = Vec3(0.3, 0.3, 0.15);
+	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
+	glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
+	draw_fsq();
+
+	light_pos = ~cam_mat * Vec4(1, 0, 0, 1).normalize();
+	light_emission = Vec3(0.1, 0.1, 0.2);
+	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
+	glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
 	draw_fsq();
 	
 	glFlush();
@@ -205,7 +239,7 @@ int main(int argc, char** argv)
 	glutInit(&argc, argv);
 	glutInitWindowSize(1600, 900);
 	glutInitWindowPosition(160,  90);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
 
 	glutCreateWindow("WindowName");
 

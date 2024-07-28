@@ -267,7 +267,7 @@ void display()
 
 	if(draw_poles)
 		render_poles();
-	
+
 	if(draw_clutter)
 		dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
 

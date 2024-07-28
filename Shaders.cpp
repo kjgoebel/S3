@@ -187,7 +187,7 @@ std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 
 
 ShaderCore *vert, *geom_points, *geom_triangles, *frag;
-ShaderCore *vert_screenspace, *frag_copy_textures, *frag_fog;
+ShaderCore *vert_screenspace, *frag_copy_textures, *frag_fog, *frag_point_light;
 
 void init_shaders()
 {
@@ -457,7 +457,7 @@ void init_shaders()
 				#endif
 
 				float bulge_factor = length(gf_r4pos);
-				frag_position = gf_r4pos / bulge_factor;
+				frag_position = (gf_r4pos / bulge_factor) * 0.5 + 0.5;
 
 				frag_normal = vec4(0, 0, 0, 1);
 
@@ -568,6 +568,41 @@ void init_shaders()
 			glUniform1i(glGetUniformLocation(program_id, "depth_tex"), 1);
 			glActiveTexture(GL_TEXTURE0 + 1);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
+		},
+		{}
+	);
+
+	frag_point_light = new ShaderCore(
+		"frag_point_light",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform sampler2D albedo_tex;
+			uniform sampler2D position_tex;
+
+			uniform vec4 light_pos;
+			uniform vec3 light_emission;
+
+			out vec4 frag_color;
+
+			void main() {
+				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
+				vec4 color = texelFetch(albedo_tex, pixel_coords, 0);
+				vec4 position = texelFetch(position_tex, pixel_coords, 0) * 2 - 1;
+				float temp = sin(2 * asin(0.5 * length(position - light_pos)));
+				frag_color.rgb = color.rgb * light_emission / (temp * temp);
+				frag_color.a = 1;
+			}
+		)",
+		NULL,
+		NULL,
+		[](GLuint program_id) {
+			glUniform1i(glGetUniformLocation(program_id, "albedo_tex"), 0);
+			glActiveTexture(GL_TEXTURE0 + 0);
+			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
+			
+			glUniform1i(glGetUniformLocation(program_id, "position_tex"), 1);
+			glActiveTexture(GL_TEXTURE0 + 1);
+			glBindTexture(GL_TEXTURE_2D, gbuffer_position);
 		},
 		{}
 	);
