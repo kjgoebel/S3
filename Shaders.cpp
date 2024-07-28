@@ -457,7 +457,7 @@ void init_shaders()
 				#endif
 
 				float bulge_factor = length(gf_r4pos);
-				frag_position = (gf_r4pos / bulge_factor) * 0.5 + 0.5;
+				frag_position = gf_r4pos / bulge_factor;
 
 				frag_normal = vec4(0, 0, 0, 1);
 
@@ -509,10 +509,11 @@ void init_shaders()
 					if((pixel_coords.y & 0x100) != 0)
 						frag_color = texelFetch(albedo_tex, pixel_coords, 0);
 					else
-						frag_color = texelFetch(position_tex, pixel_coords, 0) * 2 - 1;
+						//This shows the whole range, but sqeezes it so much you can't see anything:
+						frag_color = texelFetch(position_tex, pixel_coords, 0) / (2 * 6.283185) + 0.5;
 				else
 					if((pixel_coords.y & 0x100) != 0)
-						frag_color = texelFetch(normal_tex, pixel_coords, 0) * 2 - 1;
+						frag_color = texelFetch(normal_tex, pixel_coords, 0) * 0.5 + 0.5;
 					else
 						frag_color = texelFetch(depth_tex, pixel_coords, 0);
 			}
@@ -587,7 +588,7 @@ void init_shaders()
 			void main() {
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
 				vec4 color = texelFetch(albedo_tex, pixel_coords, 0);
-				vec4 position = texelFetch(position_tex, pixel_coords, 0) * 2 - 1;
+				vec4 position = texelFetch(position_tex, pixel_coords, 0);
 				float temp = sin(2 * asin(0.5 * length(position - light_pos)));
 				frag_color.rgb = color.rgb * light_emission / (temp * temp);
 				frag_color.a = 1;
