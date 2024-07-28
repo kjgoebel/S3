@@ -491,9 +491,17 @@ void Model::generate_normals()
 				}
 				Vec4 va = vertices[a], vb = vertices[b], vc = vertices[c];
 
-				Vec4 tangent = (vb - va).normalize();
+				/*
+					You might think vb and vc are close enough to va that the tangents 
+					don't need to be orthogonalized to va (since the final normals are 
+					going to be orthonormalized against vb and vc anyway). But no, the 
+					~0.02 dot product between the tangents and va occasionally 
+					derails the normal generation catastrophically.
+				*/
+				Vec4 tangent = vb - va;
+				tangent = (tangent - va * (va * tangent)).normalize();
 				Vec4 bitangent = vc - va;
-				bitangent = (bitangent - tangent * (tangent * bitangent)).normalize();
+				bitangent = (bitangent - tangent * (tangent * bitangent) - va * (va * bitangent)).normalize();
 
 				Vec4 temp;
 				do {
@@ -501,39 +509,28 @@ void Model::generate_normals()
 				}while((temp - tangent).mag2() < 0.2 || (temp - bitangent).mag2() < 0.2 || (temp - va).mag2() < 0.2);
 				//In theory we should check against vertices b and c as well, but we assume they're close to a.
 
-				temp = temp - tangent * (tangent * temp) - bitangent * (bitangent * temp);
-
-				Mat4 check;
-				Vec4 new_normal;
+				//an approximate normal to the triangle. We check for handedness only once because vb and vc are close to va.
+				temp = temp - tangent * (tangent * temp) - bitangent * (bitangent * temp) - va * (va * temp);
+				Mat4 check = Mat4::from_columns(tangent, bitangent, temp, va);
+				if(check.determinant() > 0)		//Why is this >?
+					temp = -temp;
 
 				//We have to orthonormalize temp three times because va, vb and vc are not parallel. Yes, there's 
 				//no such thing as a flat triangle in a curved space.
-				new_normal = temp - va * (va * temp);
-				check = Mat4::from_columns(tangent, bitangent, new_normal, va);
-				if(check.determinant() > 0)
-					new_normal = -new_normal;
-				normals[a] = normals[a] + new_normal;
+				normals[a] = normals[a] + temp.normalize();
 				times_touched[a]++;
 
-				new_normal = temp - vb * (vb * temp);
-				check = Mat4::from_columns(tangent, bitangent, new_normal, vb);
-				if(check.determinant() > 0)
-					new_normal = -new_normal;
-				normals[b] = normals[b] + new_normal;
+				normals[b] = normals[b] + (temp - vb * (vb * temp)).normalize();
 				times_touched[b]++;
 
-				new_normal = temp - vc * (vc * temp);
-				check = Mat4::from_columns(tangent, bitangent, new_normal, vc);
-				if(check.determinant() > 0)
-					new_normal = -new_normal;
-				normals[c] = normals[c] + new_normal;
+				normals[c] = normals[c] + (temp - vc * (vc * temp)).normalize();
 				times_touched[c]++;
 			}
 		);
 	}
 
 	for(int i = 0; i < num_vertices; i++)
-		normals[i] = normals[i] / times_touched[i];
+		normals[i] = (normals[i] / times_touched[i]).normalize();
 }
 
 

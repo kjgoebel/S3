@@ -89,8 +89,6 @@ void init()
 		pole_model_elements
 	);
 	pole_model->generate_primitive_colors(0.3);
-	pole_model->dump();
-	printf("\n\n");
 	pole_model->generate_normals();
 
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
