@@ -81,12 +81,8 @@ void init()
 {
 	srand(clock());
 
-	glEnable(GL_PROGRAM_POINT_SIZE);
-
+	//glEnable(GL_PROGRAM_POINT_SIZE);
 	glClearColor(0, 0, 0, 0);
-	glEnable(GL_DEPTH_TEST);
-
-	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
 	init_shaders();

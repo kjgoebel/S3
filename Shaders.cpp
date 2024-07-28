@@ -187,7 +187,7 @@ std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 
 
 ShaderCore *vert, *geom_points, *geom_triangles, *frag;
-ShaderCore *vert_screenspace, *frag_copy_texture, *frag_fog;
+ShaderCore *vert_screenspace, *frag_copy_textures, *frag_fog;
 
 void init_shaders()
 {
@@ -441,7 +441,9 @@ void init_shaders()
 			in vec4 gf_r4pos;
 			in float distance;
 				
-			layout (location = 0) out vec4 fragColor;
+			layout (location = 0) out vec4 frag_albedo;
+			layout (location = 1) out vec4 frag_position;
+			layout (location = 2) out vec4 frag_normal;
 			layout (depth_any) out float gl_FragDepth;
 
 			void main() {
@@ -449,11 +451,17 @@ void init_shaders()
 					vec4 baseColor = gf_base_color;
 				#endif
 				#ifdef VERTEX_COLOR
-					fragColor = clamp(baseColor + gf_color, 0, 1);
+					frag_albedo = clamp(baseColor + gf_color, 0, 1);
 				#else
-					fragColor = baseColor;
+					frag_albedo = baseColor;
 				#endif
-				gl_FragDepth = clamp(distance / (length(gf_r4pos) * 6.283185), 0, 1);
+
+				float bulge_factor = length(gf_r4pos);
+				frag_position = gf_r4pos / bulge_factor;
+
+				frag_normal = vec4(0, 0, 0, 1);
+
+				gl_FragDepth = clamp(distance / (bulge_factor * 6.283185), 0, 1);
 			}
 		)",
 		NULL,
@@ -482,31 +490,50 @@ void init_shaders()
 		{}
 	);
 
-	frag_copy_texture = new ShaderCore(
+	frag_copy_textures = new ShaderCore(
 		"frag_copy_textures",
 		GL_FRAGMENT_SHADER,
 		R"(
-			uniform sampler2D color_tex;
+			uniform sampler2D albedo_tex;
+			uniform sampler2D position_tex;
+			uniform sampler2D normal_tex;
 			uniform sampler2D depth_tex;
 			
 			out vec4 frag_color;
 
 			void main() {
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
-				if(((pixel_coords.x & 16) ^ (pixel_coords.y & 16)) != 0)
-					frag_color = texelFetch(color_tex, pixel_coords, 0);
+				float checker_x = float((pixel_coords.x >> 5) & 1), checker_y = float((pixel_coords.y >> 5) & 1);
+
+				if((pixel_coords.x & 0x100) != 0)
+					if((pixel_coords.y & 0x100) != 0)
+						frag_color = texelFetch(albedo_tex, pixel_coords, 0);
+					else
+						frag_color = texelFetch(position_tex, pixel_coords, 0) * 2 - 1;
 				else
-					frag_color = texelFetch(depth_tex, pixel_coords, 0);
+					if((pixel_coords.y & 0x100) != 0)
+						frag_color = texelFetch(normal_tex, pixel_coords, 0) * 2 - 1;
+					else
+						frag_color = texelFetch(depth_tex, pixel_coords, 0);
 			}
 		)",
 		NULL,
 		NULL,
 		[](GLuint program_id) {
-			glUniform1i(glGetUniformLocation(program_id, "color_tex"), 0);
+			glUniform1i(glGetUniformLocation(program_id, "albedo_tex"), 0);
 			glActiveTexture(GL_TEXTURE0 + 0);
-			glBindTexture(GL_TEXTURE_2D, gbuffer_color);
-			glUniform1i(glGetUniformLocation(program_id, "depth_tex"), 1);
+			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
+
+			glUniform1i(glGetUniformLocation(program_id, "position_tex"), 1);
 			glActiveTexture(GL_TEXTURE0 + 1);
+			glBindTexture(GL_TEXTURE_2D, gbuffer_position);
+			
+			glUniform1i(glGetUniformLocation(program_id, "normal_tex"), 2);
+			glActiveTexture(GL_TEXTURE0 + 2);
+			glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
+
+			glUniform1i(glGetUniformLocation(program_id, "depth_tex"), 3);
+			glActiveTexture(GL_TEXTURE0 + 3);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
 		},
 		{}
@@ -516,7 +543,7 @@ void init_shaders()
 		"frag_fog",
 		GL_FRAGMENT_SHADER,
 		R"(
-			uniform sampler2D color_tex;
+			uniform sampler2D albedo_tex;
 			uniform sampler2D depth_tex;
 
 			uniform float fog_scale;
@@ -526,7 +553,7 @@ void init_shaders()
 			void main() {
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
 				float distance = texelFetch(depth_tex, pixel_coords, 0).r;
-				vec4 color = texelFetch(color_tex, pixel_coords, 0);
+				vec4 color = texelFetch(albedo_tex, pixel_coords, 0);
 				frag_color = exp(-distance * fog_scale) * color;
 			}
 		)",
@@ -535,9 +562,9 @@ void init_shaders()
 			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fog_scale"), fog_scale);
 		},
 		[](GLuint program_id) {
-			glUniform1i(glGetUniformLocation(program_id, "color_tex"), 0);
+			glUniform1i(glGetUniformLocation(program_id, "albedo_tex"), 0);
 			glActiveTexture(GL_TEXTURE0 + 0);
-			glBindTexture(GL_TEXTURE_2D, gbuffer_color);
+			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
 			glUniform1i(glGetUniformLocation(program_id, "depth_tex"), 1);
 			glActiveTexture(GL_TEXTURE0 + 1);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
