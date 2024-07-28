@@ -78,7 +78,6 @@ Model::Model(
 		vertex_colors = NULL;
 	if(norms)
 	{
-		printf("Normals in Model::Model()\n");
 		normals = std::unique_ptr<Vec4[]>(new Vec4[num_verts]);
 		for(i = 0; i < num_verts; i++)
 			normals[i] = norms[i];
@@ -416,7 +415,6 @@ void Model::generate_primitive_colors(double scale)
 	std::unique_ptr<Vec4[]> old_normals;
 	if(normals)
 	{
-		printf("Normals in generate_primitive_colors()\n");
 		old_normals = std::move(normals);
 		normals.reset(new Vec4[num_vertices]);
 	}
@@ -435,6 +433,107 @@ void Model::generate_primitive_colors(double scale)
 				normals[ix] = old_normals[old_elements[ix]];
 		}
 	}
+}
+
+
+typedef std::function<void(int, int, int)> TriangleFunc;
+
+void _split_into_triangles_indirect(int primitive, int start, int verts_per_primitive, TriangleFunc emit_triangle)
+{
+	switch(primitive)
+	{
+		case GL_TRIANGLES:
+			//Ooh, I know this one!
+			if(verts_per_primitive != 3)
+				error("Primitive is triangles but verts_per_primitive = %d\n", verts_per_primitive);
+			emit_triangle(start, start + 1, start + 2);
+			break;
+		case GL_QUADS:
+			if(verts_per_primitive != 4)
+				error("Primitive is quads but verts_per_primitive = %d\n", verts_per_primitive);
+			emit_triangle(start, start + 1, start + 2);
+			emit_triangle(start, start + 2, start + 3);
+			break;
+		case GL_QUAD_STRIP:
+			for(int base = start; base < start + verts_per_primitive - 2; base += 2)
+			{
+				emit_triangle(base, base + 2, base + 1);
+				emit_triangle(base + 1, base + 2, base + 3);
+			}
+			break;
+		default:
+			error("Don't know how to split primitive type %d into triangles.\n");
+			break;
+	}
+}
+
+
+void Model::generate_normals()
+{
+	normals = std::unique_ptr<Vec4[]>(new Vec4[num_vertices]);
+	for(int i = 0; i < num_vertices; i++)
+		normals[i] = Vec4(0, 0, 0, 0);
+
+	std::shared_ptr<int[]> times_touched(new int[num_vertices]);
+
+	for(int prim = 0; prim < num_primitives; prim++)
+	{
+		_split_into_triangles_indirect(
+			primitive,
+			prim * vertices_per_primitive,
+			vertices_per_primitive,
+			[this, times_touched](int a, int b, int c) {
+				if(elements)
+				{
+					a = elements[a];
+					b = elements[b];
+					c = elements[c];
+				}
+				Vec4 va = vertices[a], vb = vertices[b], vc = vertices[c];
+
+				Vec4 tangent = (vb - va).normalize();
+				Vec4 bitangent = vc - va;
+				bitangent = (bitangent - tangent * (tangent * bitangent)).normalize();
+
+				Vec4 temp;
+				do {
+					temp = rand_s3();
+				}while((temp - tangent).mag2() < 0.2 || (temp - bitangent).mag2() < 0.2 || (temp - va).mag2() < 0.2);
+				//In theory we should check against vertices b and c as well, but we assume they're close to a.
+
+				temp = temp - tangent * (tangent * temp) - bitangent * (bitangent * temp);
+
+				Mat4 check;
+				Vec4 new_normal;
+
+				//We have to orthonormalize temp three times because va, vb and vc are not parallel. Yes, there's 
+				//no such thing as a flat triangle in a curved space.
+				new_normal = temp - va * (va * temp);
+				check = Mat4::from_columns(tangent, bitangent, new_normal, va);
+				if(check.determinant() > 0)
+					new_normal = -new_normal;
+				normals[a] = normals[a] + new_normal;
+				times_touched[a]++;
+
+				new_normal = temp - vb * (vb * temp);
+				check = Mat4::from_columns(tangent, bitangent, new_normal, vb);
+				if(check.determinant() > 0)
+					new_normal = -new_normal;
+				normals[b] = normals[b] + new_normal;
+				times_touched[b]++;
+
+				new_normal = temp - vc * (vc * temp);
+				check = Mat4::from_columns(tangent, bitangent, new_normal, vc);
+				if(check.determinant() > 0)
+					new_normal = -new_normal;
+				normals[c] = normals[c] + new_normal;
+				times_touched[c]++;
+			}
+		);
+	}
+
+	for(int i = 0; i < num_vertices; i++)
+		normals[i] = normals[i] / times_touched[i];
 }
 
 

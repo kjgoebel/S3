@@ -85,10 +85,13 @@ void init()
 		NUM_POLE_VERTS,
 		3,
 		NUM_POLE_TRIANGLES,
-		Model::s3ify(NUM_POLE_VERTS, 0.05, pole_model_vertices).get(),
+		Model::s3ify(NUM_POLE_VERTS, 0.1, pole_model_vertices).get(),
 		pole_model_elements
 	);
 	pole_model->generate_primitive_colors(0.3);
+	pole_model->dump();
+	printf("\n\n");
+	pole_model->generate_normals();
 
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
 	player_state.set_cam();

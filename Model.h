@@ -33,10 +33,17 @@ public:
 	//generate_*() must be called before draw() or make_draw_func().
 	//Passing scale <= 0 to generate_vertex_colors will allocate vertex_colors but not initialize it.
 	void generate_vertex_colors(double scale = -1);
+	/*
+		Generate vertex colors such that each primitive is a solid color. This necessitates splitting 
+		each vertex into as many versions of itself as there are primitives that include it. Note that 
+		if normals are present, they are preserved for each vertex as they were before the splitting 
+		happened. So, if you want smooth shading with colored primitives, give the model normals 
+		before calling generate_primitive_colors(), and if you want flat shading with colored 
+		primitives, call generate_normals() after calling generate_primitive_colors().
+	*/
 	void generate_primitive_colors(double scale);
 
-	//This'll be a bit of work.
-	//void generate_normals();
+	void generate_normals();
 
 	void draw(const Mat4& xform, const Vec4& base_color);
 
