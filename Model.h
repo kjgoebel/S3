@@ -44,8 +44,8 @@ public:
 	DrawFunc make_draw_func(int count, const Mat4* xforms, Vec4 base_color, bool use_instancing = false);
 	DrawFunc make_draw_func(int count, const Mat4* xforms, const Vec4* base_colors, bool use_instancing = false);
 
-	static Model* make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips = true);
-	static Model* make_torus_arc(int longitudinal_segments, int transverse_segments, double length, double hole_ratio, bool use_quad_strips = true);
+	static Model* make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips = true, bool make_normals = false);
+	static Model* make_torus_arc(int longitudinal_segments, int transverse_segments, double length, double hole_ratio, bool use_quad_strips = true, bool make_normals = false);
 	static std::shared_ptr<Vec4[]> s3ify(int count, double scale, const Vec3* vertices);		//Project a list of R3 vertices onto S3.
 
 private:

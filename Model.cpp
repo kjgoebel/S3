@@ -533,7 +533,7 @@ std::shared_ptr<GLuint[]> make_torus_quad_indices(int long_segments, int trans_s
 }
 
 
-Model* Model::make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips)
+Model* Model::make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips, bool make_normals)
 {
 	if(use_quad_strips)
 		return new Model(
@@ -544,7 +544,7 @@ Model* Model::make_torus(int longitudinal_segments, int transverse_segments, dou
 			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio).get(),
 			make_torus_quad_strip_indices(longitudinal_segments, transverse_segments).get(),
 			NULL,
-			make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio).get()
+			make_normals ? make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio).get() : NULL
 		);
 	else
 		return new Model(
@@ -555,12 +555,12 @@ Model* Model::make_torus(int longitudinal_segments, int transverse_segments, dou
 			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio).get(),
 			make_torus_quad_indices(longitudinal_segments, transverse_segments).get(),
 			NULL,
-			make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio).get()
+			make_normals ? make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio).get() : NULL
 		);
 }
 
 
-Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments, double length, double hole_ratio, bool use_quad_strips)
+Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments, double length, double hole_ratio, bool use_quad_strips, bool make_normals)
 {
 	if(use_quad_strips)
 		return new Model(
@@ -571,7 +571,7 @@ Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments,
 			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true).get(),
 			make_torus_quad_strip_indices(longitudinal_segments - 1, transverse_segments, false).get(),
 			NULL,
-			make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio, length, true).get()
+			make_normals ? make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio).get() : NULL
 		);
 	else
 		return new Model(
@@ -582,7 +582,7 @@ Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments,
 			make_torus_verts(longitudinal_segments, transverse_segments, hole_ratio, length, true).get(),
 			make_torus_quad_indices(longitudinal_segments - 1, transverse_segments, false).get(),
 			NULL,
-			make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio, length, true).get()
+			make_normals ? make_torus_normals(longitudinal_segments, transverse_segments, hole_ratio).get() : NULL
 		);
 }
 
