@@ -13,12 +13,11 @@
 #include <time.h>
 
 
-//#define COPY_TEXTURES
-
-
 Model* torus_model;
 Model* pole_model;
-ShaderProgram* fsq_program = NULL;
+ShaderProgram *copy_program = NULL, *light_program = NULL;
+
+bool dump_buffers = false;
 
 double last_frame_time;
 
@@ -66,21 +65,19 @@ void init()
 
 	init_shaders();
 
-#ifdef COPY_TEXTURES
-	fsq_program = ShaderProgram::get(
+	copy_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
 		NULL,
 		Shader::get(frag_copy_textures, {})
 	);
-#else
-	fsq_program = ShaderProgram::get(
+
+	light_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
 		NULL,
 		Shader::get(frag_point_light, {})
 	);
-#endif
 
-	torus_model = Model::make_torus(128, 128, 1, false);
+	torus_model = Model::make_torus(128, 128, 1, false, true);
 	torus_model->generate_primitive_colors(0.7);
 
 	pole_model =  new Model(
@@ -150,30 +147,35 @@ void display()
 	use_default_framebuffer();
 
 	glClear(GL_COLOR_BUFFER_BIT);
-	fsq_program->use();
 
-#ifdef COPY_TEXTURES
-	draw_fsq();
-#else
-	glEnable(GL_BLEND);
-	glBlendEquation(GL_FUNC_ADD);
-	glBlendFunc(GL_ONE, GL_ONE);
+	if(dump_buffers)
+	{
+		copy_program->use();
+		draw_fsq();
+	}
+	else
+	{
+		light_program->use();
+
+		glEnable(GL_BLEND);
+		glBlendEquation(GL_FUNC_ADD);
+		glBlendFunc(GL_ONE, GL_ONE);
 	
-	GLuint program_id = fsq_program->get_id();
+		GLuint program_id = light_program->get_id();
 
-	double theta = SUN_SPEED * last_frame_time;
-	Vec4 light_pos = ~cam_mat * Vec4(-sin(theta), cos(theta), 0, 0);
-	Vec4 light_emission = Vec3(1, 1, 1);
-	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
-	glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
-	draw_fsq();
+		double theta = SUN_SPEED * last_frame_time;
+		Vec4 light_pos = ~cam_mat * Vec4(-sin(theta), cos(theta), 0, 0);
+		Vec4 light_emission = Vec3(1, 1, 1);
+		glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
+		glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
+		draw_fsq();
 
-	light_pos = ~cam_mat * Vec4(2, 1, 0, 1).normalize();
-	light_emission = Vec3(0.3, 0.1, 0.0);
-	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
-	glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
-	draw_fsq();
-#endif
+		light_pos = ~cam_mat * Vec4(2, 1, 0, 1).normalize();
+		light_emission = Vec3(0.3, 0.1, 0.0);
+		glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
+		glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
+		draw_fsq();
+	}
 	
 	glFlush();
 	glutSwapBuffers();
@@ -252,6 +254,16 @@ void keyboard_up(unsigned char key, int x, int y)
 	}
 }
 
+void special(int key, int x, int y)
+{
+	switch(key)
+	{
+		case GLUT_KEY_F1:
+			dump_buffers = !dump_buffers;
+			break;
+	}
+}
+
 
 int main(int argc, char** argv)
 {
@@ -268,6 +280,7 @@ int main(int argc, char** argv)
 	glutDisplayFunc(display);
 	glutKeyboardFunc(keyboard);
 	glutKeyboardUpFunc(keyboard_up);
+	glutSpecialFunc(special);
 	glutPassiveMotionFunc(mouse);
 	glutMotionFunc(mouse);
 
