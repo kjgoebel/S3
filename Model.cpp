@@ -138,26 +138,27 @@ void Model::prepare_to_render()
 		options.insert(DEFINE_VERTEX_COLOR);
 	if(normals)
 		options.insert(DEFINE_VERTEX_NORMAL);
+	ShaderCore *geom_core = primitive == GL_POINTS ? geom_points : geom_triangles, *frag_core = primitive == GL_POINTS ? frag_points : frag;
 	raw_program = ShaderProgram::get(
 		Shader::get(vert, options),
-		Shader::get(primitive == GL_POINTS ? geom_points : geom_triangles, options),
-		Shader::get(frag, options)
+		Shader::get(geom_core, options),
+		Shader::get(frag_core, options)
 	);
 
 	auto vert_options = options;
 	vert_options.insert(DEFINE_INSTANCED_XFORM);
 	instanced_xform_program = ShaderProgram::get(
 		Shader::get(vert, vert_options),
-		Shader::get(primitive == GL_POINTS ? geom_points : geom_triangles, options),
-		Shader::get(frag, options)
+		Shader::get(geom_core, options),
+		Shader::get(frag_core, options)
 	);
 
 	vert_options.insert(DEFINE_INSTANCED_BASE_COLOR);
 	options.insert(DEFINE_INSTANCED_BASE_COLOR);
 	instanced_xform_and_color_program = ShaderProgram::get(
 		Shader::get(vert, vert_options),
-		Shader::get(primitive == GL_POINTS ? geom_points : geom_triangles, options),
-		Shader::get(frag, options)
+		Shader::get(geom_core, options),
+		Shader::get(frag_core, options)
 	);
 
 	raw_vertex_array = make_vertex_array();

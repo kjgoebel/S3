@@ -186,7 +186,7 @@ void ShaderProgram::frame_all()
 std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 
 
-ShaderCore *vert, *geom_points, *geom_triangles, *frag;
+ShaderCore *vert, *geom_points, *geom_triangles, *frag_points, *frag;
 ShaderCore *vert_screenspace, *frag_copy_textures, *frag_fog, *frag_point_light, *frag_dump_color;
 
 void init_shaders()
@@ -273,7 +273,7 @@ void init_shaders()
 		GL_GEOMETRY_SHADER,
 		R"(
 			layout (points, invocations = 2) in;
-			layout (triangle_strip, max_vertices = 16) out;
+			layout (triangle_strip, max_vertices = 4) out;
 
 			uniform mat4 proj_xform;
 			uniform float aspect_ratio;
@@ -281,11 +281,6 @@ void init_shaders()
 			#ifdef VERTEX_COLOR
 				in vec4 vg_color[];
 				out vec4 gf_color;
-			#endif
-
-			#ifdef VERTEX_NORMAL
-				in vec4 vg_normal[];
-				out vec4 gf_normal;
 			#endif
 
 			#ifdef INSTANCED_BASE_COLOR
@@ -298,11 +293,11 @@ void init_shaders()
 
 			out float distance;
 
+			out vec2 point_coord;
+
 			#define BASE_POINT_SIZE		(0.002)
 
 			void main() {
-				float card = BASE_POINT_SIZE, diag = 0.7071 * BASE_POINT_SIZE, mult = 1.0 / aspect_ratio;
-
 				vec4 point = gl_in[0].gl_Position;
 
 				float dist = length(point.xyz);
@@ -315,56 +310,29 @@ void init_shaders()
 				point.xyz /= point.w;
 				point.w = 1;
 
-				float size = 1 / sin(dist);
+				float distance_factor = 1 / sin(dist);
 
 				gf_r4pos = vg_r4pos[0];
 				#ifdef VERTEX_COLOR
 					gf_color = vg_color[0];
 				#endif
-				#ifdef VERTEX_NORMAL
-					gf_normal = vg_normal[0];
-				#endif
 				#ifdef INSTANCED_BASE_COLOR
 					gf_base_color = vg_base_color[0];
 				#endif
 					
-				gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
+				float height = BASE_POINT_SIZE * distance_factor, width = height / aspect_ratio;
+				
+				gl_Position = point + vec4(-width, -height, 0, 0);
+				point_coord = vec2(-1, 1);
 				EmitVertex();
-				gl_Position = point + vec4(0, 0, 0, 0);
+				gl_Position = point + vec4(width, -height, 0, 0);
+				point_coord = vec2(1, 1);
 				EmitVertex();
-				gl_Position = point + size * vec4(-diag * mult, diag, 0, 0);
+				gl_Position = point + vec4(-width, height, 0, 0);
+				point_coord = vec2(-1, -1);
 				EmitVertex();
-				gl_Position = point + size * vec4(0, card, 0, 0);
-				EmitVertex();
-				EndPrimitive();
-					
-				gl_Position = point + size * vec4(0, -card, 0, 0);
-				EmitVertex();
-				gl_Position = point + vec4(0, 0, 0, 0);
-				EmitVertex();
-				gl_Position = point + size * vec4(-diag * mult, -diag, 0, 0);
-				EmitVertex();
-				gl_Position = point + size * vec4(-card * mult, 0, 0, 0);
-				EmitVertex();
-				EndPrimitive();
-					
-				gl_Position = point + size * vec4(card * mult, 0, 0, 0);
-				EmitVertex();
-				gl_Position = point + vec4(0, 0, 0, 0);
-				EmitVertex();
-				gl_Position = point + size * vec4(diag * mult, -diag, 0, 0);
-				EmitVertex();
-				gl_Position = point + size * vec4(0, -card, 0, 0);
-				EmitVertex();
-				EndPrimitive();
-					
-				gl_Position = point + size * vec4(0, card, 0, 0);
-				EmitVertex();
-				gl_Position = point + vec4(0, 0, 0, 0);
-				EmitVertex();
-				gl_Position = point + size * vec4(diag * mult, diag, 0, 0);
-				EmitVertex();
-				gl_Position = point + size * vec4(card * mult, 0, 0, 0);
+				gl_Position = point + vec4(width, height, 0, 0);
+				point_coord = vec2(1, -1);
 				EmitVertex();
 				EndPrimitive();
 			}
@@ -377,7 +345,6 @@ void init_shaders()
 		NULL,
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_VERTEX_NORMAL, NULL, NULL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
 		}
 	);
@@ -447,6 +414,68 @@ void init_shaders()
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(DEFINE_VERTEX_NORMAL, NULL, NULL),
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
+		}
+	);
+
+	frag_points = new ShaderCore(
+		"frag_points",
+		GL_FRAGMENT_SHADER,
+		R"(
+			#ifdef VERTEX_COLOR
+				in vec4 gf_color;
+			#endif
+
+			#ifdef INSTANCED_BASE_COLOR
+				in vec4 gf_base_color;
+			#else
+				uniform vec4 base_color;
+			#endif
+			
+			in vec4 gf_r4pos;
+			in float distance;
+			in vec2 point_coord;
+				
+			layout (location = 0) out vec4 frag_albedo;
+			layout (location = 1) out vec4 frag_position;
+			layout (location = 2) out vec4 frag_normal;
+			layout (depth_any) out float gl_FragDepth;
+
+			//This should not be repeated here and in geom_points. It should be a uniform.
+			#define BASE_POINT_SIZE		(0.002)
+
+			void main() {
+				/*
+					This might be a good candidate for a "G-buffer sprite". Eliminate the square root 
+					and the discard -> one texture lookup for normal (implies depth) and alpha.
+				*/
+
+				float point_coord_l2 = point_coord.x * point_coord.x + point_coord.y * point_coord.y;
+				if(point_coord_l2 > 1)
+					discard;
+
+				#ifdef INSTANCED_BASE_COLOR
+					vec4 base_color = gf_base_color;
+				#endif
+				#ifdef VERTEX_COLOR
+					frag_albedo = clamp(base_color + gf_color, 0, 1);
+				#else
+					frag_albedo = base_color;
+				#endif
+
+				float bulge_factor = length(gf_r4pos);		//I'm pretty sure this is wrong.
+				frag_position = gf_r4pos / bulge_factor;
+
+				frag_normal = vec4(point_coord.x, point_coord.y, -sqrt(1 - point_coord_l2), 0);
+
+				gl_FragDepth = clamp((distance + BASE_POINT_SIZE * frag_normal.z) / (bulge_factor * 6.283185), 0, 1);
+			}
+		)",
+		NULL,
+		NULL,
+		NULL,
+		{
+			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
 		}
 	);
@@ -633,7 +662,11 @@ void init_shaders()
 				frag_to_light = normalize(frag_to_light - position);
 				float intensity_factor = sin(2 * asin(0.5 * r4_distance));
 				intensity_factor = 1 / (intensity_factor * intensity_factor);
-				float normal_factor = clamp(dot(normal, frag_to_light), 0, 1);
+				float normal_factor;
+				if(length(normal) > 0.5)
+					normal_factor = clamp(dot(normal, frag_to_light), 0, 1);
+				else
+					normal_factor = 1;
 
 				frag_color.rgb = color.rgb * light_emission * normal_factor * intensity_factor;
 				frag_color.a = 1;
