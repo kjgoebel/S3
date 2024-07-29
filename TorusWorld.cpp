@@ -179,27 +179,19 @@ void display()
 		glEnable(GL_BLEND);
 		glBlendEquation(GL_FUNC_ADD);
 		glBlendFunc(GL_ONE, GL_ONE);
-	
-		GLuint program_id = light_program->get_id();
 
 		double theta = SUN_SPEED * last_frame_time;
-		Vec4 light_pos = ~cam_mat * Vec4(-sin(theta), cos(theta), 0, 0);
-		Vec4 light_emission = Vec3(1, 1, 1);
-		glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
-		glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
+		light_program->set_vector("light_pos", ~cam_mat * Vec4(-sin(theta), cos(theta), 0, 0));
+		light_program->set_vector("light_emission", Vec3(1, 1, 1));
 		draw_fsq();
-
-		light_pos = ~cam_mat * Vec4(0.5, 1, 0, 1).normalize();
-		light_emission = -Vec3(0.6, 0.2, 0.0);
-		glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
-		glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
+		
+		light_program->set_vector("light_pos", ~cam_mat * Vec4(0.5, 1, 0, 1).normalize());
+		light_program->set_vector("light_emission", -Vec3(0.6, 0.2, 0.0));
 		draw_fsq();
 
 		//cam light
-		light_pos = Vec4(0, 0, 0, 1);
-		light_emission = Vec3(0.1, 0.1, 0.1);
-		glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
-		glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
+		light_program->set_vector("light_pos", Vec4(0, 0, 0, 1));
+		light_program->set_vector("light_emission", Vec3(0.1, 0.1, 0.1));
 		draw_fsq();
 	}
 

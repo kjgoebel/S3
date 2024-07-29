@@ -151,12 +151,12 @@ void ShaderProgram::set_vector(const char* name, const Vec3& v)
 	glProgramUniform3f(id, glGetUniformLocation(id, name), v.x, v.y, v.z);
 }
 
-void ShaderProgram::set_scalar(const char* name, float f)
+void ShaderProgram::set_float(const char* name, float f)
 {
 	glProgramUniform1f(id, glGetUniformLocation(id, name), f);
 }
 
-void ShaderProgram::set_scalar(const char* name, int i)
+void ShaderProgram::set_int(const char* name, int i)
 {
 	glProgramUniform1i(id, glGetUniformLocation(id, name), i);
 }
@@ -351,8 +351,7 @@ void init_shaders()
 			}
 		)",
 		[](ShaderProgram* program) {
-			GLuint program_id = program->get_id();
-			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspect_ratio"), aspect_ratio);
+			program->set_float("aspect_ratio", aspect_ratio);
 			program->set_matrix("proj_xform", proj_mat);
 		},
 		NULL,
@@ -420,8 +419,7 @@ void init_shaders()
 			}
 		)",
 		[](ShaderProgram* program) {
-			GLuint program_id = program->get_id();
-			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspect_ratio"), aspect_ratio);
+			program->set_float("aspect_ratio", aspect_ratio);
 			program->set_matrix("proj_xform", proj_mat);
 		},
 		NULL,
@@ -601,20 +599,19 @@ void init_shaders()
 		NULL,
 		NULL,
 		[](ShaderProgram* program) {
-			GLuint program_id = program->get_id();
-			glUniform1i(glGetUniformLocation(program_id, "albedo_tex"), 0);
+			program->set_int("albedo_tex", 0);
 			glActiveTexture(GL_TEXTURE0 + 0);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
-
-			glUniform1i(glGetUniformLocation(program_id, "position_tex"), 1);
+			
+			program->set_int("position_tex", 1);
 			glActiveTexture(GL_TEXTURE0 + 1);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_position);
 			
-			glUniform1i(glGetUniformLocation(program_id, "normal_tex"), 2);
+			program->set_int("normal_tex", 2);
 			glActiveTexture(GL_TEXTURE0 + 2);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
-
-			glUniform1i(glGetUniformLocation(program_id, "depth_tex"), 3);
+			
+			program->set_int("depth_tex", 3);
 			glActiveTexture(GL_TEXTURE0 + 3);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
 		},
@@ -641,15 +638,13 @@ void init_shaders()
 		)",
 		NULL,
 		[](ShaderProgram* program) {
-			GLuint program_id = program->get_id();
-			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fog_scale"), fog_scale);
+			program->set_float("fog_scale", fog_scale);
 		},
 		[](ShaderProgram* program) {
-			GLuint program_id = program->get_id();
-			glUniform1i(glGetUniformLocation(program_id, "albedo_tex"), 0);
+			program->set_int("albedo_tex", 0);
 			glActiveTexture(GL_TEXTURE0 + 0);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
-			glUniform1i(glGetUniformLocation(program_id, "depth_tex"), 1);
+			program->set_int("depth_tex", 1);
 			glActiveTexture(GL_TEXTURE0 + 1);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
 		},
@@ -693,16 +688,15 @@ void init_shaders()
 		NULL,
 		NULL,
 		[](ShaderProgram* program) {
-			GLuint program_id = program->get_id();
-			glUniform1i(glGetUniformLocation(program_id, "albedo_tex"), 0);
+			program->set_int("albedo_tex", 0);
 			glActiveTexture(GL_TEXTURE0 + 0);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
 			
-			glUniform1i(glGetUniformLocation(program_id, "position_tex"), 1);
+			program->set_int("position_tex", 1);
 			glActiveTexture(GL_TEXTURE0 + 1);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_position);
 			
-			glUniform1i(glGetUniformLocation(program_id, "normal_tex"), 2);
+			program->set_int("normal_tex", 2);
 			glActiveTexture(GL_TEXTURE0 + 2);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
 		},
@@ -728,8 +722,7 @@ void init_shaders()
 		NULL,
 		NULL,
 		[](ShaderProgram* program) {
-			GLuint program_id = program->get_id();
-			glUniform1i(glGetUniformLocation(program_id, "color_tex"), 0);
+			program->set_int("color_tex", 0);
 			glActiveTexture(GL_TEXTURE0 + 0);
 			glBindTexture(GL_TEXTURE_2D, abuffer_color);
 		},
