@@ -208,10 +208,10 @@ void init_shaders()
 			#endif
 
 			#ifdef INSTANCED_XFORM
-				layout (location = 3) in mat4 modelXForm;
-				uniform mat4 viewXForm;
+				layout (location = 3) in mat4 model_xform;
+				uniform mat4 view_xform;
 			#else
-				uniform mat4 modelViewXForm;
+				uniform mat4 model_view_xform;
 			#endif
 			
 			#ifdef INSTANCED_BASE_COLOR
@@ -233,9 +233,9 @@ void init_shaders()
 				
 			void main() {
 				#ifdef INSTANCED_XFORM
-					mat4 modelViewXForm = transpose(viewXForm) * modelXForm;
+					mat4 model_view_xform = transpose(view_xform) * model_xform;
 				#endif
-				vg_r4pos = modelViewXForm * position;
+				vg_r4pos = model_view_xform * position;
 				float distance = acos(vg_r4pos.w);
 				gl_Position.xyz = distance * normalize(vg_r4pos.xyz);
 				gl_Position.w = 1;
@@ -247,7 +247,7 @@ void init_shaders()
 					vg_color = color;
 				#endif
 				#ifdef VERTEX_NORMAL
-					vg_normal = modelViewXForm * normal;
+					vg_normal = model_view_xform * normal;
 				#endif
 			}
 		)",
@@ -261,7 +261,7 @@ void init_shaders()
 				DEFINE_INSTANCED_XFORM,
 				NULL,
 				[](int program_id) {
-					_set_uniform_matrix(program_id, "viewXForm", cam_mat);
+					_set_uniform_matrix(program_id, "view_xform", cam_mat);
 				}
 			),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
@@ -275,8 +275,8 @@ void init_shaders()
 			layout (points, invocations = 2) in;
 			layout (triangle_strip, max_vertices = 16) out;
 
-			uniform mat4 projXForm;
-			uniform float aspectRatio;
+			uniform mat4 proj_xform;
+			uniform float aspect_ratio;
 
 			#ifdef VERTEX_COLOR
 				in vec4 vg_color[];
@@ -301,7 +301,7 @@ void init_shaders()
 			#define BASE_POINT_SIZE		(0.002)
 
 			void main() {
-				float card = BASE_POINT_SIZE, diag = 0.7071 * BASE_POINT_SIZE, mult = 1.0 / aspectRatio;
+				float card = BASE_POINT_SIZE, diag = 0.7071 * BASE_POINT_SIZE, mult = 1.0 / aspect_ratio;
 
 				vec4 point = gl_in[0].gl_Position;
 
@@ -310,7 +310,7 @@ void init_shaders()
 				point.xyz *= image_dist / dist;
 				distance = abs(image_dist);
 
-				point = projXForm * point;
+				point = proj_xform * point;
 
 				point.xyz /= point.w;
 				point.w = 1;
@@ -370,8 +370,8 @@ void init_shaders()
 			}
 		)",
 		[](int program_id) {
-			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspectRatio"), aspect_ratio);
-			_set_uniform_matrix(program_id, "projXForm", proj_mat);
+			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspect_ratio"), aspect_ratio);
+			_set_uniform_matrix(program_id, "proj_xform", proj_mat);
 		},
 		NULL,
 		NULL,
@@ -389,7 +389,7 @@ void init_shaders()
 			layout (triangles, invocations = 2) in;
 			layout (triangle_strip, max_vertices = 3) out;
 
-			uniform mat4 projXForm;
+			uniform mat4 proj_xform;
 
 			#ifdef VERTEX_COLOR
 				in vec4 vg_color[];
@@ -420,7 +420,7 @@ void init_shaders()
 					point.xyz *= image_dist / dist;
 					distance = abs(image_dist);
 
-					point = projXForm * point;
+					point = proj_xform * point;
 
 					gl_Position = point;
 					#ifdef VERTEX_COLOR
@@ -439,8 +439,8 @@ void init_shaders()
 			}
 		)",
 		[](int program_id) {
-			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspectRatio"), aspect_ratio);
-			_set_uniform_matrix(program_id, "projXForm", proj_mat);
+			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspect_ratio"), aspect_ratio);
+			_set_uniform_matrix(program_id, "proj_xform", proj_mat);
 		},
 		NULL,
 		NULL,
@@ -466,7 +466,7 @@ void init_shaders()
 			#ifdef INSTANCED_BASE_COLOR
 				in vec4 gf_base_color;
 			#else
-				uniform vec4 baseColor;
+				uniform vec4 base_color;
 			#endif
 			
 			in vec4 gf_r4pos;
@@ -479,12 +479,12 @@ void init_shaders()
 
 			void main() {
 				#ifdef INSTANCED_BASE_COLOR
-					vec4 baseColor = gf_base_color;
+					vec4 base_color = gf_base_color;
 				#endif
 				#ifdef VERTEX_COLOR
-					frag_albedo = clamp(baseColor + gf_color, 0, 1);
+					frag_albedo = clamp(base_color + gf_color, 0, 1);
 				#else
-					frag_albedo = baseColor;
+					frag_albedo = base_color;
 				#endif
 
 				float bulge_factor = length(gf_r4pos);		//I'm pretty sure this is wrong.
