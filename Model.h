@@ -67,13 +67,14 @@ private:
 	std::unique_ptr<Vec4[]> normals;					//If this is NULL, lighting calculation will ignore effects of surface normal (only distance and shadow will be used).
 
 	GLuint vertex_buffer, vertex_color_buffer, element_buffer, normal_buffer;
-	ShaderProgram *raw_program, *instanced_xform_program, *instanced_xform_and_color_program;		//I don't like having this many programs....
 	
 	GLuint raw_vertex_array;
 
 	GLuint make_vertex_array();			//Creates a VAO and binds vertex, vertex color and element buffer objects to it as appropriate.
 	void prepare_to_render();			//Creates vertex, vertex color and element buffer objects as appropriate, creates 
 										//shader programs, and creates raw_vertex_array with make_vertex_array().
+
+	ShaderProgram* get_shader_program(bool instanced_xforms, bool instanced_base_colors);
 
 	void bind_xform_array(GLuint vertex_array, int count, const Mat4* xforms);		//Creates a vertex buffer for the given xforms and binds it the given VAO.
 	void bind_color_array(GLuint vertex_array, int count, const Vec4* base_colors);

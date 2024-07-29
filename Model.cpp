@@ -38,7 +38,6 @@ Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
 	normals = NULL;
 
 	vertex_buffer = vertex_color_buffer = element_buffer = normal_buffer = 0;
-	raw_program = instanced_xform_program = instanced_xform_and_color_program = NULL;
 	raw_vertex_array = 0;
 }
 
@@ -88,7 +87,6 @@ Model::Model(
 		normals = NULL;
 
 	vertex_buffer = vertex_color_buffer = element_buffer = normal_buffer = 0;
-	raw_program = instanced_xform_program = instanced_xform_and_color_program = NULL;
 	raw_vertex_array = 0;
 }
 
@@ -104,67 +102,6 @@ Model::~Model()
 		glDeleteVertexArrays(1, &raw_vertex_array);
 }
 
-
-void Model::prepare_to_render()
-{
-	if(vertex_buffer)
-		error("Model was already prepared for rendering.\n");
-
-	glGenBuffers(1, &vertex_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-	glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertices.get(), GL_STATIC_DRAW);
-
-	if(vertex_colors)
-	{
-		glGenBuffers(1, &vertex_color_buffer);
-		glBindBuffer(GL_ARRAY_BUFFER, vertex_color_buffer);
-		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertex_colors.get(), GL_STATIC_DRAW);
-	}
-
-	if(elements)
-	{
-		glGenBuffers(1, &element_buffer);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), elements.get(), GL_STATIC_DRAW);
-	}
-
-	if(normals)
-	{
-		glGenBuffers(1, &normal_buffer);
-		glBindBuffer(GL_ARRAY_BUFFER, normal_buffer);
-		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), normals.get(), GL_STATIC_DRAW);
-	}
-
-	auto options = std::set<const char*>();
-	if(vertex_colors)
-		options.insert(DEFINE_VERTEX_COLOR);
-	if(normals)
-		options.insert(DEFINE_VERTEX_NORMAL);
-	ShaderCore *geom_core = primitive == GL_POINTS ? geom_points : geom_triangles, *frag_core = primitive == GL_POINTS ? frag_points : frag;
-	raw_program = ShaderProgram::get(
-		Shader::get(vert, options),
-		Shader::get(geom_core, options),
-		Shader::get(frag_core, options)
-	);
-
-	auto vert_options = options;
-	vert_options.insert(DEFINE_INSTANCED_XFORM);
-	instanced_xform_program = ShaderProgram::get(
-		Shader::get(vert, vert_options),
-		Shader::get(geom_core, options),
-		Shader::get(frag_core, options)
-	);
-
-	vert_options.insert(DEFINE_INSTANCED_BASE_COLOR);
-	options.insert(DEFINE_INSTANCED_BASE_COLOR);
-	instanced_xform_and_color_program = ShaderProgram::get(
-		Shader::get(vert, vert_options),
-		Shader::get(geom_core, options),
-		Shader::get(frag_core, options)
-	);
-
-	raw_vertex_array = make_vertex_array();
-}
 
 GLuint Model::make_vertex_array()
 {
@@ -196,12 +133,65 @@ GLuint Model::make_vertex_array()
 	return vertex_array;
 }
 
+void Model::prepare_to_render()
+{
+	if(vertex_buffer)
+		error("Model was already prepared for rendering.\n");
+
+	glGenBuffers(1, &vertex_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+	glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertices.get(), GL_STATIC_DRAW);
+
+	if(vertex_colors)
+	{
+		glGenBuffers(1, &vertex_color_buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, vertex_color_buffer);
+		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertex_colors.get(), GL_STATIC_DRAW);
+	}
+
+	if(elements)
+	{
+		glGenBuffers(1, &element_buffer);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), elements.get(), GL_STATIC_DRAW);
+	}
+
+	if(normals)
+	{
+		glGenBuffers(1, &normal_buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, normal_buffer);
+		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), normals.get(), GL_STATIC_DRAW);
+	}
+
+	raw_vertex_array = make_vertex_array();
+}
+
+ShaderProgram* Model::get_shader_program(bool instanced_xforms, bool instanced_base_colors)
+{
+	auto options = std::set<const char*>();
+	if(vertex_colors)
+		options.insert(DEFINE_VERTEX_COLOR);
+	if(normals)
+		options.insert(DEFINE_VERTEX_NORMAL);
+	if(instanced_base_colors)
+		options.insert(DEFINE_INSTANCED_BASE_COLOR);
+	auto vert_options = options;
+	if(instanced_xforms)
+		vert_options.insert(DEFINE_INSTANCED_XFORM);
+	return ShaderProgram::get(
+		Shader::get(vert, vert_options),
+		Shader::get(primitive == GL_POINTS ? geom_points : geom_triangles, options),
+		Shader::get(primitive == GL_POINTS ? frag_points : frag, options)
+	);
+}
+
 
 void Model::draw(const Mat4& xform, const Vec4& base_color)
 {
 	if(!vertex_buffer)
 		prepare_to_render();
 		
+	ShaderProgram* raw_program = get_shader_program(false, false);
 	raw_program->use();
 	raw_program->set_vector("base_color", base_color);
 	raw_program->set_matrix("model_view_xform", ~cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
@@ -301,9 +291,10 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 		bind_xform_array(vertex_array, count, xforms);
 
 		return [count, vertex_array, base_color, this]() {
-			instanced_xform_program->use();
+			ShaderProgram* program = get_shader_program(true, false);
+			program->use();
 			glBindVertexArray(vertex_array);
-			instanced_xform_program->set_vector("base_color", base_color);
+			program->set_vector("base_color", base_color);
 			draw_instanced(count);
 		};
 	}
@@ -314,13 +305,14 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 			temp_xforms[i] = xforms[i];
 
 		return [count, temp_xforms, base_color, this]() {
-			raw_program->use();
-			raw_program->set_vector("base_color", base_color);
+			ShaderProgram* program = get_shader_program(false, false);
+			program->use();
+			program->set_vector("base_color", base_color);
 			glBindVertexArray(raw_vertex_array);
 
 			for(int i = 0; i < count; i++)
 			{
-				raw_program->set_matrix("model_view_xform", ~cam_mat * temp_xforms[i]);
+				program->set_matrix("model_view_xform", ~cam_mat * temp_xforms[i]);
 				draw_raw();
 			}
 		};
@@ -340,7 +332,8 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 		bind_color_array(vertex_array, count, base_colors);
 
 		return [count, vertex_array, this]() {
-			instanced_xform_and_color_program->use();
+			ShaderProgram* program = get_shader_program(true, true);
+			program->use();
 			glBindVertexArray(vertex_array);
 			draw_instanced(count);
 		};
@@ -356,13 +349,14 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 		}
 
 		return [count, temp_xforms, temp_colors, this]() {
-			raw_program->use();
+			ShaderProgram* program = get_shader_program(false, false);
+			program->use();
 			glBindVertexArray(raw_vertex_array);
 			for(int i = 0; i < count; i++)
 			{
 				Vec4 base_color = temp_colors[i];
-				raw_program->set_vector("base_color", base_color);
-				raw_program->set_matrix("model_view_xform", ~cam_mat * temp_xforms[i]);
+				program->set_vector("base_color", base_color);
+				program->set_matrix("model_view_xform", ~cam_mat * temp_xforms[i]);
 				draw_raw();
 			}
 		};
