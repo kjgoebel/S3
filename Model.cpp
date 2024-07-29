@@ -1,5 +1,7 @@
 #include "Model.h"
 
+#include "MakeModel.h"
+
 #include <fcntl.h>
 #include <io.h>
 #include <stdint.h>
@@ -439,6 +441,12 @@ void Model::generate_primitive_colors(double scale)
 
 typedef std::function<void(int, int, int)> TriangleFunc;
 
+/*
+	Convert a primitive into triangles. Except it's indirect, so convert a primitive into the 
+	indices into the elements list corresponding to those triangles. It's indirect because 
+	Models may or may not use element lists, so the actual list being indexed might be 
+	elements or vertices.
+*/
 void _split_into_triangles_indirect(int primitive, int start, int verts_per_primitive, TriangleFunc emit_triangle)
 {
 	switch(primitive)
@@ -532,101 +540,6 @@ void Model::generate_normals()
 
 	for(int i = 0; i < num_vertices; i++)
 		normals[i] = (normals[i] / times_touched[i]).normalize();
-}
-
-
-std::shared_ptr<Vec4[]> make_torus_verts(int long_segments, int trans_segments, double hole_ratio, double length = TAU, bool make_final_ring = false)
-{
-	double normalization_factor = 1.0 / sqrt(1.0 + hole_ratio * hole_ratio);
-
-	std::shared_ptr<Vec4[]> ret(new Vec4[long_segments * trans_segments]);
-	for(int i = 0; i < long_segments; i++)
-	{
-		double theta = (double)i * length / (make_final_ring ? long_segments - 1 : long_segments);
-		for(int j = 0; j < trans_segments; j++)
-		{
-			double phi = (double)j * TAU / trans_segments;
-
-			ret[i * trans_segments + j] = normalization_factor * Vec4(
-				hole_ratio * sin(phi),
-				hole_ratio * cos(phi),
-				sin(theta),
-				cos(theta)
-			);
-		}
-	}
-
-	return ret;
-}
-
-std::shared_ptr<Vec4[]> make_torus_normals(int long_segments, int trans_segments, double hole_ratio, double length = TAU, bool make_final_ring = false)
-{
-	std::shared_ptr<Vec4[]> ret(new Vec4[long_segments * trans_segments]);
-	for(int i = 0; i < long_segments; i++)
-	{
-		double theta = (double)i * length / (make_final_ring ? long_segments - 1 : long_segments);
-		for(int j = 0; j < trans_segments; j++)
-		{
-			double phi = (double)j * TAU / trans_segments;
-
-			ret[i * trans_segments + j] = INV_ROOT_2 * Vec4(
-				sin(phi),
-				cos(phi),
-				-sin(theta),
-				-cos(theta)
-			);
-		}
-	}
-
-	return ret;
-}
-
-std::shared_ptr<GLuint[]> make_torus_quad_strip_indices(int long_segments, int trans_segments, bool loop_longitudinally = true)
-{
-	int verts_per_strip = 2 * (trans_segments + 1);
-	std::shared_ptr<GLuint[]> ret(new GLuint[long_segments * verts_per_strip]);
-
-	/*
-		Note: I was going to try making the strips run longitudinally, so that 
-		it'd be more efficient (assuming more longitudinal segments than 
-		transverse), but I found that putting rings on the geodesics made 
-		them look better and made it easier to see what they were doing, 
-		so transverse strips it is.
-	*/
-
-	for(int i = 0; i < long_segments; i++)
-	{
-		#define NEXT_I (loop_longitudinally ? (i + 1) % long_segments : i + 1)
-		for(int j = 0; j < trans_segments; j++)
-		{
-			ret[i * verts_per_strip + 2 * j] = i * trans_segments + j;
-			ret[i * verts_per_strip + 2 * j + 1] = NEXT_I * trans_segments + j;
-		}
-
-		ret[i * verts_per_strip + 2 * trans_segments] = i * trans_segments;
-		ret[i * verts_per_strip + 2 * trans_segments + 1] = NEXT_I * trans_segments;
-		#undef NEXT_I
-	}
-
-	return ret;
-}
-
-std::shared_ptr<GLuint[]> make_torus_quad_indices(int long_segments, int trans_segments, bool loop_longitudinally = true)
-{
-	std::shared_ptr<GLuint[]> ret(new GLuint[4 * long_segments * trans_segments]);
-
-	for(int i = 0; i < long_segments; i++)
-		for(int j = 0; j < trans_segments; j++)
-		{
-			#define NEXT_I (loop_longitudinally ? (i + 1) % long_segments : i + 1)
-			ret[4 * (i * trans_segments + j)] = i * trans_segments + j;
-			ret[4 * (i * trans_segments + j) + 1] = NEXT_I * trans_segments + j;
-			ret[4 * (i * trans_segments + j) + 2] = NEXT_I * trans_segments + ((j + 1) % trans_segments);
-			ret[4 * (i * trans_segments + j) + 3] = i * trans_segments + ((j + 1) % trans_segments);
-			#undef NEXT_I
-		}
-
-	return ret;
 }
 
 
