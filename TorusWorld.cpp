@@ -12,10 +12,12 @@
 #include <stdio.h>
 #include <time.h>
 
+#pragma warning(disable : 4244)		//conversion from double to float
+
 
 Model* torus_model;
 Model* pole_model;
-ShaderProgram *copy_program = NULL, *light_program = NULL;
+ShaderProgram *copy_program = NULL, *light_program = NULL, *final_program = NULL;
 
 bool dump_buffers = false;
 
@@ -77,6 +79,12 @@ void init()
 		Shader::get(frag_point_light, {})
 	);
 
+	final_program = ShaderProgram::get(
+		Shader::get(vert_screenspace, {}),
+		NULL,
+		Shader::get(frag_dump_color, {})
+	);
+
 	torus_model = Model::make_torus(128, 128, 1, false, true);
 	torus_model->generate_primitive_colors(0.7);
 
@@ -131,9 +139,9 @@ void display()
 	player_state.set_cam();
 
 	last_frame_time += dt;
-	/*printf("%f\n", 1.0 / dt);
+	printf("%f\n", 1.0 / dt);
 	print_matrix(cam_mat);
-	printf("\n");*/
+	printf("\n");
 
 	use_gbuffer();
 
@@ -145,7 +153,7 @@ void display()
 	pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
 	pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
 
-	use_default_framebuffer();
+	use_abuffer();
 
 	glClear(GL_COLOR_BUFFER_BIT);
 
@@ -171,12 +179,18 @@ void display()
 		glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
 		draw_fsq();
 
-		light_pos = ~cam_mat * Vec4(2, 1, 0, 1).normalize();
-		light_emission = Vec3(0.3, 0.1, 0.0);
+		light_pos = ~cam_mat * Vec4(0.5, 1, 0, 1).normalize();
+		light_emission = -Vec3(0.6, 0.2, 0.0);
 		glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
 		glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
 		draw_fsq();
 	}
+
+	use_default_framebuffer();
+
+	glDisable(GL_BLEND);
+	final_program->use();
+	draw_fsq();
 	
 	glFlush();
 	glutSwapBuffers();

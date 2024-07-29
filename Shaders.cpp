@@ -187,7 +187,7 @@ std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 
 
 ShaderCore *vert, *geom_points, *geom_triangles, *frag;
-ShaderCore *vert_screenspace, *frag_copy_textures, *frag_fog, *frag_point_light;
+ShaderCore *vert_screenspace, *frag_copy_textures, *frag_fog, *frag_point_light, *frag_dump_color;
 
 void init_shaders()
 {
@@ -653,6 +653,32 @@ void init_shaders()
 			glUniform1i(glGetUniformLocation(program_id, "normal_tex"), 2);
 			glActiveTexture(GL_TEXTURE0 + 2);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
+		},
+		{}
+	);
+
+	frag_dump_color = new ShaderCore(
+		"frag_dump_color",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform sampler2D color_tex;
+
+			out vec4 frag_color;
+
+			void main() {
+				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
+				vec3 color = texelFetch(color_tex, pixel_coords, 0).rgb;
+				float value = max(color.r, max(color.g, color.b));
+				frag_color.rgb = tanh(value) * color / value;
+				frag_color.a = 1;
+			}
+		)",
+		NULL,
+		NULL,
+		[](GLuint program_id) {
+			glUniform1i(glGetUniformLocation(program_id, "color_tex"), 0);
+			glActiveTexture(GL_TEXTURE0 + 0);
+			glBindTexture(GL_TEXTURE_2D, abuffer_color);
 		},
 		{}
 	);
