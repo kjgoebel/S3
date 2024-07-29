@@ -205,7 +205,7 @@ void Model::draw(const Mat4& xform, const Vec4& base_color)
 	raw_program->use();
 	GLuint program_id = raw_program->get_id();
 	glProgramUniform4f(program_id, glGetUniformLocation(program_id, "base_color"), base_color.x, base_color.y, base_color.z, base_color.w);
-	raw_program->set_uniform_matrix("model_view_xform", ~cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
+	raw_program->set_matrix("model_view_xform", ~cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
 
 	glBindVertexArray(raw_vertex_array);
 
@@ -313,7 +313,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 
 			for(int i = 0; i < count; i++)
 			{
-				raw_program->set_uniform_matrix("model_view_xform", ~cam_mat * temp_xforms[i]);
+				raw_program->set_matrix("model_view_xform", ~cam_mat * temp_xforms[i]);
 				draw_raw();
 			}
 		};
@@ -365,7 +365,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 			{
 				Vec4 base_color = temp_colors[i];
 				glProgramUniform4f(program_id, glGetUniformLocation(program_id, "base_color"), base_color.x, base_color.y, base_color.z, base_color.w);
-				raw_program->set_uniform_matrix("model_view_xform", ~cam_mat * temp_xforms[i]);
+				raw_program->set_matrix("model_view_xform", ~cam_mat * temp_xforms[i]);
 				draw_raw();
 			}
 		};

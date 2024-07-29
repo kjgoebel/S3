@@ -12,16 +12,6 @@
 #define VERSION_STRING		"#version 460\n"
 
 
-void _set_uniform_matrix(GLuint program_id, const char* name, Mat4& mat)
-{
-	float temp[16];
-	for(int i = 0; i < 4; i++)
-		for(int j = 0; j < 4; j++)
-			temp[j * 4 + i] = mat.data[i][j];
-	glProgramUniformMatrix4fv(program_id, glGetUniformLocation(program_id, name), 1, false, temp);
-}
-
-
 Shader::Shader(ShaderCore* core, const std::set<const char*> options) : core(core), options(options)
 {
 	id = glCreateShader(core->shader_type);
@@ -142,10 +132,33 @@ ShaderProgram::ShaderProgram(Shader* vert, Shader* geom, Shader* frag)
 	all_shader_programs.push_back(this);
 }
 
-void ShaderProgram::set_uniform_matrix(const char* name, Mat4& mat)
+void ShaderProgram::set_matrix(const char* name, const Mat4& mat)
 {
-	//Don't like the function call overhead....
-	_set_uniform_matrix(id, name, mat);
+	float temp[16];
+	for(int i = 0; i < 4; i++)
+		for(int j = 0; j < 4; j++)
+			temp[j * 4 + i] = mat.data[i][j];
+	glProgramUniformMatrix4fv(id, glGetUniformLocation(id, name), 1, false, temp);
+}
+
+void ShaderProgram::set_vector(const char* name, const Vec4& v)
+{
+	glProgramUniform4f(id, glGetUniformLocation(id, name), v.x, v.y, v.z, v.w);
+}
+
+void ShaderProgram::set_vector(const char* name, const Vec3& v)
+{
+	glProgramUniform3f(id, glGetUniformLocation(id, name), v.x, v.y, v.z);
+}
+
+void ShaderProgram::set_scalar(const char* name, float f)
+{
+	glProgramUniform1f(id, glGetUniformLocation(id, name), f);
+}
+
+void ShaderProgram::set_scalar(const char* name, int i)
+{
+	glProgramUniform1i(id, glGetUniformLocation(id, name), i);
 }
 
 void ShaderProgram::dump() const
@@ -261,7 +274,7 @@ void init_shaders()
 				DEFINE_INSTANCED_XFORM,
 				NULL,
 				[](ShaderProgram* program) {
-					_set_uniform_matrix(program->get_id(), "view_xform", cam_mat);
+					program->set_matrix("view_xform", cam_mat);
 				}
 			),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
@@ -340,7 +353,7 @@ void init_shaders()
 		[](ShaderProgram* program) {
 			GLuint program_id = program->get_id();
 			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspect_ratio"), aspect_ratio);
-			_set_uniform_matrix(program_id, "proj_xform", proj_mat);
+			program->set_matrix("proj_xform", proj_mat);
 		},
 		NULL,
 		NULL,
@@ -409,7 +422,7 @@ void init_shaders()
 		[](ShaderProgram* program) {
 			GLuint program_id = program->get_id();
 			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspect_ratio"), aspect_ratio);
-			_set_uniform_matrix(program_id, "proj_xform", proj_mat);
+			program->set_matrix("proj_xform", proj_mat);
 		},
 		NULL,
 		NULL,

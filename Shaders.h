@@ -138,7 +138,11 @@ public:
 		fragment->frame(this);
 	}
 
-	void set_uniform_matrix(const char* name, Mat4& mat);
+	void set_matrix(const char* name, const Mat4& mat);
+	void set_vector(const char* name, const Vec4& v);
+	void set_vector(const char* name, const Vec3& v);
+	void set_scalar(const char* name, float f);
+	void set_scalar(const char* name, int i);
 
 	Shader* get_vertex() {return vertex;}
 	Shader* get_geometry() {return geometry;}
@@ -164,6 +168,3 @@ public:
 private:
 	static std::vector<ShaderProgram*> all_shader_programs;
 };
-
-
-void _set_uniform_matrix(GLuint program_id, const char* name, Mat4& mat);
