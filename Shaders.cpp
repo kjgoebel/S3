@@ -522,7 +522,7 @@ void init_shaders()
 				#ifdef VERTEX_NORMAL
 					frag_normal = normalize(gf_normal);
 				#else
-					frag_normal = vec4(0, 0, 1, 0);
+					frag_normal = vec4(0, 0, 0, 0);
 				#endif
 
 				gl_FragDepth = clamp(distance / (bulge_factor * 6.283185), 0, 1);

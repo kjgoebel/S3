@@ -63,7 +63,7 @@ private:
 	std::unique_ptr<Vec4[]> vertices;
 	std::unique_ptr<Vec4[]> vertex_colors;				//If this is NULL, the model will render with base color only.
 	std::unique_ptr<GLuint[]> elements;					//If this is NULL, use glDrawArrays() instead of glDrawElements().
-	std::unique_ptr<Vec4[]> normals;					//If this is NULL, normals won't be drawn into the gbuffer.
+	std::unique_ptr<Vec4[]> normals;					//If this is NULL, lighting calculation will ignore effects of surface normal (only distance and shadow will be used).
 
 	GLuint vertex_buffer, vertex_color_buffer, element_buffer, normal_buffer;
 	ShaderProgram *raw_program, *instanced_xform_program, *instanced_xform_and_color_program;		//I don't like having this many programs....
