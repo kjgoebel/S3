@@ -1,5 +1,7 @@
 #include "MakeModel.h"
 
+#include "Utils.h"
+
 
 std::shared_ptr<Vec4[]> make_torus_verts(int long_segments, int trans_segments, double hole_ratio, double length, bool make_final_ring)
 {
@@ -41,6 +43,35 @@ std::shared_ptr<Vec4[]> make_torus_normals(int long_segments, int trans_segments
 				-sin(theta),
 				-cos(theta)
 			);
+		}
+	}
+
+	return ret;
+}
+
+std::shared_ptr<Vec4[]> make_bumpy_torus_verts(int long_segments, int trans_segments, double bump_height)
+{
+	std::shared_ptr<Vec4[]> ret(new Vec4[long_segments * trans_segments]);
+	for(int i = 0; i < long_segments; i++)
+	{
+		double theta = (double)i * TAU / long_segments;
+		for(int j = 0; j < trans_segments; j++)
+		{
+			double phi = (double)j * TAU / trans_segments;
+
+			Vec4 pos(
+				sin(phi),
+				cos(phi),
+				sin(theta),
+				cos(theta)
+			);
+			Vec4 up(
+				sin(phi),
+				cos(phi),
+				-sin(theta),
+				-cos(theta)
+			);
+			ret[i * trans_segments + j] = (pos + fsrand() * bump_height * up).normalize();
 		}
 	}
 

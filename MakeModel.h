@@ -19,8 +19,13 @@
 std::shared_ptr<Vec4[]> make_torus_verts(int long_segments, int trans_segments, double hole_ratio, double length = TAU, bool make_final_ring = false);
 std::shared_ptr<Vec4[]> make_torus_normals(int long_segments, int trans_segments, double hole_ratio, double length = TAU, bool make_final_ring = false);
 
+//Assumes hole_ratio = 1, length = TAU and make_final_ring = false.
+std::shared_ptr<Vec4[]> make_bumpy_torus_verts(int long_segments, int trans_segments, double bump_height);
+
 /*
 	Generate elements for the above torus. loop_longitudinally = false corresponds to make_final_ring = true (and normally length < TAU).
+	Quad strip version generates long_segments * 2 * (trans_segments + 1) elements.
+	Quad version generates 4 * long_segments * trans_segments elements.
 */
 std::shared_ptr<GLuint[]> make_torus_quad_strip_indices(int long_segments, int trans_segments, bool loop_longitudinally = true);
 std::shared_ptr<GLuint[]> make_torus_quad_indices(int long_segments, int trans_segments, bool loop_longitudinally = true);

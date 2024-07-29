@@ -597,6 +597,29 @@ Model* Model::make_torus_arc(int longitudinal_segments, int transverse_segments,
 }
 
 
+Model* Model::make_bumpy_torus(int longitudinal_segments, int transverse_segments, double bump_height, bool use_quad_strips)
+{
+	if(use_quad_strips)
+		return new Model(
+			GL_QUAD_STRIP,
+			longitudinal_segments * transverse_segments,
+			2 * (transverse_segments + 1),
+			longitudinal_segments,
+			make_bumpy_torus_verts(longitudinal_segments, transverse_segments, bump_height).get(),
+			make_torus_quad_strip_indices(longitudinal_segments, transverse_segments).get()
+		);
+	else
+		return new Model(
+			GL_QUADS,
+			longitudinal_segments * transverse_segments,
+			4,
+			longitudinal_segments * transverse_segments,
+			make_bumpy_torus_verts(longitudinal_segments, transverse_segments, bump_height).get(),
+			make_torus_quad_indices(longitudinal_segments, transverse_segments).get()
+		);
+}
+
+
 std::shared_ptr<Vec4[]> Model::s3ify(int count, double scale, const Vec3* vertices)
 {
 	std::shared_ptr<Vec4[]> ret(new Vec4[count]);

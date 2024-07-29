@@ -53,7 +53,7 @@ struct PlayerState
 		Vec4 right = Vec4(sb, -cb, 0, 0);
 
 		cam_mat = Mat4::from_columns(right, down, fwd, pos)		//location on the torus
-					* Mat4::axial_rotation(_y, _w, 0.002)		//head position above feet
+					* Mat4::axial_rotation(_y, _w, 0.03)		//head position above feet
 					* Mat4::axial_rotation(_z, _x, yaw)			//yaw
 					* Mat4::axial_rotation(_y, _z, pitch);		//pitch
 	}
@@ -93,7 +93,8 @@ void init()
 	dots_model = new Model(NUM_DOTS, dots);
 	delete[] dots;
 
-	torus_model = Model::make_torus(128, 128, 1, false, true);
+	torus_model = Model::make_bumpy_torus(64, 64, 0.03);
+	torus_model->generate_normals();
 	torus_model->generate_primitive_colors(0.7);
 
 	pole_model =  new Model(
@@ -190,6 +191,13 @@ void display()
 
 		light_pos = ~cam_mat * Vec4(0.5, 1, 0, 1).normalize();
 		light_emission = -Vec3(0.6, 0.2, 0.0);
+		glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
+		glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
+		draw_fsq();
+
+		//cam light
+		light_pos = Vec4(0, 0, 0, 1);
+		light_emission = Vec3(0.1, 0.1, 0.1);
 		glProgramUniform4f(program_id, glGetUniformLocation(program_id, "light_pos"), light_pos.x, light_pos.y, light_pos.z, light_pos.w);
 		glProgramUniform3f(program_id, glGetUniformLocation(program_id, "light_emission"), light_emission.x, light_emission.y, light_emission.z);
 		draw_fsq();

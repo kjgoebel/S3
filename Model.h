@@ -53,6 +53,7 @@ public:
 
 	static Model* make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips = true, bool make_normals = false);
 	static Model* make_torus_arc(int longitudinal_segments, int transverse_segments, double length, double hole_ratio, bool use_quad_strips = true, bool make_normals = false);
+	static Model* make_bumpy_torus(int longitudinal_segments, int transverse_segments, double bump_height, bool use_quad_strips = false);
 	static std::shared_ptr<Vec4[]> s3ify(int count, double scale, const Vec3* vertices);		//Project a list of R3 vertices onto S3.
 
 private:
