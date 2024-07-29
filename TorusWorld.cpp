@@ -15,6 +15,13 @@
 #pragma warning(disable : 4244)		//conversion from double to float
 
 
+#define NUM_DOTS		(2000)
+#define WALK_SPEED		(TAU / 50)
+#define FOG_INCREMENT		(0.5)
+#define SUN_SPEED		(TAU / 30)
+
+
+Model* dots_model;
 Model* torus_model;
 Model* pole_model;
 ShaderProgram *copy_program = NULL, *light_program = NULL, *final_program = NULL;
@@ -22,6 +29,7 @@ ShaderProgram *copy_program = NULL, *light_program = NULL, *final_program = NULL
 bool dump_buffers = false;
 
 double last_frame_time;
+
 
 struct Controls
 {
@@ -45,18 +53,12 @@ struct PlayerState
 		Vec4 right = Vec4(sb, -cb, 0, 0);
 
 		cam_mat = Mat4::from_columns(right, down, fwd, pos)		//location on the torus
-					* Mat4::axial_rotation(_y, _w, 0.001)		//head position above feet
+					* Mat4::axial_rotation(_y, _w, 0.002)		//head position above feet
 					* Mat4::axial_rotation(_z, _x, yaw)			//yaw
 					* Mat4::axial_rotation(_y, _z, pitch);		//pitch
 	}
 };
 PlayerState player_state;
-
-#define WALK_SPEED		(TAU / 50)
-
-#define FOG_INCREMENT		(0.5)
-
-#define SUN_SPEED		(TAU / 30)
 
 
 void init()
@@ -84,6 +86,12 @@ void init()
 		NULL,
 		Shader::get(frag_dump_color, {})
 	);
+
+	Vec4* dots = new Vec4[NUM_DOTS];
+	for(int i = 0; i < NUM_DOTS; i++)
+		dots[i] = rand_s3();
+	dots_model = new Model(NUM_DOTS, dots);
+	delete[] dots;
 
 	torus_model = Model::make_torus(128, 128, 1, false, true);
 	torus_model->generate_primitive_colors(0.7);
@@ -150,6 +158,7 @@ void display()
 	ShaderProgram::frame_all();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
+	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
 	pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
 	pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
 
