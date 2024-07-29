@@ -61,36 +61,36 @@ Shader::Shader(ShaderCore* core, const std::set<const char*> options) : core(cor
 		exit(-1);
 	}
 	
-	init_func = [core, options](GLuint program_id) {
+	init_func = [core, options](ShaderProgram* program) {
 		if(core->init_func)
-			core->init_func(program_id);
+			core->init_func(program);
 		for(auto option : options)
 		{
 			ShaderPullFunc temp = core->options[option]->init_func;
 			if(temp)
-				temp(program_id);
+				temp(program);
 		}
 	};
 
-	frame_func = [core, options](GLuint program_id) {
+	frame_func = [core, options](ShaderProgram* program) {
 		if(core->frame_func)
-			core->frame_func(program_id);
+			core->frame_func(program);
 		for(auto option : options)
 		{
 			ShaderPullFunc temp = core->options[option]->frame_func;
 			if(temp)
-				temp(program_id);
+				temp(program);
 		}
 	};
 
-	use_func = [core, options](GLuint program_id) {
+	use_func = [core, options](ShaderProgram* program) {
 		if(core->use_func)
-			core->use_func(program_id);
+			core->use_func(program);
 		for(auto option : options)
 		{
 			ShaderPullFunc temp = core->options[option]->use_func;
 			if(temp)
-				temp(program_id);
+				temp(program);
 		}
 	};
 
@@ -260,8 +260,8 @@ void init_shaders()
 			new ShaderOption(
 				DEFINE_INSTANCED_XFORM,
 				NULL,
-				[](int program_id) {
-					_set_uniform_matrix(program_id, "view_xform", cam_mat);
+				[](ShaderProgram* program) {
+					_set_uniform_matrix(program->get_id(), "view_xform", cam_mat);
 				}
 			),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
@@ -337,7 +337,8 @@ void init_shaders()
 				EndPrimitive();
 			}
 		)",
-		[](int program_id) {
+		[](ShaderProgram* program) {
+			GLuint program_id = program->get_id();
 			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspect_ratio"), aspect_ratio);
 			_set_uniform_matrix(program_id, "proj_xform", proj_mat);
 		},
@@ -405,7 +406,8 @@ void init_shaders()
 				EndPrimitive();
 			}
 		)",
-		[](int program_id) {
+		[](ShaderProgram* program) {
+			GLuint program_id = program->get_id();
 			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "aspect_ratio"), aspect_ratio);
 			_set_uniform_matrix(program_id, "proj_xform", proj_mat);
 		},
@@ -585,7 +587,8 @@ void init_shaders()
 		)",
 		NULL,
 		NULL,
-		[](GLuint program_id) {
+		[](ShaderProgram* program) {
+			GLuint program_id = program->get_id();
 			glUniform1i(glGetUniformLocation(program_id, "albedo_tex"), 0);
 			glActiveTexture(GL_TEXTURE0 + 0);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
@@ -624,10 +627,12 @@ void init_shaders()
 			}
 		)",
 		NULL,
-		[](GLuint program_id) {
+		[](ShaderProgram* program) {
+			GLuint program_id = program->get_id();
 			glProgramUniform1f(program_id, glGetUniformLocation(program_id, "fog_scale"), fog_scale);
 		},
-		[](GLuint program_id) {
+		[](ShaderProgram* program) {
+			GLuint program_id = program->get_id();
 			glUniform1i(glGetUniformLocation(program_id, "albedo_tex"), 0);
 			glActiveTexture(GL_TEXTURE0 + 0);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
@@ -674,7 +679,8 @@ void init_shaders()
 		)",
 		NULL,
 		NULL,
-		[](GLuint program_id) {
+		[](ShaderProgram* program) {
+			GLuint program_id = program->get_id();
 			glUniform1i(glGetUniformLocation(program_id, "albedo_tex"), 0);
 			glActiveTexture(GL_TEXTURE0 + 0);
 			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
@@ -708,7 +714,8 @@ void init_shaders()
 		)",
 		NULL,
 		NULL,
-		[](GLuint program_id) {
+		[](ShaderProgram* program) {
+			GLuint program_id = program->get_id();
 			glUniform1i(glGetUniformLocation(program_id, "color_tex"), 0);
 			glActiveTexture(GL_TEXTURE0 + 0);
 			glBindTexture(GL_TEXTURE_2D, abuffer_color);

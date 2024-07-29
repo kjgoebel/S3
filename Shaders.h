@@ -31,7 +31,7 @@
 */
 
 
-typedef std::function<void(int)> ShaderPullFunc;
+typedef std::function<void(class ShaderProgram*)> ShaderPullFunc;
 
 
 #define DEFINE_VERTEX_COLOR			"#define VERTEX_COLOR\n"
@@ -80,9 +80,9 @@ class Shader
 public:
 	GLuint get_id() {return id;}
 
-	void init(GLuint program_id) {init_func(program_id);}
-	void frame(GLuint program_id) {frame_func(program_id);}
-	void use(GLuint program_id) {use_func(program_id);}
+	void init(ShaderProgram* program) {init_func(program);}
+	void frame(ShaderProgram* program) {frame_func(program);}
+	void use(ShaderProgram* program) {use_func(program);}
 
 	ShaderCore* get_core() {return core;}
 	const std::set<const char*> get_options() {return options;}
@@ -118,24 +118,24 @@ public:
 	void use()
 	{
 		glUseProgram(id);
-		vertex->use(id);
+		vertex->use(this);
 		if(geometry)
-			geometry->use(id);
-		fragment->use(id);
+			geometry->use(this);
+		fragment->use(this);
 	}
 	void init()
 	{
-		vertex->init(id);
+		vertex->init(this);
 		if(geometry)
-			geometry->init(id);
-		fragment->init(id);
+			geometry->init(this);
+		fragment->init(this);
 	}
 	void frame()
 	{
-		vertex->frame(id);
+		vertex->frame(this);
 		if(geometry)
-			geometry->frame(id);
-		fragment->frame(id);
+			geometry->frame(this);
+		fragment->frame(this);
 	}
 
 	void set_uniform_matrix(const char* name, Mat4& mat);
