@@ -210,14 +210,19 @@ void init_shaders()
 		R"(
 			layout (location = 0) in vec4 position;
 
-			#ifdef VERTEX_COLOR
-				layout (location = 1) in vec4 color;
-				out vec4 vg_color;
-			#endif
-
-			#ifdef VERTEX_NORMAL
-				layout (location = 2) in vec4 normal;
-				out vec4 vg_normal;
+			#ifndef SHADOW
+				#ifdef VERTEX_COLOR
+					layout (location = 1) in vec4 color;
+					out vec4 vg_color;
+				#endif
+				#ifdef VERTEX_NORMAL
+					layout (location = 2) in vec4 normal;
+					out vec4 vg_normal;
+				#endif
+				#ifdef INSTANCED_BASE_COLOR
+					layout (location = 7) in vec4 base_color;
+					out vec4 vg_base_color;
+				#endif
 			#endif
 
 			#ifdef INSTANCED_XFORM
@@ -225,11 +230,6 @@ void init_shaders()
 				uniform mat4 view_xform;
 			#else
 				uniform mat4 model_view_xform;
-			#endif
-			
-			#ifdef INSTANCED_BASE_COLOR
-				layout (location = 7) in vec4 base_color;
-				out vec4 vg_base_color;
 			#endif
 
 			/*
@@ -253,14 +253,16 @@ void init_shaders()
 				gl_Position.xyz = distance * normalize(vg_r4pos.xyz);
 				gl_Position.w = 1;
 
-				#ifdef INSTANCED_BASE_COLOR
-					vg_base_color = base_color;
-				#endif
-				#ifdef VERTEX_COLOR
-					vg_color = color;
-				#endif
-				#ifdef VERTEX_NORMAL
-					vg_normal = model_view_xform * normal;
+				#ifndef SHADOW
+					#ifdef INSTANCED_BASE_COLOR
+						vg_base_color = base_color;
+					#endif
+					#ifdef VERTEX_COLOR
+						vg_color = color;
+					#endif
+					#ifdef VERTEX_NORMAL
+						vg_normal = model_view_xform * normal;
+					#endif
 				#endif
 			}
 		)",
@@ -277,7 +279,8 @@ void init_shaders()
 					program->set_matrix("view_xform", cam_mat);
 				}
 			),
-			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_SHADOW, NULL, NULL)
 		}
 	);
 
@@ -291,14 +294,15 @@ void init_shaders()
 			uniform mat4 proj_xform;
 			uniform float aspect_ratio;
 
-			#ifdef VERTEX_COLOR
-				in vec4 vg_color[];
-				out vec4 gf_color;
-			#endif
-
-			#ifdef INSTANCED_BASE_COLOR
-				in vec4 vg_base_color[];
-				out vec4 gf_base_color;
+			#ifndef SHADOW
+				#ifdef VERTEX_COLOR
+					in vec4 vg_color[];
+					out vec4 gf_color;
+				#endif
+				#ifdef INSTANCED_BASE_COLOR
+					in vec4 vg_base_color[];
+					out vec4 gf_base_color;
+				#endif
 			#endif
 
 			in vec4 vg_r4pos[];
@@ -326,11 +330,14 @@ void init_shaders()
 				float distance_factor = 1 / sin(dist);
 
 				gf_r4pos = vg_r4pos[0];
-				#ifdef VERTEX_COLOR
-					gf_color = vg_color[0];
-				#endif
-				#ifdef INSTANCED_BASE_COLOR
-					gf_base_color = vg_base_color[0];
+
+				#ifndef SHADOW
+					#ifdef VERTEX_COLOR
+						gf_color = vg_color[0];
+					#endif
+					#ifdef INSTANCED_BASE_COLOR
+						gf_base_color = vg_base_color[0];
+					#endif
 				#endif
 					
 				float height = BASE_POINT_SIZE * distance_factor, width = height / aspect_ratio;
@@ -358,7 +365,8 @@ void init_shaders()
 		NULL,
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_SHADOW, NULL, NULL)
 		}
 	);
 
@@ -371,23 +379,24 @@ void init_shaders()
 
 			uniform mat4 proj_xform;
 
-			#ifdef VERTEX_COLOR
-				in vec4 vg_color[];
-				out vec4 gf_color;
-			#endif
-
-			#ifdef VERTEX_NORMAL
-				in vec4 vg_normal[];
-				out vec4 gf_normal;
-			#endif
-
-			#ifdef INSTANCED_BASE_COLOR
-				in vec4 vg_base_color[];
-				out vec4 gf_base_color;
+			#ifndef SHADOW
+				#ifdef VERTEX_COLOR
+					in vec4 vg_color[];
+					out vec4 gf_color;
+				#endif
+				#ifdef VERTEX_NORMAL
+					in vec4 vg_normal[];
+					out vec4 gf_normal;
+				#endif
+				#ifdef INSTANCED_BASE_COLOR
+					in vec4 vg_base_color[];
+					out vec4 gf_base_color;
+				#endif
 			#endif
 
 			in vec4 vg_r4pos[];
 			out vec4 gf_r4pos;
+
 			out float distance;
 
 			void main() {
@@ -400,19 +409,20 @@ void init_shaders()
 					point.xyz *= image_dist / dist;
 					distance = abs(image_dist);
 
-					point = proj_xform * point;
-
-					gl_Position = point;
-					#ifdef VERTEX_COLOR
-						gf_color = vg_color[i];
-					#endif
-					#ifdef VERTEX_NORMAL
-						gf_normal = vg_normal[i];
-					#endif
-					#ifdef INSTANCED_BASE_COLOR
-						gf_base_color = vg_base_color[i];
-					#endif
+					gl_Position = proj_xform * point;
 					gf_r4pos = vg_r4pos[i];
+
+					#ifndef SHADOW
+						#ifdef VERTEX_COLOR
+							gf_color = vg_color[i];
+						#endif
+						#ifdef VERTEX_NORMAL
+							gf_normal = vg_normal[i];
+						#endif
+						#ifdef INSTANCED_BASE_COLOR
+							gf_base_color = vg_base_color[i];
+						#endif
+					#endif
 					EmitVertex();
 				}
 				EndPrimitive();
@@ -427,7 +437,8 @@ void init_shaders()
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(DEFINE_VERTEX_NORMAL, NULL, NULL),
-			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_SHADOW, NULL, NULL)
 		}
 	);
 
@@ -435,23 +446,26 @@ void init_shaders()
 		"frag_points",
 		GL_FRAGMENT_SHADER,
 		R"(
-			#ifdef VERTEX_COLOR
-				in vec4 gf_color;
-			#endif
-
-			#ifdef INSTANCED_BASE_COLOR
-				in vec4 gf_base_color;
-			#else
-				uniform vec4 base_color;
+			#ifndef SHADOW
+				#ifdef VERTEX_COLOR
+					in vec4 gf_color;
+				#endif
+				#ifdef INSTANCED_BASE_COLOR
+					in vec4 gf_base_color;
+				#else
+					uniform vec4 base_color;
+				#endif
 			#endif
 			
 			in vec4 gf_r4pos;
 			in float distance;
 			in vec2 point_coord;
 				
-			layout (location = 0) out vec4 frag_albedo;
-			layout (location = 1) out vec4 frag_position;
-			layout (location = 2) out vec4 frag_normal;
+			#ifndef SHADOW
+				layout (location = 0) out vec4 frag_albedo;
+				layout (location = 1) out vec4 frag_position;
+				layout (location = 2) out vec4 frag_normal;
+			#endif
 			layout (depth_any) out float gl_FragDepth;
 
 			//This should not be repeated here and in geom_points. It should be a uniform.
@@ -467,19 +481,21 @@ void init_shaders()
 				if(point_coord_l2 > 1)
 					discard;
 
-				#ifdef INSTANCED_BASE_COLOR
-					vec4 base_color = gf_base_color;
-				#endif
-				#ifdef VERTEX_COLOR
-					frag_albedo = clamp(base_color + gf_color, 0, 1);
-				#else
-					frag_albedo = base_color;
+				#ifndef SHADOW
+					#ifdef INSTANCED_BASE_COLOR
+						vec4 base_color = gf_base_color;
+					#endif
+					#ifdef VERTEX_COLOR
+						frag_albedo = clamp(base_color + gf_color, 0, 1);
+					#else
+						frag_albedo = base_color;
+					#endif
+
+					frag_normal = vec4(point_coord.x, point_coord.y, -sqrt(1 - point_coord_l2), 0);
 				#endif
 
 				float bulge_factor = length(gf_r4pos);		//I'm pretty sure this is wrong.
 				frag_position = gf_r4pos / bulge_factor;
-
-				frag_normal = vec4(point_coord.x, point_coord.y, -sqrt(1 - point_coord_l2), 0);
 
 				gl_FragDepth = clamp((distance + BASE_POINT_SIZE * frag_normal.z) / (bulge_factor * 6.283185), 0, 1);
 			}
@@ -489,7 +505,8 @@ void init_shaders()
 		NULL,
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_SHADOW, NULL, NULL)
 		}
 	);
 
@@ -497,46 +514,50 @@ void init_shaders()
 		"frag",
 		GL_FRAGMENT_SHADER,
 		R"(
-			#ifdef VERTEX_COLOR
-				in vec4 gf_color;
-			#endif
-
-			#ifdef VERTEX_NORMAL
-				in vec4 gf_normal;
-			#endif
-
-			#ifdef INSTANCED_BASE_COLOR
-				in vec4 gf_base_color;
-			#else
-				uniform vec4 base_color;
+			#ifndef SHADOW
+				#ifdef VERTEX_COLOR
+					in vec4 gf_color;
+				#endif
+				#ifdef VERTEX_NORMAL
+					in vec4 gf_normal;
+				#endif
+				#ifdef INSTANCED_BASE_COLOR
+					in vec4 gf_base_color;
+				#else
+					uniform vec4 base_color;
+				#endif
 			#endif
 			
 			in vec4 gf_r4pos;
 			in float distance;
 				
-			layout (location = 0) out vec4 frag_albedo;
-			layout (location = 1) out vec4 frag_position;
-			layout (location = 2) out vec4 frag_normal;
+			#ifndef SHADOW
+				layout (location = 0) out vec4 frag_albedo;
+				layout (location = 1) out vec4 frag_position;
+				layout (location = 2) out vec4 frag_normal;
+			#endif
 			layout (depth_any) out float gl_FragDepth;
 
 			void main() {
-				#ifdef INSTANCED_BASE_COLOR
-					vec4 base_color = gf_base_color;
-				#endif
-				#ifdef VERTEX_COLOR
-					frag_albedo = clamp(base_color + gf_color, 0, 1);
-				#else
-					frag_albedo = base_color;
+				#ifndef SHADOW
+					#ifdef INSTANCED_BASE_COLOR
+						vec4 base_color = gf_base_color;
+					#endif
+					#ifdef VERTEX_COLOR
+						frag_albedo = clamp(base_color + gf_color, 0, 1);
+					#else
+						frag_albedo = base_color;
+					#endif
+					
+					#ifdef VERTEX_NORMAL
+						frag_normal = normalize(gf_normal);
+					#else
+						frag_normal = vec4(0, 0, 0, 0);
+					#endif
 				#endif
 
 				float bulge_factor = length(gf_r4pos);		//I'm pretty sure this is wrong.
 				frag_position = gf_r4pos / bulge_factor;
-
-				#ifdef VERTEX_NORMAL
-					frag_normal = normalize(gf_normal);
-				#else
-					frag_normal = vec4(0, 0, 0, 0);
-				#endif
 
 				gl_FragDepth = clamp(distance / (bulge_factor * 6.283185), 0, 1);
 			}
@@ -547,7 +568,8 @@ void init_shaders()
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
 			new ShaderOption(DEFINE_VERTEX_NORMAL, NULL, NULL),
-			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL)
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL),
+			new ShaderOption(DEFINE_SHADOW, NULL, NULL)
 		}
 	);
 
