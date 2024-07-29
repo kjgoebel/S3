@@ -1,13 +1,18 @@
 #include "Model.h"
 
 #include "MakeModel.h"
-
 #include <fcntl.h>
 #include <io.h>
 #include <stdint.h>
 #include <memory>
-
 #include "Utils.h"
+
+/*
+	We use is_shadow_pass to choose automagically which shader program to use. I don't 
+	like this, but the alternative is to clutter up Main with a whole bunch of false
+	values that don't need to be there.
+*/
+#include "Framebuffer.h"
 
 #pragma warning(disable : 4244)		//conversion from double to float
 
@@ -166,7 +171,7 @@ void Model::prepare_to_render()
 	raw_vertex_array = make_vertex_array();
 }
 
-ShaderProgram* Model::get_shader_program(bool instanced_xforms, bool instanced_base_colors)
+ShaderProgram* Model::get_shader_program(bool shadow, bool instanced_xforms, bool instanced_base_colors)
 {
 	auto options = std::set<const char*>();
 	if(vertex_colors)
@@ -175,6 +180,8 @@ ShaderProgram* Model::get_shader_program(bool instanced_xforms, bool instanced_b
 		options.insert(DEFINE_VERTEX_NORMAL);
 	if(instanced_base_colors)
 		options.insert(DEFINE_INSTANCED_BASE_COLOR);
+	if(shadow)
+		options.insert(DEFINE_SHADOW);
 	auto vert_options = options;
 	if(instanced_xforms)
 		vert_options.insert(DEFINE_INSTANCED_XFORM);
@@ -191,7 +198,7 @@ void Model::draw(const Mat4& xform, const Vec4& base_color)
 	if(!vertex_buffer)
 		prepare_to_render();
 		
-	ShaderProgram* raw_program = get_shader_program(false, false);
+	ShaderProgram* raw_program = get_shader_program(is_shadow_pass, false, false);
 	raw_program->use();
 	raw_program->set_vector("base_color", base_color);
 	raw_program->set_matrix("model_view_xform", ~cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
@@ -291,7 +298,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 		bind_xform_array(vertex_array, count, xforms);
 
 		return [count, vertex_array, base_color, this]() {
-			ShaderProgram* program = get_shader_program(true, false);
+			ShaderProgram* program = get_shader_program(is_shadow_pass, true, false);
 			program->use();
 			glBindVertexArray(vertex_array);
 			program->set_vector("base_color", base_color);
@@ -305,7 +312,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 			temp_xforms[i] = xforms[i];
 
 		return [count, temp_xforms, base_color, this]() {
-			ShaderProgram* program = get_shader_program(false, false);
+			ShaderProgram* program = get_shader_program(is_shadow_pass, false, false);
 			program->use();
 			program->set_vector("base_color", base_color);
 			glBindVertexArray(raw_vertex_array);
@@ -332,7 +339,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 		bind_color_array(vertex_array, count, base_colors);
 
 		return [count, vertex_array, this]() {
-			ShaderProgram* program = get_shader_program(true, true);
+			ShaderProgram* program = get_shader_program(is_shadow_pass, true, true);
 			program->use();
 			glBindVertexArray(vertex_array);
 			draw_instanced(count);
@@ -349,7 +356,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 		}
 
 		return [count, temp_xforms, temp_colors, this]() {
-			ShaderProgram* program = get_shader_program(false, false);
+			ShaderProgram* program = get_shader_program(is_shadow_pass, false, false);
 			program->use();
 			glBindVertexArray(raw_vertex_array);
 			for(int i = 0; i < count; i++)

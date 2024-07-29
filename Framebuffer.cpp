@@ -6,6 +6,7 @@
 
 GLuint gbuffer = 0, gbuffer_albedo = 0, gbuffer_position = 0, gbuffer_normal = 0, gbuffer_depth = 0;
 GLuint abuffer, abuffer_color;
+bool is_shadow_pass = false;
 GLuint fsq_vertex_array = 0;
 
 
