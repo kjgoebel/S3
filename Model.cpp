@@ -236,6 +236,19 @@ void Model::bind_xform_array(GLuint vertex_array, int count, const Mat4* xforms)
 	}
 }
 
+void Model::bind_color_array(GLuint vertex_array, int count, const Vec4* base_colors)
+{
+	glBindVertexArray(vertex_array);
+
+	GLuint base_color_buffer;
+	glGenBuffers(1, &base_color_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, base_color_buffer);
+	glBufferData(GL_ARRAY_BUFFER, count * sizeof(Vec4), base_colors, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(7);
+	glVertexAttribPointer(7, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
+	glVertexAttribDivisor(7, 1);
+}
+
 void Model::draw_raw()
 {
 	if(elements)
@@ -324,16 +337,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 	{
 		GLuint vertex_array = make_vertex_array();
 		bind_xform_array(vertex_array, count, xforms);
-
-		glBindVertexArray(vertex_array);
-
-		GLuint base_color_buffer;
-		glGenBuffers(1, &base_color_buffer);
-		glBindBuffer(GL_ARRAY_BUFFER, base_color_buffer);
-		glBufferData(GL_ARRAY_BUFFER, count * sizeof(Vec4), base_colors, GL_STATIC_DRAW);
-		glEnableVertexAttribArray(7);
-		glVertexAttribPointer(7, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
-		glVertexAttribDivisor(7, 1);
+		bind_color_array(vertex_array, count, base_colors);
 
 		return [count, vertex_array, this]() {
 			instanced_xform_and_color_program->use();

@@ -76,6 +76,7 @@ private:
 										//shader programs, and creates raw_vertex_array with make_vertex_array().
 
 	void bind_xform_array(GLuint vertex_array, int count, const Mat4* xforms);		//Creates a vertex buffer for the given xforms and binds it the given VAO.
+	void bind_color_array(GLuint vertex_array, int count, const Vec4* base_colors);
 	
 	void draw_raw();
 	void draw_instanced(int count);
