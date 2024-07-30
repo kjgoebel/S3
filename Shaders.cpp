@@ -788,8 +788,12 @@ void init_shaders()
 			out vec4 frag_color;
 
 			#ifdef USE_PCF
-				float rand(vec2 co){
-					return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453) * 2 - 1;
+				float bnoise(ivec2 p) {
+					int temp = 
+						(p.x * p.y * 999999937) ^
+						(p.x * p.y * 999416681) ^
+						999319777;
+					return float(temp % 135977) / 135976;
 				}
 			#endif
 
@@ -824,9 +828,9 @@ void init_shaders()
 					for(int i = 0; i < 10; i++)
 					{
 						vec4 offset = 0.001 * vec4(
-							rand(gl_FragCoord.xy),
-							rand(gl_FragCoord.xy + vec2(0, i)),
-							rand(gl_FragCoord.xy + vec2(i, 0)),
+							bnoise(pixel_coords + ivec2(0, 439 * i)),
+							bnoise(pixel_coords + ivec2(547 * i, 0)),
+							bnoise(pixel_coords + ivec2(0, 227 * i)),
 							0
 						);
 						shadow_factor += texture(light_map, light_to_frag + offset);
