@@ -43,7 +43,7 @@ typedef std::function<void(class ShaderProgram*)> ShaderPullFunc;
 
 struct ShaderOption
 {
-	ShaderOption(const char* def_name, ShaderPullFunc init_func = NULL, ShaderPullFunc frame_func = NULL)
+	ShaderOption(const char* def_name, ShaderPullFunc init_func = NULL, ShaderPullFunc frame_func = NULL, ShaderPullFunc use_func = NULL)
 		: def_name(def_name), init_func(init_func), frame_func(frame_func), use_func(use_func) {}
 
 	const char* def_name;
@@ -101,12 +101,12 @@ public:
 	static Shader* get(ShaderCore* core, const std::set<const char*> options);
 
 private:
-	static std::vector<Shader*> all_shaders;
+	static std::vector<Shader*> all_shaders;		//This should be a map.
 };
 
 
 extern ShaderCore *vert, *geom_points, *geom_triangles, *frag_points, *frag;
-extern ShaderCore *vert_screenspace, *frag_copy_textures, *frag_fog, *frag_point_light, *frag_dump_color;
+extern ShaderCore *vert_screenspace, *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_fog, *frag_point_light, *frag_dump_color;
 
 void init_shaders();
 
@@ -140,10 +140,12 @@ public:
 	}
 
 	void set_matrix(const char* name, const Mat4& mat);
+	void set_matrices(const char* name, const Mat4* mats, int count);
 	void set_vector(const char* name, const Vec4& v);
 	void set_vector(const char* name, const Vec3& v);
 	void set_float(const char* name, float f);
 	void set_int(const char* name, int i);
+	void set_texture(const char* name, int tex_unit, GLuint texture, GLenum target = GL_TEXTURE_2D);
 
 	Shader* get_vertex() {return vertex;}
 	Shader* get_geometry() {return geometry;}
@@ -167,5 +169,5 @@ public:
 	static void frame_all();
 
 private:
-	static std::vector<ShaderProgram*> all_shader_programs;
+	static std::vector<ShaderProgram*> all_shader_programs;		//This should be a map.
 };

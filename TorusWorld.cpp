@@ -16,17 +16,27 @@
 
 
 #define NUM_DOTS		(2000)
+#define LIGHT_MAP_SIZE	(1024)
 #define WALK_SPEED		(TAU / 50)
 #define FOG_INCREMENT		(0.5)
 #define SUN_SPEED		(TAU / 30)
+
+enum Mode {
+	NORMAL,
+	COPY_TEXTURES,
+	DUMP_ALBEDO,
+	DUMP_POSITION,
+	DUMP_NORMAL,
+	DUMP_DEPTH,
+	DUMP_LIGHT_MAP
+};
 
 
 Model* dots_model;
 Model* torus_model;
 Model* pole_model;
-ShaderProgram *copy_program = NULL, *light_program = NULL, *final_program = NULL;
-
-bool dump_buffers = false;
+ShaderProgram *dump_program, *dump_cube_program, *light_program, *final_program;
+Mode mode = NORMAL;
 
 double last_frame_time;
 
@@ -69,10 +79,22 @@ void init()
 
 	init_shaders();
 
-	copy_program = ShaderProgram::get(
+	/*copy_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
 		NULL,
 		Shader::get(frag_copy_textures, {})
+	);*/
+
+	dump_program = ShaderProgram::get(
+		Shader::get(vert_screenspace, {}),
+		NULL,
+		Shader::get(frag_dump_texture, {})
+	);
+
+	dump_cube_program = ShaderProgram::get(
+		Shader::get(vert_screenspace, {}),
+		NULL,
+		Shader::get(frag_dump_cubemap, {})
 	);
 
 	light_program = ShaderProgram::get(
@@ -112,19 +134,55 @@ void init()
 	player_state.set_cam();
 }
 
-int window_width, window_height;
+int window_width = 0, window_height = 0;
 
 void reshape(int w, int h)
 {
-	window_width = w;
-	window_height = h;
-
-	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
-	set_perspective((double)w / h);
-
-	init_framebuffer(w, h);
+	if(w != window_width || h != window_height)
+	{
+		window_width = w;
+		window_height = h;
+		init_framebuffer(window_width, window_height, LIGHT_MAP_SIZE);
+	}
 
 	ShaderProgram::init_all();
+}
+
+void draw_scene(bool shadow)
+{
+	is_shadow_pass = shadow;
+
+	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
+	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
+	pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
+	pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
+
+	is_shadow_pass = false;
+}
+
+void render_point_light(Mat4& light_mat, Vec3 light_emission)
+{
+	use_lbuffer();
+	glClear(GL_DEPTH_BUFFER_BIT);
+	glViewport(0, 0, LIGHT_MAP_SIZE, LIGHT_MAP_SIZE);
+	
+	set_perspective(1);
+
+	//This is filthy. This is why we don't communicate through globals.
+	Mat4 temp = cam_mat;
+	cam_mat = light_mat;
+	draw_scene(true);
+	cam_mat = temp;
+
+	use_abuffer();
+	glViewport(0, 0, window_width, window_height);
+	light_program->use();
+	light_program->set_matrix("light_xform", ~light_mat * cam_mat);
+	light_program->set_vector("light_pos", ~cam_mat * light_mat.get_column(_w));
+	light_program->set_vector("light_emission", light_emission);
+	//light_program->set_texture("light_map", 3, light_map);
+
+	draw_fsq();
 }
 
 void display()
@@ -152,54 +210,95 @@ void display()
 	print_matrix(cam_mat);
 	printf("\n");
 
+	ShaderProgram::frame_all();
+
+	//Geometry Pass
 	use_gbuffer();
 
-	glDisable(GL_BLEND);
-
-	ShaderProgram::frame_all();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
-	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
-	pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
-	pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
+	glViewport(0, 0, window_width, window_height);
+	set_perspective((double)window_width / window_height);
+	glDisable(GL_BLEND);
+	draw_scene(false);
 
+	//Light (Accumulation) Pass
 	use_abuffer();
 
 	glClear(GL_COLOR_BUFFER_BIT);
+	glEnable(GL_BLEND);
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_ONE, GL_ONE);
 
-	if(dump_buffers)
-	{
-		copy_program->use();
-		draw_fsq();
-	}
-	else
-	{
-		light_program->use();
-
-		glEnable(GL_BLEND);
-		glBlendEquation(GL_FUNC_ADD);
-		glBlendFunc(GL_ONE, GL_ONE);
-
-		double theta = SUN_SPEED * last_frame_time;
-		light_program->set_vector("light_pos", ~cam_mat * Vec4(-sin(theta), cos(theta), 0, 0));
-		light_program->set_vector("light_emission", Vec3(1, 1, 1));
-		draw_fsq();
-		
-		light_program->set_vector("light_pos", ~cam_mat * Vec4(0.5, 1, 0, 1).normalize());
-		light_program->set_vector("light_emission", -Vec3(0.6, 0.2, 0.0));
-		draw_fsq();
-
-		//cam light
-		light_program->set_vector("light_pos", Vec4(0, 0, 0, 1));
-		light_program->set_vector("light_emission", Vec3(0.1, 0.1, 0.1));
-		draw_fsq();
-	}
-
+	render_point_light(
+		Mat4::axial_rotation(_x, _y, SUN_SPEED * last_frame_time) * Mat4::axial_rotation(_w, _x, TAU / 4) * Mat4::axial_rotation(_z, _y, TAU / 4),
+		Vec3(1, 1, 1)
+	);
+	render_point_light(
+		Mat4::axial_rotation(_w, _x, TAU / 7),
+		-Vec3(0.6, 0.2, 0.0)
+	);
+	/*render_point_light(
+		cam_mat,
+		Vec3(0.1, 0.1, 0.1)
+	);*/
+	
+	//Final Pass
 	use_default_framebuffer();
 
+	glViewport(0, 0, window_width, window_height);
+	set_perspective((double)window_width / window_height);
 	glDisable(GL_BLEND);
-	final_program->use();
-	draw_fsq();
+
+	switch(mode)
+	{
+		case NORMAL:
+			final_program->use();
+			draw_fsq();
+			break;
+
+		case COPY_TEXTURES:
+			dump_program->use();
+			
+			dump_program->set_texture("tex", 0, gbuffer_albedo);
+			draw_qsq(0);
+			dump_program->set_texture("tex", 0, gbuffer_position);
+			draw_qsq(1);
+			dump_program->set_texture("tex", 0, gbuffer_normal);
+			draw_qsq(2);
+			dump_program->set_texture("tex", 0, gbuffer_depth);
+			draw_qsq(3);
+			break;
+
+		case DUMP_LIGHT_MAP:
+			glClear(GL_COLOR_BUFFER_BIT);
+			dump_cube_program->use();
+			dump_cube_program->set_texture("tex", 0, light_map);
+			dump_cube_program->set_float("z_mult", 1);
+			draw_hsq(0);
+			dump_cube_program->set_float("z_mult", -1);
+			draw_hsq(1);
+			break;
+
+		default:
+			dump_program->use();
+			switch(mode) 
+			{
+				case DUMP_ALBEDO:
+					dump_program->set_texture("tex", 0, gbuffer_albedo);
+					break;
+				case DUMP_POSITION:
+					dump_program->set_texture("tex", 0, gbuffer_position);
+					break;
+				case DUMP_NORMAL:
+					dump_program->set_texture("tex", 0, gbuffer_normal);
+					break;
+				case DUMP_DEPTH:
+					dump_program->set_texture("tex", 0, gbuffer_depth);
+					break;
+			}
+			draw_fsq();
+			break;
+	}
 	
 	glFlush();
 	glutSwapBuffers();
@@ -283,7 +382,25 @@ void special(int key, int x, int y)
 	switch(key)
 	{
 		case GLUT_KEY_F1:
-			dump_buffers = !dump_buffers;
+			mode = NORMAL;
+			break;
+		case GLUT_KEY_F2:
+			mode = COPY_TEXTURES;
+			break;
+		case GLUT_KEY_F3:
+			mode = DUMP_ALBEDO;
+			break;
+		case GLUT_KEY_F4:
+			mode = DUMP_POSITION;
+			break;
+		case GLUT_KEY_F5:
+			mode = DUMP_NORMAL;
+			break;
+		case GLUT_KEY_F6:
+			mode = DUMP_DEPTH;
+			break;
+		case GLUT_KEY_F7:
+			mode = DUMP_LIGHT_MAP;
 			break;
 	}
 }

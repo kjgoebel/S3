@@ -27,6 +27,8 @@ extern Mat4 proj_mat;
 
 extern double aspect_ratio, fog_scale;
 
+extern const Mat4 cube_xforms[6];
+
 void translate_cam(double right, double down, double fwd);
 void rotate_cam(double pitch, double yaw, double roll);
 

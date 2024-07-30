@@ -11,6 +11,15 @@ Mat4 proj_mat = Mat4::identity();
 double aspect_ratio = 1;
 double fog_scale = 1.5;
 
+const Mat4 cube_xforms[6] = {
+	Mat4::axial_rotation(_z, _x, TAU / 4),		//+X
+	Mat4::axial_rotation(_x, _z, TAU / 4),		//-X
+	Mat4::axial_rotation(_z, _y, TAU / 4),		//+Y
+	Mat4::axial_rotation(_y, _z, TAU / 4),		//-Y
+	Mat4::identity(),							//+Z
+	Mat4::axial_rotation(_z, _x, TAU / 2)		//-Z
+};
+
 
 /*
 	Note that these implementations of translate_cam() and rotate_cam() are 

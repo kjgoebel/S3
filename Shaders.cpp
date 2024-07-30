@@ -141,6 +141,17 @@ void ShaderProgram::set_matrix(const char* name, const Mat4& mat)
 	glProgramUniformMatrix4fv(id, glGetUniformLocation(id, name), 1, false, temp);
 }
 
+void ShaderProgram::set_matrices(const char* name, const Mat4* mats, int count)
+{
+	float* temp = new float[16 * count];
+	for(int mat = 0; mat < count; mat++)
+		for(int i = 0; i < 4; i++)
+			for(int j = 0; j < 4; j++)
+				temp[mat * 16 + j * 4 + i] = mats[mat].data[i][j];
+	glProgramUniformMatrix4fv(id, glGetUniformLocation(id, name), count, false, temp);
+	delete[] temp;
+}
+
 void ShaderProgram::set_vector(const char* name, const Vec4& v)
 {
 	glProgramUniform4f(id, glGetUniformLocation(id, name), v.x, v.y, v.z, v.w);
@@ -159,6 +170,13 @@ void ShaderProgram::set_float(const char* name, float f)
 void ShaderProgram::set_int(const char* name, int i)
 {
 	glProgramUniform1i(id, glGetUniformLocation(id, name), i);
+}
+
+void ShaderProgram::set_texture(const char* name, int tex_unit, GLuint texture, GLenum target)
+{
+	set_int(name, tex_unit);
+	glActiveTexture(GL_TEXTURE0 + tex_unit);
+	glBindTexture(target, texture);
 }
 
 void ShaderProgram::dump() const
@@ -200,7 +218,7 @@ std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 
 
 ShaderCore *vert, *geom_points, *geom_triangles, *frag_points, *frag;
-ShaderCore *vert_screenspace, *frag_copy_textures, *frag_fog, *frag_point_light, *frag_dump_color;
+ShaderCore *vert_screenspace, *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_fog, *frag_point_light, *frag_dump_color;
 
 void init_shaders()
 {
@@ -270,17 +288,18 @@ void init_shaders()
 		NULL,
 		NULL,
 		{
-			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_VERTEX_NORMAL, NULL, NULL),
+			new ShaderOption(DEFINE_VERTEX_COLOR),
+			new ShaderOption(DEFINE_VERTEX_NORMAL),
 			new ShaderOption(
 				DEFINE_INSTANCED_XFORM,
+				NULL,
 				NULL,
 				[](ShaderProgram* program) {
 					program->set_matrix("view_xform", cam_mat);
 				}
 			),
-			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_SHADOW, NULL, NULL)
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
+			new ShaderOption(DEFINE_SHADOW)
 		}
 	);
 
@@ -289,12 +308,18 @@ void init_shaders()
 		GL_GEOMETRY_SHADER,
 		R"(
 			layout (points, invocations = 2) in;
-			layout (triangle_strip, max_vertices = 4) out;
+			#ifdef SHADOW
+				layout (triangle_strip, max_vertices = 24) out;
+			#else
+				layout (triangle_strip, max_vertices = 4) out;
+			#endif
 
 			uniform mat4 proj_xform;
 			uniform float aspect_ratio;
 
-			#ifndef SHADOW
+			#ifdef SHADOW
+				uniform mat4 cube_xforms[6];
+			#else
 				#ifdef VERTEX_COLOR
 					in vec4 vg_color[];
 					out vec4 gf_color;
@@ -321,12 +346,7 @@ void init_shaders()
 				float image_dist = dist - gl_InvocationID * 6.283185;
 				point.xyz *= image_dist / dist;
 				distance = abs(image_dist);
-
-				point = proj_xform * point;
-
-				point.xyz /= point.w;
-				point.w = 1;
-
+				
 				float distance_factor = 1 / sin(dist);
 
 				gf_r4pos = vg_r4pos[0];
@@ -341,32 +361,50 @@ void init_shaders()
 				#endif
 					
 				float height = BASE_POINT_SIZE * distance_factor, width = height / aspect_ratio;
-				
-				gl_Position = point + vec4(-width, -height, 0, 0);
-				point_coord = vec2(-1, 1);
-				EmitVertex();
-				gl_Position = point + vec4(width, -height, 0, 0);
-				point_coord = vec2(1, 1);
-				EmitVertex();
-				gl_Position = point + vec4(-width, height, 0, 0);
-				point_coord = vec2(-1, -1);
-				EmitVertex();
-				gl_Position = point + vec4(width, height, 0, 0);
-				point_coord = vec2(1, -1);
-				EmitVertex();
-				EndPrimitive();
+
+				#ifdef SHADOW
+					for(int face = 0; face < 6; face++)
+					{
+						gl_Layer = face;
+
+						point = proj_xform * cube_xforms[face] * point;
+				#else
+						point = proj_xform * point;
+				#endif
+
+						point.xyz /= point.w;
+						point.w = 1;
+
+						gl_Position = point + vec4(-width, -height, 0, 0);
+						point_coord = vec2(-1, 1);
+						EmitVertex();
+						gl_Position = point + vec4(width, -height, 0, 0);
+						point_coord = vec2(1, 1);
+						EmitVertex();
+						gl_Position = point + vec4(-width, height, 0, 0);
+						point_coord = vec2(-1, -1);
+						EmitVertex();
+						gl_Position = point + vec4(width, height, 0, 0);
+						point_coord = vec2(1, -1);
+						EmitVertex();
+						EndPrimitive();
+				#ifdef SHADOW
+					}
+				#endif
 			}
 		)",
+		[](ShaderProgram* program) {
+			program->set_matrices("cube_xforms", cube_xforms, 6);
+		},
+		NULL,
 		[](ShaderProgram* program) {
 			program->set_float("aspect_ratio", aspect_ratio);
 			program->set_matrix("proj_xform", proj_mat);
 		},
-		NULL,
-		NULL,
 		{
-			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_SHADOW, NULL, NULL)
+			new ShaderOption(DEFINE_VERTEX_COLOR),
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
+			new ShaderOption(DEFINE_SHADOW)
 		}
 	);
 
@@ -375,11 +413,17 @@ void init_shaders()
 		GL_GEOMETRY_SHADER,
 		R"(
 			layout (triangles, invocations = 2) in;
-			layout (triangle_strip, max_vertices = 3) out;
+			#ifdef SHADOW
+				layout (triangle_strip, max_vertices = 18) out;
+			#else
+				layout (triangle_strip, max_vertices = 3) out;
+			#endif
 
 			uniform mat4 proj_xform;
 
-			#ifndef SHADOW
+			#ifdef SHADOW
+				uniform mat4 cube_xforms[6];
+			#else
 				#ifdef VERTEX_COLOR
 					in vec4 vg_color[];
 					out vec4 gf_color;
@@ -400,45 +444,59 @@ void init_shaders()
 			out float distance;
 
 			void main() {
-				for(int i = 0; i < 3; i++)
-				{
-					vec4 point = gl_in[i].gl_Position;
+				#ifdef SHADOW
+					for(int face = 0; face < 6; face++)
+					{
+						gl_Layer = face;
+				#endif
+						for(int i = 0; i < 3; i++)
+						{
+							vec4 point = gl_in[i].gl_Position;
 
-					float dist = length(point.xyz);
-					float image_dist = dist - gl_InvocationID * 6.283185;
-					point.xyz *= image_dist / dist;
-					distance = abs(image_dist);
+							float dist = length(point.xyz);
+							float image_dist = dist - gl_InvocationID * 6.283185;
+							point.xyz *= image_dist / dist;
+							distance = abs(image_dist);
 
-					gl_Position = proj_xform * point;
-					gf_r4pos = vg_r4pos[i];
+							#ifdef SHADOW
+								gl_Position = proj_xform * cube_xforms[face] * point;
+							#else
+								gl_Position = proj_xform * point;
+							#endif
+							gf_r4pos = vg_r4pos[i];
 
-					#ifndef SHADOW
-						#ifdef VERTEX_COLOR
-							gf_color = vg_color[i];
-						#endif
-						#ifdef VERTEX_NORMAL
-							gf_normal = vg_normal[i];
-						#endif
-						#ifdef INSTANCED_BASE_COLOR
-							gf_base_color = vg_base_color[i];
-						#endif
-					#endif
-					EmitVertex();
-				}
-				EndPrimitive();
+							#ifndef SHADOW
+								#ifdef VERTEX_COLOR
+									gf_color = vg_color[i];
+								#endif
+								#ifdef VERTEX_NORMAL
+									gf_normal = vg_normal[i];
+								#endif
+								#ifdef INSTANCED_BASE_COLOR
+									gf_base_color = vg_base_color[i];
+								#endif
+							#endif
+							EmitVertex();
+						}
+						EndPrimitive();
+				#ifdef SHADOW
+					}
+				#endif
 			}
 		)",
+		[](ShaderProgram* program) {
+			program->set_matrices("cube_xforms", cube_xforms, 6);
+		},
+		NULL,
 		[](ShaderProgram* program) {
 			program->set_float("aspect_ratio", aspect_ratio);
 			program->set_matrix("proj_xform", proj_mat);
 		},
-		NULL,
-		NULL,
 		{
-			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_VERTEX_NORMAL, NULL, NULL),
-			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_SHADOW, NULL, NULL)
+			new ShaderOption(DEFINE_VERTEX_COLOR),
+			new ShaderOption(DEFINE_VERTEX_NORMAL),
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
+			new ShaderOption(DEFINE_SHADOW)
 		}
 	);
 
@@ -481,6 +539,10 @@ void init_shaders()
 				if(point_coord_l2 > 1)
 					discard;
 
+				float normal_z = -sqrt(1 - point_coord_l2);
+
+				float bulge_factor = length(gf_r4pos);		//I'm pretty sure this is wrong.
+
 				#ifndef SHADOW
 					#ifdef INSTANCED_BASE_COLOR
 						vec4 base_color = gf_base_color;
@@ -491,22 +553,21 @@ void init_shaders()
 						frag_albedo = base_color;
 					#endif
 
-					frag_normal = vec4(point_coord.x, point_coord.y, -sqrt(1 - point_coord_l2), 0);
+					frag_normal = vec4(point_coord.x, point_coord.y, normal_z, 0);
+
+					frag_position = gf_r4pos / bulge_factor;
 				#endif
-
-				float bulge_factor = length(gf_r4pos);		//I'm pretty sure this is wrong.
-				frag_position = gf_r4pos / bulge_factor;
-
-				gl_FragDepth = clamp((distance + BASE_POINT_SIZE * frag_normal.z) / (bulge_factor * 6.283185), 0, 1);
+				
+				gl_FragDepth = clamp((distance + BASE_POINT_SIZE * normal_z) / (bulge_factor * 6.283185), 0, 1);
 			}
 		)",
 		NULL,
 		NULL,
 		NULL,
 		{
-			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_SHADOW, NULL, NULL)
+			new ShaderOption(DEFINE_VERTEX_COLOR),
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
+			new ShaderOption(DEFINE_SHADOW)
 		}
 	);
 
@@ -539,6 +600,8 @@ void init_shaders()
 			layout (depth_any) out float gl_FragDepth;
 
 			void main() {
+				float bulge_factor = length(gf_r4pos);		//I'm pretty sure this is wrong.
+
 				#ifndef SHADOW
 					#ifdef INSTANCED_BASE_COLOR
 						vec4 base_color = gf_base_color;
@@ -554,11 +617,10 @@ void init_shaders()
 					#else
 						frag_normal = vec4(0, 0, 0, 0);
 					#endif
+
+					frag_position = gf_r4pos / bulge_factor;
 				#endif
-
-				float bulge_factor = length(gf_r4pos);		//I'm pretty sure this is wrong.
-				frag_position = gf_r4pos / bulge_factor;
-
+				
 				gl_FragDepth = clamp(distance / (bulge_factor * 6.283185), 0, 1);
 			}
 		)",
@@ -566,10 +628,10 @@ void init_shaders()
 		NULL,
 		NULL,
 		{
-			new ShaderOption(DEFINE_VERTEX_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_VERTEX_NORMAL, NULL, NULL),
-			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR, NULL, NULL),
-			new ShaderOption(DEFINE_SHADOW, NULL, NULL)
+			new ShaderOption(DEFINE_VERTEX_COLOR),
+			new ShaderOption(DEFINE_VERTEX_NORMAL),
+			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
+			new ShaderOption(DEFINE_SHADOW)
 		}
 	);
 
@@ -579,9 +641,13 @@ void init_shaders()
 		GL_VERTEX_SHADER,
 		R"(
 			layout (location = 0) in vec4 position;
+			layout (location = 1) in vec2 tex_coord;
+
+			out vec2 vf_tex_coord;
 
 			void main() {
 				gl_Position = position;
+				vf_tex_coord = tex_coord;
 			}
 		)",
 		NULL,
@@ -621,22 +687,58 @@ void init_shaders()
 		NULL,
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_int("albedo_tex", 0);
-			glActiveTexture(GL_TEXTURE0 + 0);
-			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
-			
-			program->set_int("position_tex", 1);
-			glActiveTexture(GL_TEXTURE0 + 1);
-			glBindTexture(GL_TEXTURE_2D, gbuffer_position);
-			
-			program->set_int("normal_tex", 2);
-			glActiveTexture(GL_TEXTURE0 + 2);
-			glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
-			
-			program->set_int("depth_tex", 3);
-			glActiveTexture(GL_TEXTURE0 + 3);
-			glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
+			program->set_texture("albedo_tex", 0, gbuffer_albedo);
+			program->set_texture("position_tex", 1, gbuffer_position);
+			program->set_texture("normal_tex", 2, gbuffer_normal);
+			program->set_texture("depth_tex", 3, gbuffer_depth);
 		},
+		{}
+	);
+
+	frag_dump_texture = new ShaderCore(
+		"frag_dump_texture",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform sampler2D tex;
+
+			in vec2 vf_tex_coord;
+
+			out vec4 frag_color;
+
+			void main() {
+				frag_color = texture(tex, vf_tex_coord);
+			}
+		)",
+		NULL,
+		NULL,
+		NULL,
+		{}
+	);
+
+	frag_dump_cubemap = new ShaderCore(
+		"frag_dump_cubemap",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform samplerCube tex;
+			
+			uniform float z_mult;
+
+			in vec2 vf_tex_coord;
+
+			out vec4 frag_color;
+
+			void main() {
+				vec2 coord = vf_tex_coord * 2 - 1;
+				float temp = 1 - coord.x * coord.x - coord.y * coord.y;
+				if(temp < 0)
+					discard;
+				vec3 dir = vec3(coord.x, coord.y, z_mult * sqrt(temp));
+				frag_color = texture(tex, dir);
+			}
+		)",
+		NULL,
+		NULL,
+		NULL,
 		{}
 	);
 
@@ -663,12 +765,8 @@ void init_shaders()
 			program->set_float("fog_scale", fog_scale);
 		},
 		[](ShaderProgram* program) {
-			program->set_int("albedo_tex", 0);
-			glActiveTexture(GL_TEXTURE0 + 0);
-			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
-			program->set_int("depth_tex", 1);
-			glActiveTexture(GL_TEXTURE0 + 1);
-			glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
+			program->set_texture("albedo_tex", 0, gbuffer_albedo);
+			program->set_texture("depth_tex", 1, gbuffer_depth);
 		},
 		{}
 	);
@@ -680,7 +778,9 @@ void init_shaders()
 			uniform sampler2D albedo_tex;
 			uniform sampler2D position_tex;
 			uniform sampler2D normal_tex;
+			uniform samplerCube light_map;
 
+			uniform mat4 light_xform;
 			uniform vec4 light_pos;
 			uniform vec3 light_emission;
 
@@ -694,33 +794,36 @@ void init_shaders()
 
 				vec4 frag_to_light = light_pos - position;
 				float r4_distance = length(frag_to_light);
-				frag_to_light = normalize(frag_to_light - position);
-				float intensity_factor = sin(2 * asin(0.5 * r4_distance));
-				intensity_factor = 1 / (intensity_factor * intensity_factor);
+				frag_to_light = normalize(frag_to_light - position * dot(position, frag_to_light));
+				float distance = 2 * asin(0.5 * r4_distance);
+				float distance_factor = sin(distance);
+				distance_factor = 1 / (distance_factor * distance_factor);
 				float normal_factor;
 				if(length(normal) > 0.5)
 					normal_factor = clamp(dot(normal, frag_to_light), 0, 1);
 				else
 					normal_factor = 1;
 
-				frag_color.rgb = color.rgb * light_emission * normal_factor * intensity_factor;
+				vec4 light_to_frag = light_xform * position;
+				light_to_frag.w = 0;
+				light_to_frag = normalize(light_to_frag);
+				float min_distance = texture(light_map, light_to_frag.xyz).r;
+				float shadow_factor = (distance / 6.283185) - 0.03 < min_distance ? 1 : 0;
+				//float shadow_factor = 1;
+
+				//frag_color.rgb = vec3(distance / 6.283185, min_distance, 0);
+
+				frag_color.rgb = color.rgb * shadow_factor * light_emission * normal_factor * distance_factor;
 				frag_color.a = 1;
 			}
 		)",
 		NULL,
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_int("albedo_tex", 0);
-			glActiveTexture(GL_TEXTURE0 + 0);
-			glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
-			
-			program->set_int("position_tex", 1);
-			glActiveTexture(GL_TEXTURE0 + 1);
-			glBindTexture(GL_TEXTURE_2D, gbuffer_position);
-			
-			program->set_int("normal_tex", 2);
-			glActiveTexture(GL_TEXTURE0 + 2);
-			glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
+			program->set_texture("albedo_tex", 0, gbuffer_albedo);
+			program->set_texture("position_tex", 1, gbuffer_position);
+			program->set_texture("normal_tex", 2, gbuffer_normal);
+			program->set_texture("light_map", 3, light_map, GL_TEXTURE_CUBE_MAP);
 		},
 		{}
 	);
@@ -744,9 +847,7 @@ void init_shaders()
 		NULL,
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_int("color_tex", 0);
-			glActiveTexture(GL_TEXTURE0 + 0);
-			glBindTexture(GL_TEXTURE_2D, abuffer_color);
+			program->set_texture("color_tex", 0, abuffer_color);
 		},
 		{}
 	);

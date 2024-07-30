@@ -6,11 +6,14 @@
 
 GLuint gbuffer = 0, gbuffer_albedo = 0, gbuffer_position = 0, gbuffer_normal = 0, gbuffer_depth = 0;
 GLuint abuffer, abuffer_color;
+GLuint lbuffer, light_map;
 bool is_shadow_pass = false;
 GLuint fsq_vertex_array = 0;
 
 
-void init_framebuffer(int w, int h)
+#include <stdio.h>
+
+void init_framebuffer(int w, int h, int light_map_size)
 {
 	glClearColor(0, 0, 0, 0);
 	//glEnable(GL_PROGRAM_POINT_SIZE);
@@ -18,12 +21,61 @@ void init_framebuffer(int w, int h)
 
 	if(!fsq_vertex_array)
 	{
-		Vec4 fsq_vertices[4] = {
+		Vec4 fsq_vertices[4 * 7] = {
+			//full-screen quad
 			{1, 1, 0, 1},
 			{-1, 1, 0, 1},
 			{-1, -1, 0, 1},
+			{1, -1, 0, 1},
+
+			//half-screen quads
+			{0, 1, 0, 1},
+			{-1, 1, 0, 1},
+			{-1, -1, 0, 1},
+			{0, -1, 0, 1},
+
+			{1, 1, 0, 1},
+			{0, 1, 0, 1},
+			{0, -1, 0, 1},
+			{1, -1, 0, 1},
+
+			//quarter-screen quads
+			{0, 1, 0, 1},
+			{-1, 1, 0, 1},
+			{-1, 0, 0, 1},
+			{0, 0, 0, 1},
+
+			{1, 1, 0, 1},
+			{0, 1, 0, 1},
+			{0, 0, 0, 1},
+			{1, 0, 0, 1},
+
+			{0, 0, 0, 1},
+			{-1, 0, 0, 1},
+			{-1, -1, 0, 1},
+			{0, -1, 0, 1},
+
+			{1, 0, 0, 1},
+			{0, 0, 0, 1},
+			{0, -1, 0, 1},
 			{1, -1, 0, 1}
 		};
+
+		float fsq_tex_coords[4 * 7][2];
+		for(int i = 0; i < 7; i++)
+		{
+			fsq_tex_coords[4 * i + 0][0] = 1;
+			fsq_tex_coords[4 * i + 0][1] = 1;
+
+			fsq_tex_coords[4 * i + 1][0] = 0;
+			fsq_tex_coords[4 * i + 1][1] = 1;
+
+			fsq_tex_coords[4 * i + 2][0] = 0;
+			fsq_tex_coords[4 * i + 2][1] = 0;
+
+			fsq_tex_coords[4 * i + 3][0] = 1;
+			fsq_tex_coords[4 * i + 3][1] = 0;
+		}
 
 		glGenVertexArrays(1, &fsq_vertex_array);
 		glBindVertexArray(fsq_vertex_array);
@@ -35,6 +87,14 @@ void init_framebuffer(int w, int h)
 
 		glVertexAttribPointer(0, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
 		glEnableVertexAttribArray(0);
+
+		GLuint fsq_tex_coord_buffer;
+		glGenBuffers(1, &fsq_tex_coord_buffer);
+		glBindBuffer(GL_ARRAY_BUFFER, fsq_tex_coord_buffer);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(fsq_tex_coords), fsq_tex_coords, GL_STATIC_DRAW);
+		
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
 	}
 
 	if(gbuffer)		//init_framebuffer() has been called before
@@ -47,11 +107,27 @@ void init_framebuffer(int w, int h)
 		glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 		glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, abuffer);
 		glBindTexture(GL_TEXTURE_2D, abuffer_color);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
+
+		if(light_map_size && light_map)
+		{
+			glBindTexture(GL_TEXTURE_CUBE_MAP, light_map);
+			for(int face = 0; face < 6; face++)
+				glTexImage2D(
+					GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
+					0,
+					GL_DEPTH_COMPONENT32F,
+					light_map_size,
+					light_map_size,
+					0,
+					GL_DEPTH_COMPONENT,
+					GL_FLOAT,
+					NULL
+				);
+		}
 	}
 	else
 	{
@@ -81,7 +157,7 @@ void init_framebuffer(int w, int h)
 		
 		glGenTextures(1, &gbuffer_depth);
 		glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glNamedFramebufferTexture(gbuffer, GL_DEPTH_ATTACHMENT, gbuffer_depth, 0);
@@ -98,6 +174,35 @@ void init_framebuffer(int w, int h)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glNamedFramebufferTexture(abuffer, GL_COLOR_ATTACHMENT0, abuffer_color, 0);
+
+		if(light_map_size)
+		{
+			glGenFramebuffers(1, &lbuffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, lbuffer);
+
+			glDrawBuffers(0, NULL);		//Lights only need depth.
+
+			glGenTextures(1, &light_map);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, light_map);
+			for(int face = 0; face < 6; face++)
+				glTexImage2D(
+					GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
+					0,
+					GL_DEPTH_COMPONENT32F,
+					light_map_size,
+					light_map_size,
+					0,
+					GL_DEPTH_COMPONENT,
+					GL_FLOAT,
+					NULL
+				);
+			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+			glNamedFramebufferTexture(lbuffer, GL_DEPTH_ATTACHMENT, light_map, 0);
+		}
 	}
 
 	if(glCheckNamedFramebufferStatus(gbuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
@@ -106,11 +211,22 @@ void init_framebuffer(int w, int h)
 	if(glCheckNamedFramebufferStatus(abuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		error("A-Buffer status is %d\n", glCheckNamedFramebufferStatus(abuffer, GL_FRAMEBUFFER));
 
+	if(glCheckNamedFramebufferStatus(lbuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		error("L-Buffer status is %d\n", glCheckNamedFramebufferStatus(lbuffer, GL_FRAMEBUFFER));
+
 }
 
 void use_gbuffer()
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, gbuffer);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+}
+
+void use_lbuffer()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, lbuffer);
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
@@ -137,4 +253,16 @@ void draw_fsq()
 {
 	glBindVertexArray(fsq_vertex_array);
 	glDrawArrays(GL_QUADS, 0, 4);
+}
+
+void draw_hsq(int i)
+{
+	glBindVertexArray(fsq_vertex_array);
+	glDrawArrays(GL_QUADS, 4 + 4 * i, 4);
+}
+
+void draw_qsq(int i)
+{
+	glBindVertexArray(fsq_vertex_array);
+	glDrawArrays(GL_QUADS, 12 + 4 * i, 4);
 }
