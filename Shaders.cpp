@@ -808,10 +808,8 @@ void init_shaders()
 				light_to_frag.w = 0;
 				light_to_frag = normalize(light_to_frag);
 				float min_distance = texture(light_map, light_to_frag.xyz).r;
-				float shadow_factor = (distance / 6.283185) - 0.03 < min_distance ? 1 : 0;
-				//float shadow_factor = 1;
-
-				//frag_color.rgb = vec3(distance / 6.283185, min_distance, 0);
+				float bias = max(0.002 * (1 - normal_factor), 0.0002);
+				float shadow_factor = (distance / 6.283185) - bias < min_distance ? 1 : 0;
 
 				frag_color.rgb = color.rgb * shadow_factor * light_emission * normal_factor * distance_factor;
 				frag_color.a = 1;

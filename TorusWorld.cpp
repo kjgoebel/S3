@@ -35,6 +35,7 @@ enum Mode {
 Model* dots_model;
 Model* torus_model;
 Model* pole_model;
+DrawFunc render_boulders;
 ShaderProgram *dump_program, *dump_cube_program, *light_program, *final_program;
 Mode mode = NORMAL;
 
@@ -130,6 +131,9 @@ void init()
 	pole_model->generate_primitive_colors(0.3);
 	pole_model->generate_normals();
 
+	Mat4 temp = Mat4::axial_rotation(_w, _y, 0.85);
+	render_boulders = pole_model->make_draw_func(1, &temp, Vec4(0.7, 0.7, 0.7, 1));
+
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
 	player_state.set_cam();
 }
@@ -156,6 +160,7 @@ void draw_scene(bool shadow)
 	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
 	pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
 	pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
+	render_boulders();
 
 	is_shadow_pass = false;
 }
@@ -228,14 +233,14 @@ void display()
 	glEnable(GL_BLEND);
 	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_ONE);
-
-	render_point_light(
-		Mat4::axial_rotation(_x, _y, SUN_SPEED * last_frame_time) * Mat4::axial_rotation(_w, _x, TAU / 4) * Mat4::axial_rotation(_z, _y, TAU / 4),
-		Vec3(1, 1, 1)
-	);
+	
 	render_point_light(
 		Mat4::axial_rotation(_w, _x, TAU / 7),
 		-Vec3(0.6, 0.2, 0.0)
+	);
+	render_point_light(
+		Mat4::axial_rotation(_x, _y, SUN_SPEED * last_frame_time) * Mat4::axial_rotation(_w, _x, TAU / 4) * Mat4::axial_rotation(_z, _y, TAU / 4),
+		Vec3(1, 1, 1)
 	);
 	/*render_point_light(
 		cam_mat,
