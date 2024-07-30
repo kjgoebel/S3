@@ -340,16 +340,10 @@ void init_shaders()
 			#define BASE_POINT_SIZE		(0.002)
 
 			void main() {
-				vec4 point = gl_in[0].gl_Position;
-
-				float dist = length(point.xyz);
-				float image_dist = dist - gl_InvocationID * 6.283185;
-				point.xyz *= image_dist / dist;
-				distance = abs(image_dist);
-				
-				float distance_factor = 1 / sin(dist);
-
 				gf_r4pos = vg_r4pos[0];
+
+				float dist = length(gl_in[0].gl_Position.xyz);
+				float distance_factor = 1 / sin(dist);
 
 				#ifndef SHADOW
 					#ifdef VERTEX_COLOR
@@ -366,11 +360,18 @@ void init_shaders()
 					for(int face = 0; face < 6; face++)
 					{
 						gl_Layer = face;
-
-						point = proj_xform * cube_xforms[face] * point;
-				#else
-						point = proj_xform * point;
 				#endif
+						vec4 point = gl_in[0].gl_Position;
+
+						float image_dist = dist - gl_InvocationID * 6.283185;
+						point.xyz *= image_dist / dist;
+						distance = abs(image_dist);
+
+						#ifdef SHADOW
+							point = proj_xform * cube_xforms[face] * point;
+						#else
+							point = proj_xform * point;
+						#endif
 
 						point.xyz /= point.w;
 						point.w = 1;
@@ -775,6 +776,8 @@ void init_shaders()
 		"frag_point_light",
 		GL_FRAGMENT_SHADER,
 		R"(
+			#define USE_PCF
+
 			uniform sampler2D albedo_tex;
 			uniform sampler2D position_tex;
 			uniform sampler2D normal_tex;
@@ -786,9 +789,11 @@ void init_shaders()
 
 			out vec4 frag_color;
 
-			float rand(vec2 co){
-				return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453) * 2 - 1;
-			}
+			#ifdef USE_PCF
+				float rand(vec2 co){
+					return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453) * 2 - 1;
+				}
+			#endif
 
 			void main() {
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
@@ -817,17 +822,21 @@ void init_shaders()
 				float bias = max(0.002 * (1 - normal_factor), 0.0002);
 				light_to_frag.w = (distance / 6.283185) - bias;
 				float shadow_factor = 0;
-				for(int i = 0; i < 10; i++)
-				{
-					vec4 offset = 0.001 * vec4(
-						rand(gl_FragCoord.xy),
-						rand(gl_FragCoord.xy + vec2(0, i)),
-						rand(gl_FragCoord.xy + vec2(i, 0)),
-						0
-					);
-					shadow_factor += texture(light_map, light_to_frag + offset);
-				}
-				shadow_factor *= 0.1;
+				#ifdef USE_PCF
+					for(int i = 0; i < 10; i++)
+					{
+						vec4 offset = 0.001 * vec4(
+							rand(gl_FragCoord.xy),
+							rand(gl_FragCoord.xy + vec2(0, i)),
+							rand(gl_FragCoord.xy + vec2(i, 0)),
+							0
+						);
+						shadow_factor += texture(light_map, light_to_frag + offset);
+					}
+					shadow_factor *= 0.1;
+				#else
+					shadow_factor = texture(light_map, light_to_frag);
+				#endif
 				if(shadow_factor <= 0)
 					discard;
 

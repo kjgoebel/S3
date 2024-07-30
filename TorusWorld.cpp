@@ -15,7 +15,7 @@
 #pragma warning(disable : 4244)		//conversion from double to float
 
 
-#define NUM_DOTS		(2000)
+#define NUM_DOTS		(4000)
 #define NUM_BOULDERS	(40)
 #define LIGHT_MAP_SIZE	(4096)
 #define WALK_SPEED		(TAU / 50)
@@ -171,8 +171,8 @@ void draw_scene(bool shadow)
 
 	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
 	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
-	pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
-	pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
+	//pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
+	//pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
 	render_boulders();
 
 	is_shadow_pass = false;
@@ -198,7 +198,6 @@ void render_point_light(Mat4& light_mat, Vec3 light_emission)
 	light_program->set_matrix("light_xform", ~light_mat * cam_mat);
 	light_program->set_vector("light_pos", ~cam_mat * light_mat.get_column(_w));
 	light_program->set_vector("light_emission", light_emission);
-	//light_program->set_texture("light_map", 3, light_map);
 
 	draw_fsq();
 }
