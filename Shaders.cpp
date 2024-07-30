@@ -542,8 +542,6 @@ void init_shaders()
 
 				float normal_z = -sqrt(1 - point_coord_l2);
 
-				float bulge_factor = length(gf_r4pos);		//I'm pretty sure this is wrong.
-
 				#ifndef SHADOW
 					#ifdef INSTANCED_BASE_COLOR
 						vec4 base_color = gf_base_color;
@@ -556,10 +554,10 @@ void init_shaders()
 
 					frag_normal = vec4(point_coord.x, point_coord.y, normal_z, 0);
 
-					frag_position = gf_r4pos / bulge_factor;
+					frag_position = gf_r4pos + BASE_POINT_SIZE * frag_normal;
 				#endif
 				
-				gl_FragDepth = clamp((distance + BASE_POINT_SIZE * normal_z) / (bulge_factor * 6.283185), 0, 1);
+				gl_FragDepth = clamp((distance + BASE_POINT_SIZE * normal_z) / 6.283185, 0, 1);
 			}
 		)",
 		NULL,
