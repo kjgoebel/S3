@@ -778,7 +778,7 @@ void init_shaders()
 			uniform sampler2D albedo_tex;
 			uniform sampler2D position_tex;
 			uniform sampler2D normal_tex;
-			uniform samplerCube light_map;
+			uniform samplerCubeShadow light_map;
 
 			uniform mat4 light_xform;
 			uniform vec4 light_pos;
@@ -786,9 +786,13 @@ void init_shaders()
 
 			out vec4 frag_color;
 
+			float rand(vec2 co){
+				return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453) * 2 - 1;
+			}
+
 			void main() {
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
-				vec4 color = texelFetch(albedo_tex, pixel_coords, 0);
+				vec4 albedo = texelFetch(albedo_tex, pixel_coords, 0);
 				vec4 position = texelFetch(position_tex, pixel_coords, 0);
 				vec4 normal = texelFetch(normal_tex, pixel_coords, 0);
 
@@ -798,20 +802,36 @@ void init_shaders()
 				float distance = 2 * asin(0.5 * r4_distance);
 				float distance_factor = sin(distance);
 				distance_factor = 1 / (distance_factor * distance_factor);
+
 				float normal_factor;
 				if(length(normal) > 0.5)
 					normal_factor = clamp(dot(normal, frag_to_light), 0, 1);
 				else
 					normal_factor = 1;
+				if(normal_factor <= 0)
+					discard;
 
 				vec4 light_to_frag = light_xform * position;
 				light_to_frag.w = 0;
 				light_to_frag = normalize(light_to_frag);
-				float min_distance = texture(light_map, light_to_frag.xyz).r;
 				float bias = max(0.002 * (1 - normal_factor), 0.0002);
-				float shadow_factor = (distance / 6.283185) - bias < min_distance ? 1 : 0;
+				light_to_frag.w = (distance / 6.283185) - bias;
+				float shadow_factor = 0;
+				for(int i = 0; i < 10; i++)
+				{
+					vec4 offset = 0.001 * vec4(
+						rand(gl_FragCoord.xy),
+						rand(gl_FragCoord.xy + vec2(0, i)),
+						rand(gl_FragCoord.xy + vec2(i, 0)),
+						0
+					);
+					shadow_factor += texture(light_map, light_to_frag + offset);
+				}
+				shadow_factor *= 0.1;
+				if(shadow_factor <= 0)
+					discard;
 
-				frag_color.rgb = color.rgb * shadow_factor * light_emission * normal_factor * distance_factor;
+				frag_color.rgb = shadow_factor * normal_factor * distance_factor * light_emission * albedo.rgb;
 				frag_color.a = 1;
 			}
 		)",

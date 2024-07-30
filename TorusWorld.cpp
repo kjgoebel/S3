@@ -16,9 +16,10 @@
 
 
 #define NUM_DOTS		(2000)
-#define LIGHT_MAP_SIZE	(1024)
+#define NUM_BOULDERS	(40)
+#define LIGHT_MAP_SIZE	(4096)
 #define WALK_SPEED		(TAU / 50)
-#define FOG_INCREMENT		(0.5)
+#define FOG_INCREMENT	(0.5)
 #define SUN_SPEED		(TAU / 30)
 
 enum Mode {
@@ -42,6 +43,23 @@ Mode mode = NORMAL;
 double last_frame_time;
 
 
+Mat4& torus_world_xform(double x, double y, double z, double yaw, double pitch, double roll)
+{
+	double cx = cos(x), sx = sin(x), cy = cos(y), sy = sin(y);
+	Vec4 pos = INV_ROOT_2 * Vec4(cx, sx, cy, sy);
+	Vec4 fwd = Vec4(0, 0, -sy, cy);
+
+	Vec4 down = INV_ROOT_2 * Vec4(-cx, -sx, cy, sy);
+	Vec4 right = Vec4(sx, -cx, 0, 0);
+
+	return Mat4::from_columns(right, down, fwd, pos)
+				* Mat4::axial_rotation(_y, _w, z)
+				* Mat4::axial_rotation(_z, _x, yaw)
+				* Mat4::axial_rotation(_y, _z, pitch)
+				* Mat4::axial_rotation(_x, _y, roll);
+}
+
+
 struct Controls
 {
 	bool	fwd, back,
@@ -56,17 +74,8 @@ struct PlayerState
 
 	void set_cam() const
 	{
+		cam_mat = torus_world_xform(b, a, 0.03, yaw, pitch, 0);
 		double ca = cos(a), sa = sin(a), cb = cos(b), sb = sin(b);
-		Vec4 pos = INV_ROOT_2 * Vec4(cb, sb, ca, sa);
-		Vec4 fwd = Vec4(0, 0, -sa, ca);
-
-		Vec4 down = INV_ROOT_2 * Vec4(-cb, -sb, ca, sa);
-		Vec4 right = Vec4(sb, -cb, 0, 0);
-
-		cam_mat = Mat4::from_columns(right, down, fwd, pos)		//location on the torus
-					* Mat4::axial_rotation(_y, _w, 0.03)		//head position above feet
-					* Mat4::axial_rotation(_z, _x, yaw)			//yaw
-					* Mat4::axial_rotation(_y, _z, pitch);		//pitch
 	}
 };
 PlayerState player_state;
@@ -77,6 +86,7 @@ void init()
 	srand(clock());
 
 	glCullFace(GL_BACK);
+	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 	init_shaders();
 
@@ -131,8 +141,11 @@ void init()
 	pole_model->generate_primitive_colors(0.3);
 	pole_model->generate_normals();
 
-	Mat4 temp = Mat4::axial_rotation(_w, _y, 0.85);
-	render_boulders = pole_model->make_draw_func(1, &temp, Vec4(0.7, 0.7, 0.7, 1));
+	Mat4* boulders = new Mat4[NUM_BOULDERS];
+	for(int i = 0; i < NUM_BOULDERS; i++)
+		boulders[i] = torus_world_xform(frand() * TAU, frand() * TAU, 0.05, frand() * TAU, fsrand() * 0.5 * TAU, fsrand() * 0.5 * TAU);
+	render_boulders = pole_model->make_draw_func(NUM_BOULDERS, boulders, Vec4(0.7, 0.7, 0.7, 1));
+	delete[] boulders;
 
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
 	player_state.set_cam();
