@@ -7,8 +7,6 @@
 #include "Utils.h"
 #include "Framebuffer.h"
 
-#include "PoleModel.h"
-
 #include <stdio.h>
 #include <time.h>
 
@@ -43,7 +41,7 @@ Mode mode = NORMAL;
 double last_frame_time;
 
 
-Mat4& torus_world_xform(double x, double y, double z, double yaw, double pitch, double roll)
+Mat4 torus_world_xform(double x, double y, double z, double yaw, double pitch, double roll)
 {
 	double cx = cos(x), sx = sin(x), cy = cos(y), sy = sin(y);
 	Vec4 pos = INV_ROOT_2 * Vec4(cx, sx, cy, sy);
@@ -130,14 +128,7 @@ void init()
 	torus_model->generate_normals();
 	torus_model->generate_primitive_colors(0.7);
 
-	pole_model =  new Model(
-		GL_TRIANGLES,
-		NUM_POLE_VERTS,
-		3,
-		NUM_POLE_TRIANGLES,
-		Model::s3ify(NUM_POLE_VERTS, 0.1, pole_model_vertices).get(),
-		pole_model_elements
-	);
+	pole_model =  Model::make_icosahedron(0.1, 2);
 	pole_model->generate_primitive_colors(0.3);
 	pole_model->generate_normals();
 
@@ -247,8 +238,8 @@ void display()
 	glBlendFunc(GL_ONE, GL_ONE);
 	
 	render_point_light(
-		Mat4::axial_rotation(_w, _x, TAU / 7),
-		-Vec3(0.6, 0.2, 0.0)
+		Mat4::axial_rotation(_w, _x, TAU / 6),
+		-Vec3(0.6, 0.6, 0.6)
 	);
 	render_point_light(
 		Mat4::axial_rotation(_x, _y, SUN_SPEED * last_frame_time) * Mat4::axial_rotation(_w, _x, TAU / 4) * Mat4::axial_rotation(_z, _y, TAU / 4),

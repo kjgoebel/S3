@@ -50,7 +50,8 @@ public:
 	//Note: Instancing is broken. Dunno why, but passing use_instancing = true makes rendering much slower.
 	DrawFunc make_draw_func(int count, const Mat4* xforms, Vec4 base_color, bool use_instancing = false);
 	DrawFunc make_draw_func(int count, const Mat4* xforms, const Vec4* base_colors, bool use_instancing = false);
-
+	
+	static Model* make_icosahedron(double scale, int subdivisions = 0, bool normalize = false);
 	static Model* make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips = true, bool make_normals = false);
 	static Model* make_torus_arc(int longitudinal_segments, int transverse_segments, double length, double hole_ratio, bool use_quad_strips = true, bool make_normals = false);
 	static Model* make_bumpy_torus(int longitudinal_segments, int transverse_segments, double bump_height, bool use_quad_strips = false);

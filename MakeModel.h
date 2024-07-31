@@ -29,3 +29,19 @@ std::shared_ptr<Vec4[]> make_bumpy_torus_verts(int long_segments, int trans_segm
 */
 std::shared_ptr<GLuint[]> make_torus_quad_strip_indices(int long_segments, int trans_segments, bool loop_longitudinally = true);
 std::shared_ptr<GLuint[]> make_torus_quad_indices(int long_segments, int trans_segments, bool loop_longitudinally = true);
+
+
+void subdivide_triangles(
+	int num_verts,
+	int num_triangles,
+	const Vec3* vertices,
+	const GLuint* elements,
+	int& out_new_num_verts,
+	int& out_new_num_triangles,
+	Vec3*& out_new_vertices,
+	GLuint*& out_new_elements,
+	bool normalize = false
+);
+
+extern const Vec3 icosahedron_verts[20];
+extern const GLuint icosahedron_elements[3 * 20];

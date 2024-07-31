@@ -474,7 +474,6 @@ void _split_into_triangles_indirect(int primitive, int start, int verts_per_prim
 	}
 }
 
-
 void Model::generate_normals()
 {
 	normals = std::unique_ptr<Vec4[]>(new Vec4[num_vertices]);
@@ -540,6 +539,49 @@ void Model::generate_normals()
 		normals[i] = (normals[i] / times_touched[i]).normalize();
 }
 
+
+Model* Model::make_icosahedron(double scale, int subdivisions, bool normalize) {
+	//This is way more complicated than it should be. Perhaps there should be 
+	//a class R3Model that manages Vec3 vertices and elements?
+	int num_verts = 12;
+	int num_triangles = 20;
+	Vec3* verts = new Vec3[12];
+	GLuint* elements = new GLuint[3 * 20];
+
+	for(int i = 0; i < 12; i++)
+		verts[i] = icosahedron_verts[i];
+	for(int i = 0; i < 3 * 20; i++)
+		elements[i] = icosahedron_elements[i];
+
+	for(int i = 0; i < subdivisions; i++)
+	{
+		int new_num_verts;
+		int new_num_triangles;
+		Vec3* new_verts;
+		GLuint* new_elements;
+
+		subdivide_triangles(num_verts, num_triangles, verts, elements, new_num_verts, new_num_triangles, new_verts, new_elements, normalize);
+
+		num_verts = new_num_verts;
+		num_triangles = new_num_triangles;
+		delete[] verts;
+		verts = new_verts;
+		delete[] elements;
+		elements = new_elements;
+	}
+
+	Model* ret = new Model(
+		GL_TRIANGLES,
+		num_verts,
+		3,
+		num_triangles,
+		s3ify(num_verts, scale, verts).get(),
+		elements
+	);
+	delete[] verts;
+	delete[] elements;
+	return ret;
+}
 
 Model* Model::make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips, bool make_normals)
 {
@@ -625,7 +667,7 @@ std::shared_ptr<Vec4[]> Model::s3ify(int count, double scale, const Vec3* vertic
 	{
 		/*
 			This is the most straightforward way to project onto S3. We could also 
-			get the magnitude and take its secent to preserve distance from the origin.
+			get the magnitude and take its secant to preserve distance from the origin.
 		*/
 		const Vec3& temp = vertices[i];
 		ret[i] = Vec4(
