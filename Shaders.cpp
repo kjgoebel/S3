@@ -599,7 +599,7 @@ void init_shaders()
 			layout (depth_any) out float gl_FragDepth;
 
 			void main() {
-				float bulge_factor = length(gf_r4pos);		//I'm pretty sure this is wrong.
+				vec4 true_position = normalize(gf_r4pos);
 
 				#ifndef SHADOW
 					#ifdef INSTANCED_BASE_COLOR
@@ -617,10 +617,14 @@ void init_shaders()
 						frag_normal = vec4(0, 0, 0, 0);
 					#endif
 
-					frag_position = gf_r4pos / bulge_factor;
+					frag_position = true_position;
 				#endif
 				
-				gl_FragDepth = clamp(distance / (bulge_factor * 6.283185), 0, 1);
+				float true_distance = 2 * asin(0.5 * length(true_position - vec4(0, 0, 0, 1)));
+				if(distance > 3.141593)
+					true_distance = 6.283185 - true_distance;
+
+				gl_FragDepth = clamp(true_distance / 6.283185, 0, 1);
 			}
 		)",
 		NULL,
