@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include "GL/glew.h"
 
 #pragma warning(disable : 4244)
 
@@ -63,4 +64,12 @@ void error(const char* fmt, ...)
 	fprintf(stderr, buffer);
 	va_end(arg_list);
 	exit(-1);
+}
+
+
+void check_gl_errors(const char* check_point_name)
+{
+	GLenum error = glGetError();
+	if(error != GL_NO_ERROR)
+		fprintf(stderr, "GL Error: %s: %s\n", check_point_name, gluErrorString(error));
 }

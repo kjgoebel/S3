@@ -199,6 +199,8 @@ void render_point_light(Mat4& light_mat, Vec3 light_emission)
 
 void display()
 {
+	check_gl_errors("display 0");
+
 	glutWarpPointer(window_width >> 1, window_height >> 1);
 
 	double dt = current_time() - last_frame_time;
@@ -240,7 +242,7 @@ void display()
 	glEnable(GL_BLEND);
 	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_ONE);
-	
+
 	render_point_light(
 		Mat4::axial_rotation(_w, _x, TAU / 6),
 		-Vec3(0.6, 0.6, 0.6)
@@ -258,7 +260,7 @@ void display()
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
-	glNamedFramebufferReadBuffer(gbuffer, GL_BACK);
+
 	set_perspective((double)window_width / window_height);
 
 	sun_model->draw(sun_xform, Vec4(100, 100, 100, 1));
@@ -293,7 +295,7 @@ void display()
 		case DUMP_LIGHT_MAP:
 			glClear(GL_COLOR_BUFFER_BIT);
 			dump_cube_program->use();
-			dump_cube_program->set_texture("tex", 0, light_map);
+			dump_cube_program->set_texture("tex", 0, light_map, GL_TEXTURE_CUBE_MAP);
 			dump_cube_program->set_float("z_mult", 1);
 			draw_hsq(0);
 			dump_cube_program->set_float("z_mult", -1);
