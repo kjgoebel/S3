@@ -116,7 +116,7 @@ void init()
 	final_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
 		NULL,
-		Shader::get(frag_dump_color, {})
+		Shader::get(frag_final_color, {})
 	);
 
 	Vec4* dots = new Vec4[NUM_DOTS];
@@ -245,15 +245,14 @@ void display()
 		Mat4::axial_rotation(_w, _x, TAU / 6),
 		-Vec3(0.6, 0.6, 0.6)
 	);
-
 	Mat4 sun_xform = Mat4::axial_rotation(_x, _y, SUN_SPEED * last_frame_time) * Mat4::axial_rotation(_w, _x, TAU / 4) * Mat4::axial_rotation(_z, _y, TAU / 4);
 	render_point_light(
 		sun_xform,
 		Vec3(1, 1, 1)
 	);
 	/*render_point_light(
-		cam_mat,
-		Vec3(0.1, 0.1, 0.1)
+		cam_mat * Mat4::axial_rotation(_w, _x, 0.01) * Mat4::axial_rotation(_w, _y, 0.005),
+		Vec3(0.2, 0.1, 0.05)
 	);*/
 	
 	glDisable(GL_BLEND);

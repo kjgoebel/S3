@@ -218,7 +218,7 @@ std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 
 
 ShaderCore *vert, *geom_points, *geom_triangles, *frag_points, *frag;
-ShaderCore *vert_screenspace, *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_fog, *frag_point_light, *frag_dump_color;
+ShaderCore *vert_screenspace, *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_fog, *frag_point_light, *frag_final_color;
 
 void init_shaders()
 {
@@ -810,20 +810,21 @@ void init_shaders()
 				float distance_factor = sin(distance);
 				distance_factor = 1 / (distance_factor * distance_factor);
 
-				float normal_factor;
+				vec2 normal_factor;			//(short_way, long_way)
 				if(length(normal) > 0.5)
-					normal_factor = clamp(dot(normal, frag_to_light), 0, 1);
+				{
+					float short_dot = dot(normal, frag_to_light);
+					normal_factor = clamp(vec2(short_dot, -short_dot), 0, 1);
+				}
 				else
-					normal_factor = 1;
-				if(normal_factor <= 0)
-					discard;
+					normal_factor = vec2(1);
 
 				vec4 light_to_frag = light_xform * position;
 				light_to_frag.w = 0;
 				light_to_frag = normalize(light_to_frag);
-				float bias = max(0.002 * (1 - normal_factor), 0.0002);
+				float bias = max(0.002 * (1 - abs(normal_factor.x)), 0.0002);
 				light_to_frag.w = (distance / 6.283185) - bias;
-				float shadow_factor = 0;
+				vec2 shadow_factor = vec2(0);		//(short_way, long_way)
 				#ifdef USE_PCF
 					for(int i = 0; i < 10; i++)
 					{
@@ -833,16 +834,15 @@ void init_shaders()
 							bnoise(pixel_coords + ivec2(0, 227 * i)),
 							0
 						);
-						shadow_factor += texture(light_map, light_to_frag + offset);
+						shadow_factor.x += texture(light_map, light_to_frag + offset);
+						shadow_factor.y += texture(light_map, vec4(0, 0, 0, 1 - 2 * bias) - light_to_frag + offset);
 					}
 					shadow_factor *= 0.1;
 				#else
 					shadow_factor = texture(light_map, light_to_frag);
 				#endif
-				if(shadow_factor <= 0)
-					discard;
 
-				frag_color.rgb = shadow_factor * normal_factor * distance_factor * light_emission * albedo.rgb;
+				frag_color.rgb = (shadow_factor.x * normal_factor.x + shadow_factor.y * normal_factor.y) * distance_factor * light_emission * albedo.rgb;
 				frag_color.a = 1;
 			}
 		)",
@@ -857,8 +857,8 @@ void init_shaders()
 		{}
 	);
 
-	frag_dump_color = new ShaderCore(
-		"frag_dump_color",
+	frag_final_color = new ShaderCore(
+		"frag_final_color",
 		GL_FRAGMENT_SHADER,
 		R"(
 			uniform sampler2D color_tex;

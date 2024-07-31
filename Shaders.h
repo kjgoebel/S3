@@ -106,7 +106,7 @@ private:
 
 
 extern ShaderCore *vert, *geom_points, *geom_triangles, *frag_points, *frag;
-extern ShaderCore *vert_screenspace, *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_fog, *frag_point_light, *frag_dump_color;
+extern ShaderCore *vert_screenspace, *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_fog, *frag_point_light, *frag_final_color;
 
 void init_shaders();
 
