@@ -2,6 +2,7 @@
 
 #include "GL/glew.h"
 #include "Vector.h"
+#include "Framebuffer.h"
 #include <vector>
 #include <functional>
 #include <map>
@@ -105,8 +106,12 @@ private:
 };
 
 
+//S3 shaders:
 extern ShaderCore *vert, *geom_points, *geom_triangles, *frag_points, *frag;
-extern ShaderCore *vert_screenspace, *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_fog, *frag_point_light, *frag_final_color;
+//Screenspace shaders:
+extern ShaderCore *vert_screenspace, *frag_fog, *frag_point_light, *frag_final_color;
+//Debugging shaders:
+extern ShaderCore *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_dump_texture1d;
 
 void init_shaders();
 
@@ -146,6 +151,7 @@ public:
 	void set_float(const char* name, float f);
 	void set_int(const char* name, int i);
 	void set_texture(const char* name, int tex_unit, GLuint texture, GLenum target = GL_TEXTURE_2D);
+	void set_lut(const char* name, int tex_unit, LookupTable* lut);
 
 	Shader* get_vertex() {return vertex;}
 	Shader* get_geometry() {return geometry;}

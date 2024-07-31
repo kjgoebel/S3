@@ -13,12 +13,16 @@
 #pragma warning(disable : 4244)		//conversion from double to float
 
 
+#define PRINT_FRAME_RATE
+
 #define NUM_DOTS		(4000)
 #define NUM_BOULDERS	(40)
 #define LIGHT_MAP_SIZE	(4096)
+
 #define WALK_SPEED		(TAU / 50)
-#define FOG_INCREMENT	(0.5)
 #define SUN_SPEED		(TAU / 30)
+
+#define FOG_INCREMENT	(0.5)
 
 enum Mode {
 	NORMAL,
@@ -27,7 +31,8 @@ enum Mode {
 	DUMP_POSITION,
 	DUMP_NORMAL,
 	DUMP_DEPTH,
-	DUMP_LIGHT_MAP
+	DUMP_LIGHT_MAP,
+	DUMP_CHORD_DISTANCE_LUT
 };
 
 
@@ -36,7 +41,7 @@ Model* torus_model;
 Model* sun_model;
 Model* boulder_model;
 DrawFunc render_boulders;
-ShaderProgram *dump_program, *dump_cube_program, *light_program, *final_program;
+ShaderProgram *light_program, *final_program;
 Mode mode = NORMAL;
 
 double last_frame_time;
@@ -94,18 +99,6 @@ void init()
 		NULL,
 		Shader::get(frag_copy_textures, {})
 	);*/
-
-	dump_program = ShaderProgram::get(
-		Shader::get(vert_screenspace, {}),
-		NULL,
-		Shader::get(frag_dump_texture, {})
-	);
-
-	dump_cube_program = ShaderProgram::get(
-		Shader::get(vert_screenspace, {}),
-		NULL,
-		Shader::get(frag_dump_cubemap, {})
-	);
 
 	light_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
@@ -220,11 +213,18 @@ void display()
 	player_state.set_cam();
 
 	last_frame_time += dt;
-	printf("%f\n", 1.0 / dt);
-	print_matrix(cam_mat);
-	printf("\n");
+
+	#ifdef PRINT_FRAME_RATE
+		printf("%f\n", 1.0 / dt);
+		print_matrix(cam_mat);
+		printf("\n");
+	#endif
+	
+	check_gl_errors("display 1");
 
 	ShaderProgram::frame_all();
+
+	check_gl_errors("display 2");
 
 	//Geometry Pass
 	use_gbuffer();
@@ -234,6 +234,8 @@ void display()
 	set_perspective((double)window_width / window_height);
 	glDisable(GL_BLEND);
 	draw_scene(false);
+
+	check_gl_errors("display 3");
 
 	//Light (Accumulation) Pass
 	use_abuffer();
@@ -252,11 +254,13 @@ void display()
 		sun_xform,
 		Vec3(1, 1, 1)
 	);
-	/*render_point_light(
+	render_point_light(
 		cam_mat * Mat4::axial_rotation(_w, _x, 0.01) * Mat4::axial_rotation(_w, _y, 0.005),
 		Vec3(0.2, 0.1, 0.05)
-	);*/
+	);
 	
+	check_gl_errors("display 4");
+
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
@@ -264,6 +268,8 @@ void display()
 	set_perspective((double)window_width / window_height);
 
 	sun_model->draw(sun_xform, Vec4(100, 100, 100, 1));
+
+	check_gl_errors("display 5");
 
 	//Final Pass
 	use_default_framebuffer();
@@ -280,52 +286,91 @@ void display()
 			break;
 
 		case COPY_TEXTURES:
-			dump_program->use();
+			{
+				ShaderProgram* dump_program = ShaderProgram::get(
+					Shader::get(vert_screenspace, {}),
+					NULL,
+					Shader::get(frag_dump_texture, {})
+				);
+
+				dump_program->use();
 			
-			dump_program->set_texture("tex", 0, gbuffer_albedo);
-			draw_qsq(0);
-			dump_program->set_texture("tex", 0, gbuffer_position);
-			draw_qsq(1);
-			dump_program->set_texture("tex", 0, gbuffer_normal);
-			draw_qsq(2);
-			dump_program->set_texture("tex", 0, gbuffer_depth);
-			draw_qsq(3);
+				dump_program->set_texture("tex", 0, gbuffer_albedo);
+				draw_qsq(0);
+				dump_program->set_texture("tex", 0, gbuffer_position);
+				draw_qsq(1);
+				dump_program->set_texture("tex", 0, gbuffer_normal);
+				draw_qsq(2);
+				dump_program->set_texture("tex", 0, gbuffer_depth);
+				draw_qsq(3);
+			}
 			break;
 
 		case DUMP_LIGHT_MAP:
-			glClear(GL_COLOR_BUFFER_BIT);
-			dump_cube_program->use();
-			dump_cube_program->set_texture("tex", 0, light_map, GL_TEXTURE_CUBE_MAP);
-			dump_cube_program->set_float("z_mult", 1);
-			draw_hsq(0);
-			dump_cube_program->set_float("z_mult", -1);
-			draw_hsq(1);
+			{
+				ShaderProgram* dump_cube_program = ShaderProgram::get(
+					Shader::get(vert_screenspace, {}),
+					NULL,
+					Shader::get(frag_dump_cubemap, {})
+				);
+				glClear(GL_COLOR_BUFFER_BIT);
+				dump_cube_program->use();
+				dump_cube_program->set_texture("tex", 0, light_map, GL_TEXTURE_CUBE_MAP);
+				dump_cube_program->set_float("z_mult", 1);
+				draw_hsq(0);
+				dump_cube_program->set_float("z_mult", -1);
+				draw_hsq(1);
+			}
+			break;
+
+		case DUMP_CHORD_DISTANCE_LUT:
+			{
+				ShaderProgram* dump_program = ShaderProgram::get(
+					Shader::get(vert_screenspace, {}),
+					NULL,
+					Shader::get(frag_dump_texture1d, {})
+				);
+				dump_program->use();
+				dump_program->set_texture("tex", 0, chord_distance_lut->get_texture(), chord_distance_lut->get_target());
+				draw_fsq();
+			}
 			break;
 
 		default:
-			dump_program->use();
-			switch(mode) 
 			{
-				case DUMP_ALBEDO:
-					dump_program->set_texture("tex", 0, gbuffer_albedo);
-					break;
-				case DUMP_POSITION:
-					dump_program->set_texture("tex", 0, gbuffer_position);
-					break;
-				case DUMP_NORMAL:
-					dump_program->set_texture("tex", 0, gbuffer_normal);
-					break;
-				case DUMP_DEPTH:
-					dump_program->set_texture("tex", 0, gbuffer_depth);
-					break;
+				ShaderProgram* dump_program = ShaderProgram::get(
+					Shader::get(vert_screenspace, {}),
+					NULL,
+					Shader::get(frag_dump_texture, {})
+				);
+				dump_program->use();
+				switch(mode) 
+				{
+					case DUMP_ALBEDO:
+						dump_program->set_texture("tex", 0, gbuffer_albedo);
+						break;
+					case DUMP_POSITION:
+						dump_program->set_texture("tex", 0, gbuffer_position);
+						break;
+					case DUMP_NORMAL:
+						dump_program->set_texture("tex", 0, gbuffer_normal);
+						break;
+					case DUMP_DEPTH:
+						dump_program->set_texture("tex", 0, gbuffer_depth);
+						break;
+				}
+				draw_fsq();
 			}
-			draw_fsq();
 			break;
 	}
 	
+	check_gl_errors("display 6");
+
 	glFlush();
 	glutSwapBuffers();
 	glutPostRedisplay();
+
+	check_gl_errors("display 7");
 }
 
 #define PITCH_SENSITIVITY (0.001)
@@ -424,6 +469,9 @@ void special(int key, int x, int y)
 			break;
 		case GLUT_KEY_F7:
 			mode = DUMP_LIGHT_MAP;
+			break;
+		case GLUT_KEY_F8:
+			mode = DUMP_CHORD_DISTANCE_LUT;
 			break;
 	}
 }

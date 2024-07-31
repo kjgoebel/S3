@@ -7,6 +7,7 @@
 #include "Framebuffer.h"
 
 #pragma warning(disable : 4244)		//conversion from double to float
+#pragma warning(disable : 4996)		//VS doesn't like old-school string manipulation.
 
 
 #define VERSION_STRING		"#version 460\n"
@@ -179,6 +180,26 @@ void ShaderProgram::set_texture(const char* name, int tex_unit, GLuint texture, 
 	glBindTexture(target, texture);
 }
 
+void ShaderProgram::set_lut(const char* name, int tex_unit, LookupTable* lut)
+{
+	check_gl_errors("set_lut 0");
+	size_t name_length = strlen(name);
+	char* temp = new char[name_length + 8];		//8 = strlen("_offset") + 1 for the null char. strlen("_offset") > strlen("_scale").
+	strcpy(temp, name);
+	
+	set_texture(name, tex_unit, lut->get_texture(), lut->get_target());
+	strcat(temp, "_scale");
+
+	set_float(temp, lut->get_scale());
+	temp[name_length] = 0;
+	strcat(temp, "_offset");
+
+	set_float(temp, lut->get_offset());
+	
+	delete[] temp;
+	check_gl_errors("set_lut 1");
+}
+
 void ShaderProgram::dump() const
 {
 	printf("Shader program id %d:\n", id);
@@ -218,10 +239,12 @@ std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 
 
 ShaderCore *vert, *geom_points, *geom_triangles, *frag_points, *frag;
-ShaderCore *vert_screenspace, *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_fog, *frag_point_light, *frag_final_color;
+ShaderCore *vert_screenspace, *frag_fog, *frag_point_light, *frag_final_color;
+ShaderCore *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_dump_texture1d;
 
 void init_shaders()
 {
+	//S3 Shaders
 	vert = new ShaderCore(
 		"vert",
 		GL_VERTEX_SHADER,
@@ -574,6 +597,10 @@ void init_shaders()
 		"frag",
 		GL_FRAGMENT_SHADER,
 		R"(
+			uniform sampler1D chord_distance_lut;
+			uniform float chord_distance_lut_scale;
+			uniform float chord_distance_lut_offset;
+
 			#ifndef SHADOW
 				#ifdef VERTEX_COLOR
 					in vec4 gf_color;
@@ -620,14 +647,17 @@ void init_shaders()
 					frag_position = true_position;
 				#endif
 				
-				float true_distance = 2 * asin(0.5 * length(true_position - vec4(0, 0, 0, 1)));
+				float parm = 0.5 * length(true_position - vec4(0, 0, 0, 1));
+				float true_distance = texture(chord_distance_lut, parm * chord_distance_lut_scale + chord_distance_lut_offset).r;
 				if(distance > 3.141593)
 					true_distance = 6.283185 - true_distance;
 
 				gl_FragDepth = clamp(true_distance / 6.283185, 0, 1);
 			}
 		)",
-		NULL,
+		[](ShaderProgram* program) {
+			program->set_lut("chord_distance_lut", 0, chord_distance_lut);
+		},
 		NULL,
 		NULL,
 		{
@@ -638,7 +668,7 @@ void init_shaders()
 		}
 	);
 
-
+	//Screenspace Shaders
 	vert_screenspace = new ShaderCore(
 		"vert_screenspace",
 		GL_VERTEX_SHADER,
@@ -651,92 +681,6 @@ void init_shaders()
 			void main() {
 				gl_Position = position;
 				vf_tex_coord = tex_coord;
-			}
-		)",
-		NULL,
-		NULL,
-		NULL,
-		{}
-	);
-
-	frag_copy_textures = new ShaderCore(
-		"frag_copy_textures",
-		GL_FRAGMENT_SHADER,
-		R"(
-			uniform sampler2D albedo_tex;
-			uniform sampler2D position_tex;
-			uniform sampler2D normal_tex;
-			uniform sampler2D depth_tex;
-			
-			out vec4 frag_color;
-
-			void main() {
-				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
-				float checker_x = float((pixel_coords.x >> 5) & 1), checker_y = float((pixel_coords.y >> 5) & 1);
-
-				if((pixel_coords.x & 0x100) != 0)
-					if((pixel_coords.y & 0x100) != 0)
-						frag_color = texelFetch(albedo_tex, pixel_coords, 0);
-					else
-						//This shows the whole range, but sqeezes it so much you can't see anything:
-						frag_color = texelFetch(position_tex, pixel_coords, 0) / (2 * 6.283185) + 0.5;
-				else
-					if((pixel_coords.y & 0x100) != 0)
-						frag_color = texelFetch(normal_tex, pixel_coords, 0) * 0.5 + 0.5;
-					else
-						frag_color = texelFetch(depth_tex, pixel_coords, 0);
-			}
-		)",
-		NULL,
-		NULL,
-		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, gbuffer_albedo);
-			program->set_texture("position_tex", 1, gbuffer_position);
-			program->set_texture("normal_tex", 2, gbuffer_normal);
-			program->set_texture("depth_tex", 3, gbuffer_depth);
-		},
-		{}
-	);
-
-	frag_dump_texture = new ShaderCore(
-		"frag_dump_texture",
-		GL_FRAGMENT_SHADER,
-		R"(
-			uniform sampler2D tex;
-
-			in vec2 vf_tex_coord;
-
-			out vec4 frag_color;
-
-			void main() {
-				frag_color = texture(tex, vf_tex_coord);
-			}
-		)",
-		NULL,
-		NULL,
-		NULL,
-		{}
-	);
-
-	frag_dump_cubemap = new ShaderCore(
-		"frag_dump_cubemap",
-		GL_FRAGMENT_SHADER,
-		R"(
-			uniform samplerCube tex;
-			
-			uniform float z_mult;
-
-			in vec2 vf_tex_coord;
-
-			out vec4 frag_color;
-
-			void main() {
-				vec2 coord = vf_tex_coord * 2 - 1;
-				float temp = 1 - coord.x * coord.x - coord.y * coord.y;
-				if(temp < 0)
-					discard;
-				vec3 dir = vec3(coord.x, coord.y, z_mult * sqrt(temp));
-				frag_color = texture(tex, dir);
 			}
 		)",
 		NULL,
@@ -882,6 +826,113 @@ void init_shaders()
 		[](ShaderProgram* program) {
 			program->set_texture("color_tex", 0, abuffer_color);
 		},
+		{}
+	);
+	
+	//Debugging Shaders
+	frag_copy_textures = new ShaderCore(
+		"frag_copy_textures",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform sampler2D albedo_tex;
+			uniform sampler2D position_tex;
+			uniform sampler2D normal_tex;
+			uniform sampler2D depth_tex;
+			
+			out vec4 frag_color;
+
+			void main() {
+				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
+				float checker_x = float((pixel_coords.x >> 5) & 1), checker_y = float((pixel_coords.y >> 5) & 1);
+
+				if((pixel_coords.x & 0x100) != 0)
+					if((pixel_coords.y & 0x100) != 0)
+						frag_color = texelFetch(albedo_tex, pixel_coords, 0);
+					else
+						//This shows the whole range, but sqeezes it so much you can't see anything:
+						frag_color = texelFetch(position_tex, pixel_coords, 0) / (2 * 6.283185) + 0.5;
+				else
+					if((pixel_coords.y & 0x100) != 0)
+						frag_color = texelFetch(normal_tex, pixel_coords, 0) * 0.5 + 0.5;
+					else
+						frag_color = texelFetch(depth_tex, pixel_coords, 0);
+			}
+		)",
+		NULL,
+		NULL,
+		[](ShaderProgram* program) {
+			program->set_texture("albedo_tex", 0, gbuffer_albedo);
+			program->set_texture("position_tex", 1, gbuffer_position);
+			program->set_texture("normal_tex", 2, gbuffer_normal);
+			program->set_texture("depth_tex", 3, gbuffer_depth);
+		},
+		{}
+	);
+
+	frag_dump_texture = new ShaderCore(
+		"frag_dump_texture",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform sampler2D tex;
+
+			in vec2 vf_tex_coord;
+
+			out vec4 frag_color;
+
+			void main() {
+				frag_color = texture(tex, vf_tex_coord);
+			}
+		)",
+		NULL,
+		NULL,
+		NULL,
+		{}
+	);
+
+	frag_dump_cubemap = new ShaderCore(
+		"frag_dump_cubemap",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform samplerCube tex;
+			
+			uniform float z_mult;
+
+			in vec2 vf_tex_coord;
+
+			out vec4 frag_color;
+
+			void main() {
+				vec2 coord = vf_tex_coord * 2 - 1;
+				float temp = 1 - coord.x * coord.x - coord.y * coord.y;
+				if(temp < 0)
+					discard;
+				vec3 dir = vec3(coord.x, coord.y, z_mult * sqrt(temp));
+				frag_color = texture(tex, dir);
+			}
+		)",
+		NULL,
+		NULL,
+		NULL,
+		{}
+	);
+
+	frag_dump_texture1d = new ShaderCore(
+		"frag_dump_texture1d",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform sampler1D tex;
+
+			in vec2 vf_tex_coord;
+
+			out vec4 frag_color;
+
+			void main() {
+				frag_color = texture(tex, vf_tex_coord.x);
+			}
+		)",
+		NULL,
+		NULL,
+		NULL,
 		{}
 	);
 }

@@ -12,6 +12,8 @@
 #include <time.h>
 
 
+#define PRINT_FRAME_RATE
+
 Model* dots_model = NULL;
 Model* pole_model = NULL;
 Model* geodesic_model = NULL;
@@ -144,7 +146,7 @@ void init()
 			* Mat4::axial_rotation(_y, _z, theta);
 			//* Mat4::axial_rotation(_w, _z, frand() * TAU);		//Random longitudinal displacement so that the stripes on nearby fibers don't line up. It might be more elucidating if they do line up, come to think of it.
 	}
-	render_superhopf = geodesic_model->make_draw_func(NUM_SUPERHOPF_FIBERS, superhopf_xforms, Vec4(0.5, 1, 0.5, 1));
+	render_superhopf = geodesic_model->make_draw_func(NUM_SUPERHOPF_FIBERS, superhopf_xforms, Vec4(0.5, 1, 0.5, 1), true);
 
 	Mat4 tesseract_edge_xforms[NUM_TESSERACT_EDGES];
 	tesseract_arc = Model::make_torus_arc(8, 8, acos(0.5), STANDARD_HOLE_RATIO);
@@ -230,9 +232,12 @@ void reshape(int w, int h)
 void display()
 {
 	double dt = current_time() - last_fame_time;
-	printf("%f\n", 1.0 / dt);
-	print_matrix(cam_mat);
-	printf("\n");
+
+	#ifdef PRINT_FRAME_RATE
+		printf("%f\n", 1.0 / dt);
+		print_matrix(cam_mat);
+		printf("\n");
+	#endif
 
 	#define CONTROL_SPEED(positive, negative, speed)	(\
 		(positive && !negative) ? speed * dt : \
