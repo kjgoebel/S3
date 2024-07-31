@@ -175,6 +175,8 @@ void init_framebuffer(int w, int h, int light_map_size)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glNamedFramebufferTexture(abuffer, GL_COLOR_ATTACHMENT0, abuffer_color, 0);
 
+		glNamedFramebufferTexture(abuffer, GL_DEPTH_ATTACHMENT, gbuffer_depth, 0);
+
 		if(light_map_size)
 		{
 			glGenFramebuffers(1, &lbuffer);
@@ -222,6 +224,7 @@ void use_gbuffer()
 	glBindFramebuffer(GL_FRAMEBUFFER, gbuffer);
 
 	glEnable(GL_DEPTH_TEST);
+	glDepthMask(true);
 	glEnable(GL_CULL_FACE);
 }
 
@@ -230,6 +233,7 @@ void use_lbuffer()
 	glBindFramebuffer(GL_FRAMEBUFFER, lbuffer);
 
 	glEnable(GL_DEPTH_TEST);
+	glDepthMask(true);
 	glEnable(GL_CULL_FACE);
 }
 
@@ -238,6 +242,7 @@ void use_abuffer()
 	glBindFramebuffer(GL_FRAMEBUFFER, abuffer);
 
 	glDisable(GL_DEPTH_TEST);
+	glDepthMask(false);
 	glDisable(GL_CULL_FACE);
 }
 

@@ -33,7 +33,8 @@ enum Mode {
 
 Model* dots_model;
 Model* torus_model;
-Model* pole_model;
+Model* sun_model;
+Model* boulder_model;
 DrawFunc render_boulders;
 ShaderProgram *dump_program, *dump_cube_program, *light_program, *final_program;
 Mode mode = NORMAL;
@@ -128,14 +129,17 @@ void init()
 	torus_model->generate_normals();
 	torus_model->generate_primitive_colors(0.7);
 
-	pole_model =  Model::make_icosahedron(0.1, 2);
-	pole_model->generate_primitive_colors(0.3);
-	pole_model->generate_normals();
+	sun_model = Model::make_icosahedron(0.05, 2, true);
+	sun_model->generate_normals();
+
+	boulder_model =  Model::make_icosahedron(0.1, 2);
+	boulder_model->generate_primitive_colors(0.3);
+	boulder_model->generate_normals();
 
 	Mat4* boulders = new Mat4[NUM_BOULDERS];
 	for(int i = 0; i < NUM_BOULDERS; i++)
 		boulders[i] = torus_world_xform(frand() * TAU, frand() * TAU, 0.05, frand() * TAU, fsrand() * 0.5 * TAU, fsrand() * 0.5 * TAU);
-	render_boulders = pole_model->make_draw_func(NUM_BOULDERS, boulders, Vec4(0.7, 0.7, 0.7, 1));
+	render_boulders = boulder_model->make_draw_func(NUM_BOULDERS, boulders, Vec4(0.7, 0.7, 0.7, 1));
 	delete[] boulders;
 
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
@@ -162,8 +166,8 @@ void draw_scene(bool shadow)
 
 	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
 	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
-	//pole_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
-	//pole_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
+	//boulder_model->draw(Mat4::axial_rotation(_w, _x, TAU / 4), Vec4(0.7, 0, 0, 1));
+	//boulder_model->draw(Mat4::axial_rotation(_w, _y, TAU / 4), Vec4(0, 0.7, 0, 1));
 	render_boulders();
 
 	is_shadow_pass = false;
@@ -241,8 +245,10 @@ void display()
 		Mat4::axial_rotation(_w, _x, TAU / 6),
 		-Vec3(0.6, 0.6, 0.6)
 	);
+
+	Mat4 sun_xform = Mat4::axial_rotation(_x, _y, SUN_SPEED * last_frame_time) * Mat4::axial_rotation(_w, _x, TAU / 4) * Mat4::axial_rotation(_z, _y, TAU / 4);
 	render_point_light(
-		Mat4::axial_rotation(_x, _y, SUN_SPEED * last_frame_time) * Mat4::axial_rotation(_w, _x, TAU / 4) * Mat4::axial_rotation(_z, _y, TAU / 4),
+		sun_xform,
 		Vec3(1, 1, 1)
 	);
 	/*render_point_light(
@@ -250,6 +256,14 @@ void display()
 		Vec3(0.1, 0.1, 0.1)
 	);*/
 	
+	glDisable(GL_BLEND);
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glNamedFramebufferReadBuffer(gbuffer, GL_BACK);
+	set_perspective((double)window_width / window_height);
+
+	sun_model->draw(sun_xform, Vec4(100, 100, 100, 1));
+
 	//Final Pass
 	use_default_framebuffer();
 
