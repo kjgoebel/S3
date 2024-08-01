@@ -3,7 +3,7 @@
 #include "Vector.h"
 #include "Utils.h"
 
-#define CHORD_DISTANCE_LUT_SIZE		(32)
+#define CHORD_DISTANCE_LUT_SIZE		(64)
 
 
 GLuint gbuffer = 0, gbuffer_albedo = 0, gbuffer_position = 0, gbuffer_normal = 0, gbuffer_depth = 0;
@@ -11,12 +11,27 @@ GLuint abuffer = 0, abuffer_color = 0;
 GLuint lbuffer = 0, light_map = 0;
 bool is_shadow_pass = false;
 
-LookupTable* chord_distance_lut;
+LookupTable* chord2_lut;
 
 GLuint fsq_vertex_array = 0;
 
 
-#include <stdio.h>
+void init_luts()
+{
+	float* chord2_data = new float[2 * CHORD_DISTANCE_LUT_SIZE];
+	for(int i = 0; i < CHORD_DISTANCE_LUT_SIZE; i++)
+	{
+		float c = 4.0 * i / (CHORD_DISTANCE_LUT_SIZE - 1);
+		chord2_data[2 * i] = 2.0 * asin(0.5 * sqrt(c));
+		float temp = sin(chord2_data[2 * i]);
+		chord2_data[2 * i + 1] = 1.0 / (temp * temp);
+	}
+		
+	chord2_lut = new LookupTable(GL_TEXTURE_1D, CHORD_DISTANCE_LUT_SIZE, GL_RG32F, GL_RG, chord2_data, 0.25);
+	check_gl_errors("chord distance lut setup");
+
+	delete[] chord2_data;
+}
 
 void init_framebuffer(int w, int h, int light_map_size)
 {
@@ -100,21 +115,6 @@ void init_framebuffer(int w, int h, int light_map_size)
 		
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
 		glEnableVertexAttribArray(1);
-	}
-
-	if(!chord_distance_lut)
-	{
-		float* chord_distance_data = new float[CHORD_DISTANCE_LUT_SIZE];
-		for(int i = 0; i < CHORD_DISTANCE_LUT_SIZE; i++)
-		{
-			float c = 2.0 * i / (CHORD_DISTANCE_LUT_SIZE - 1);
-			chord_distance_data[i] = 2.0 * asin(0.5 * c);
-		}
-		
-		chord_distance_lut = new LookupTable(GL_TEXTURE_1D, CHORD_DISTANCE_LUT_SIZE, GL_R32F, GL_RED, chord_distance_data);
-		check_gl_errors("chord distance lut setup");
-
-		delete[] chord_distance_data;
 	}
 
 	if(gbuffer)		//init_framebuffer() has been called before

@@ -44,6 +44,10 @@ DrawFunc render_boulders;
 ShaderProgram *light_program, *final_program;
 Mode mode = NORMAL;
 
+#define NUM_LIGHTS (4)
+Mat4 light_xforms[NUM_LIGHTS];
+Vec3 light_emissions[NUM_LIGHTS];
+
 double last_frame_time;
 
 
@@ -92,6 +96,7 @@ void init()
 	glCullFace(GL_BACK);
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
+	init_luts();
 	init_shaders();
 
 	/*copy_program = ShaderProgram::get(
@@ -134,6 +139,12 @@ void init()
 		boulders[i] = torus_world_xform(frand() * TAU, frand() * TAU, 0.05, frand() * TAU, fsrand() * 0.5 * TAU, fsrand() * 0.5 * TAU);
 	render_boulders = boulder_model->make_draw_func(NUM_BOULDERS, boulders, Vec4(0.7, 0.7, 0.7, 1));
 	delete[] boulders;
+
+	for(int i = 0; i < NUM_LIGHTS; i++)
+	{
+		light_xforms[i] = torus_world_xform(frand() * TAU, frand() * TAU, 0.3 * frand(), frand() * TAU, fsrand() * 0.5 * TAU, fsrand() * 0.5 * TAU);
+		light_emissions[i] = 0.25 * Vec3(frand(), frand(), frand());
+	}
 
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
 	player_state.set_cam();
@@ -249,16 +260,19 @@ void display()
 		Mat4::axial_rotation(_w, _x, TAU / 6),
 		-Vec3(0.6, 0.6, 0.6)
 	);
+	for(int i = 0; i < NUM_LIGHTS; i++)
+		render_point_light(light_xforms[i], light_emissions[i]);
+
 	Mat4 sun_xform = Mat4::axial_rotation(_x, _y, SUN_SPEED * last_frame_time) * Mat4::axial_rotation(_w, _x, TAU / 4) * Mat4::axial_rotation(_z, _y, TAU / 4);
 	render_point_light(
 		sun_xform,
 		Vec3(1, 1, 1)
 	);
-	render_point_light(
+	/*render_point_light(
 		cam_mat * Mat4::axial_rotation(_w, _x, 0.01) * Mat4::axial_rotation(_w, _y, 0.005),
 		Vec3(0.2, 0.1, 0.05)
-	);
-	
+	);*/
+
 	check_gl_errors("display 4");
 
 	glDisable(GL_BLEND);
@@ -331,7 +345,7 @@ void display()
 					Shader::get(frag_dump_texture1d, {})
 				);
 				dump_program->use();
-				dump_program->set_texture("tex", 0, chord_distance_lut->get_texture(), chord_distance_lut->get_target());
+				dump_program->set_texture("tex", 0, chord2_lut->get_texture(), chord2_lut->get_target());
 				draw_fsq();
 			}
 			break;

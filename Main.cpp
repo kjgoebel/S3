@@ -86,6 +86,7 @@ void init()
 	glClearColor(0, 0, 0, 0);
 	glCullFace(GL_BACK);
 
+	init_luts();
 	init_shaders();
 
 	fog_quad_program = ShaderProgram::get(
@@ -146,7 +147,7 @@ void init()
 			* Mat4::axial_rotation(_y, _z, theta);
 			//* Mat4::axial_rotation(_w, _z, frand() * TAU);		//Random longitudinal displacement so that the stripes on nearby fibers don't line up. It might be more elucidating if they do line up, come to think of it.
 	}
-	render_superhopf = geodesic_model->make_draw_func(NUM_SUPERHOPF_FIBERS, superhopf_xforms, Vec4(0.5, 1, 0.5, 1), true);
+	render_superhopf = geodesic_model->make_draw_func(NUM_SUPERHOPF_FIBERS, superhopf_xforms, Vec4(0.5, 1, 0.5, 1));
 
 	Mat4 tesseract_edge_xforms[NUM_TESSERACT_EDGES];
 	tesseract_arc = Model::make_torus_arc(8, 8, acos(0.5), STANDARD_HOLE_RATIO);

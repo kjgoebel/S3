@@ -19,6 +19,11 @@ class LookupTable
 	Using textureSize() within the shader is another possibility, but it's slower. 
 	Even if textureSize() is fast, calculating offset and scale involve int to 
 	float conversion and more arithmetic than "scale * thing + offset".
+
+	Using a uniform also allows us to do automate the squeezing of the range: if 
+	your input is supposed to go from 0 to 4, pass in a scale factor of 0.25 and 
+	that will be multiplied into the LUT's scale, so you don't have to in your 
+	shader.
 */
 
 private:
@@ -28,11 +33,11 @@ private:
 
 public:
 	//Assume for now that all LUT textures will be square (so that offset and scale can be scalars).
-	LookupTable(GLenum targ, GLsizei tex_size, GLenum internal_format, GLenum format, const float* data)
+	LookupTable(GLenum targ, GLsizei tex_size, GLenum internal_format, GLenum format, const float* data, float scale_factor)
 	{
 		target = targ;
 		offset = 0.5 / tex_size;
-		scale = ((float)tex_size - 1) / tex_size;
+		scale = scale_factor * ((float)tex_size - 1) / tex_size;
 
 		glGenTextures(1, &texture);
 		glBindTexture(target, texture);
@@ -68,7 +73,10 @@ extern GLuint lbuffer, light_map;
 
 extern bool is_shadow_pass;
 
-extern LookupTable* chord_distance_lut;
+//LUT for R4 chord length squared -> R) S3 distance, G) 1 / sin^2(S3 distance)
+extern LookupTable* chord2_lut;
+
+void init_luts();
 
 /*
 	Call this in reshape(). It can be called multiple times.

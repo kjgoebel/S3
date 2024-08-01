@@ -597,9 +597,9 @@ void init_shaders()
 		"frag",
 		GL_FRAGMENT_SHADER,
 		R"(
-			uniform sampler1D chord_distance_lut;
-			uniform float chord_distance_lut_scale;
-			uniform float chord_distance_lut_offset;
+			uniform sampler1D chord2_lut;
+			uniform float chord2_lut_scale;
+			uniform float chord2_lut_offset;
 
 			#ifndef SHADOW
 				#ifdef VERTEX_COLOR
@@ -647,8 +647,8 @@ void init_shaders()
 					frag_position = true_position;
 				#endif
 				
-				float parm = 0.5 * length(true_position - vec4(0, 0, 0, 1));
-				float true_distance = texture(chord_distance_lut, parm * chord_distance_lut_scale + chord_distance_lut_offset).r;
+				vec4 delta = true_position - vec4(0, 0, 0, 1);
+				float true_distance = texture(chord2_lut, dot(delta, delta) * chord2_lut_scale + chord2_lut_offset).r;
 				if(distance > 3.141593)
 					true_distance = 6.283185 - true_distance;
 
@@ -656,7 +656,7 @@ void init_shaders()
 			}
 		)",
 		[](ShaderProgram* program) {
-			program->set_lut("chord_distance_lut", 0, chord_distance_lut);
+			program->set_lut("chord2_lut", 0, chord2_lut);
 		},
 		NULL,
 		NULL,
@@ -724,6 +724,10 @@ void init_shaders()
 		R"(
 			#define USE_PCF
 
+			uniform sampler1D chord2_lut;
+			uniform float chord2_lut_scale;
+			uniform float chord2_lut_offset;
+
 			uniform sampler2D albedo_tex;
 			uniform sampler2D position_tex;
 			uniform sampler2D normal_tex;
@@ -751,12 +755,10 @@ void init_shaders()
 				vec4 position = texelFetch(position_tex, pixel_coords, 0);
 				vec4 normal = texelFetch(normal_tex, pixel_coords, 0);
 
-				vec4 frag_to_light = light_pos - position;
-				float r4_distance = length(frag_to_light);
-				frag_to_light = normalize(frag_to_light - position * dot(position, frag_to_light));
-				float distance = 2 * asin(0.5 * r4_distance);
-				float distance_factor = sin(distance);
-				distance_factor = 1 / (distance_factor * distance_factor);
+				vec4 delta = light_pos - position;
+				vec4 lut_data = texture(chord2_lut, dot(delta, delta) * chord2_lut_scale + chord2_lut_offset);
+				float distance_factor = lut_data.y;
+				vec4 frag_to_light = normalize(delta - position * dot(position, delta));
 
 				vec2 normal_factor;			//(short_way, long_way)
 				if(length(normal) > 0.5)
@@ -770,8 +772,8 @@ void init_shaders()
 				vec4 light_to_frag = light_xform * position;
 				light_to_frag.w = 0;
 				light_to_frag = normalize(light_to_frag);
-				float bias = max(0.002 * (1 - abs(normal_factor.x)), 0.0002);
-				light_to_frag.w = (distance / 6.283185) - bias;
+				float bias = max(0.003 * (1 - abs(normal_factor.x)), 0.0003);
+				light_to_frag.w = (lut_data.x / 6.283185) - bias;
 				vec2 shadow_factor = vec2(0);		//(short_way, long_way)
 				#ifdef USE_PCF
 					for(int i = 0; i < 10; i++)
@@ -794,7 +796,9 @@ void init_shaders()
 				frag_color.a = 1;
 			}
 		)",
-		NULL,
+		[](ShaderProgram* program) {
+			program->set_lut("chord2_lut", 4, chord2_lut);
+		},
 		NULL,
 		[](ShaderProgram* program) {
 			program->set_texture("albedo_tex", 0, gbuffer_albedo);
