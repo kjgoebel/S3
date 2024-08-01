@@ -17,7 +17,7 @@ Shader::Shader(ShaderCore* core, const std::set<const char*> options) : core(cor
 {
 	id = glCreateShader(core->shader_type);
 
-	printf("new shader id = %d\n", id);
+	fprintf(stderr, "new shader id = %d\n", id);
 	fprintf(stderr, "%s\n", core->name);
 	for(auto option : options)
 		fprintf(stderr, "\t%s", option);
@@ -106,7 +106,7 @@ ShaderProgram::ShaderProgram(Shader* vert, Shader* geom, Shader* frag)
 	fragment = frag;
 
 	id = glCreateProgram();
-	printf("new program id = %d (%d, %d, %d)\n", id, vertex->get_id(), geometry ? geometry->get_id() : -1, fragment->get_id());
+	fprintf(stderr, "new program id = %d (%d, %d, %d)\n", id, vertex->get_id(), geometry ? geometry->get_id() : -1, fragment->get_id());
 	glAttachShader(id, vertex->get_id());
 	if(geometry)
 		glAttachShader(id, geometry->get_id());
@@ -290,6 +290,8 @@ void init_shaders()
 					mat4 model_view_xform = transpose(view_xform) * model_xform;
 				#endif
 				vg_r4pos = model_view_xform * position;
+
+				//*** Next two lines could be replaced with a LUT fetch.
 				float distance = acos(vg_r4pos.w);
 				gl_Position.xyz = distance * normalize(vg_r4pos.xyz);
 				gl_Position.w = 1;
@@ -752,6 +754,9 @@ void init_shaders()
 			void main() {
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
 				vec4 albedo = texelFetch(albedo_tex, pixel_coords, 0);
+				if(albedo.w == 0)
+					discard;
+
 				vec4 position = texelFetch(position_tex, pixel_coords, 0);
 				vec4 normal = texelFetch(normal_tex, pixel_coords, 0);
 
