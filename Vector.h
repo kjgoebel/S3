@@ -1,6 +1,7 @@
 #pragma once
 
 #include <math.h>
+#include <stdio.h>
 
 
 #define _x (0)
@@ -49,6 +50,11 @@ struct Vec3
 		this->x = x;
 		this->y = y;
 		this->z = z;
+	}
+	Vec3(const double* components)
+	{
+		for(int i = 0; i < 3; i++)
+			this->components[i] = components[i];
 	}
 
 	inline double operator[] (unsigned int index) const
@@ -136,6 +142,11 @@ struct Vec4
 		this->y = y;
 		this->z = z;
 		this->w = w;
+	}
+	Vec4(const double* components)
+	{
+		for(int i = 0; i < 4; i++)
+			this->components[i] = components[i];
 	}
 
 	inline double operator[] (unsigned int index) const
@@ -355,6 +366,5 @@ struct Mat4
 	}
 };
 
-
-void print_vector(const Vec4& v);
-void print_matrix(const Mat4& m);
+void print_vector(const Vec4& v, FILE* fout = stdout);
+void print_matrix(const Mat4& m, FILE* fout = stdout);
