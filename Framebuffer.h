@@ -57,6 +57,7 @@ public:
 		
 		glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);		//This doesn't do anything, but it makes dumps of the texture look better.
 	}
 
 	GLenum get_target() {return target;}

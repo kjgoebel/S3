@@ -26,6 +26,10 @@ void init_luts()
 		float temp = sin(chord2_data[2 * i]);
 		chord2_data[2 * i + 1] = 1.0 / (temp * temp);
 	}
+	//1 / sin^2(0) is infinite and my GPU doesn't seem to like infinity.
+	//FLT_MAX is also too big, because it makes for a visible discontinuity at distance = 2 / (CHORD_DISTANCE_LUT_SIZE - 1).
+	//Could try to model the actual size of point lights.
+	chord2_data[1] = 3 * chord2_data[3];
 		
 	chord2_lut = new LookupTable(GL_TEXTURE_1D, CHORD_DISTANCE_LUT_SIZE, GL_RG32F, GL_RG, chord2_data, 0.25);
 	check_gl_errors("chord distance lut setup");
