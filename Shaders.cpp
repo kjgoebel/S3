@@ -757,11 +757,11 @@ void init_shaders()
 
 				vec4 delta = light_pos - position;
 				vec4 lut_data = texture(chord2_lut, dot(delta, delta) * chord2_lut_scale + chord2_lut_offset);
-				float distance_factor = lut_data.y;
+				float distance_factor = lut_data.y;		//1 / sin^2(distance)
 				vec4 frag_to_light = normalize(delta - position * dot(position, delta));
 
 				vec2 normal_factor;			//(short_way, long_way)
-				if(length(normal) > 0.5)
+				if(dot(normal, normal) > 0.5)
 				{
 					float short_dot = dot(normal, frag_to_light);
 					normal_factor = clamp(vec2(short_dot, -short_dot), 0, 1);
