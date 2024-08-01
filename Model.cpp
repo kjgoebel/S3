@@ -16,6 +16,9 @@
 
 #pragma warning(disable : 4244)		//conversion from double to float
 
+//#define VERIFY_BUFFERS
+//#define VERIFY_BUFFER_ASSIGNMENT
+
 
 Model::Model(int num_verts, const Vec4* verts, const Vec4* vert_colors)
 {
@@ -128,12 +131,14 @@ GLuint Model::make_vertex_array()
 	if(element_buffer)
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
 
-	if(normals)
+	if(normal_buffer)
 	{
 		glBindBuffer(GL_ARRAY_BUFFER, normal_buffer);
 		glVertexAttribPointer(2, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
 		glEnableVertexAttribArray(2);
 	}
+
+	glBindVertexArray(0);
 
 	return vertex_array;
 }
@@ -142,23 +147,49 @@ void Model::prepare_to_render()
 {
 	if(vertex_buffer)
 		error("Model was already prepared for rendering.\n");
-
+		
 	glGenBuffers(1, &vertex_buffer);
 	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
 	glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertices.get(), GL_STATIC_DRAW);
+	#ifdef VERIFY_BUFFERS
+		fprintf(stderr, "%d vertices = %d\n", num_vertices, vertex_buffer);
+		for(int i = 0; i < num_vertices; i++)
+		{
+			fprintf(stderr, "\t");
+			print_vector(vertices[i], stderr);
+		}
+	#endif
 
 	if(vertex_colors)
 	{
 		glGenBuffers(1, &vertex_color_buffer);
 		glBindBuffer(GL_ARRAY_BUFFER, vertex_color_buffer);
 		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), vertex_colors.get(), GL_STATIC_DRAW);
+		#ifdef VERIFY_BUFFERS
+			fprintf(stderr, "%d vertex colors = %d\n", num_vertices, vertex_buffer);
+			for(int i = 0; i < num_vertices; i++)
+			{
+				fprintf(stderr, "\t");
+				print_vector(vertex_colors[i], stderr);
+			}
+		#endif
 	}
 
 	if(elements)
 	{
 		glGenBuffers(1, &element_buffer);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, element_buffer);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(int), elements.get(), GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, num_primitives * vertices_per_primitive * sizeof(GLuint), elements.get(), GL_STATIC_DRAW);
+		#ifdef VERIFY_BUFFERS
+			fprintf(stderr, "%d x %d elements = %d\n", num_primitives, vertices_per_primitive, vertex_buffer);
+			for(int i = 0; i < num_primitives; i++)
+			{
+				fprintf(stderr, "\t");
+				for(int j = 0; j < vertices_per_primitive; j++)
+					fprintf(stderr, "%d ", elements[i * vertices_per_primitive + j]);
+				fprintf(stderr, "\n");
+			}
+		#endif
 	}
 
 	if(normals)
@@ -166,6 +197,14 @@ void Model::prepare_to_render()
 		glGenBuffers(1, &normal_buffer);
 		glBindBuffer(GL_ARRAY_BUFFER, normal_buffer);
 		glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(Vec4), normals.get(), GL_STATIC_DRAW);
+		#ifdef VERIFY_BUFFERS
+			fprintf(stderr, "%d normals = %d\n", num_vertices, normal_buffer);
+			for(int i = 0; i < num_vertices; i++)
+			{
+				fprintf(stderr, "\t");
+				print_vector(normals[i], stderr);
+			}
+		#endif
 	}
 
 	raw_vertex_array = make_vertex_array();
@@ -202,10 +241,10 @@ void Model::draw(const Mat4& xform, const Vec4& base_color)
 	raw_program->use();
 	raw_program->set_vector("base_color", base_color);
 	raw_program->set_matrix("model_view_xform", ~cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
-
+	
 	glBindVertexArray(raw_vertex_array);
-
 	draw_raw();
+	glBindVertexArray(0);
 }
 
 
@@ -231,6 +270,8 @@ void Model::bind_xform_array(GLuint vertex_array, int count, const Mat4* xforms)
 		glVertexAttribPointer(3 + i, 4, GL_FLOAT, GL_FALSE, 16 * sizeof(float), (void*)(4 * i * sizeof(float)));
 		glVertexAttribDivisor(3 + i, 1);
 	}
+
+	glBindVertexArray(0);
 }
 
 void Model::bind_color_array(GLuint vertex_array, int count, const Vec4* base_colors)
@@ -244,10 +285,26 @@ void Model::bind_color_array(GLuint vertex_array, int count, const Vec4* base_co
 	glEnableVertexAttribArray(7);
 	glVertexAttribPointer(7, 4, GL_DOUBLE, GL_FALSE, sizeof(Vec4), (void*)0);
 	glVertexAttribDivisor(7, 1);
+
+	glBindVertexArray(0);
 }
 
 void Model::draw_raw()
 {
+	#ifdef VERIFY_BUFFER_ASSIGNMENT
+		printf("%d, %d, %d, %d, %d\n", num_vertices, raw_vertex_array, vertex_buffer, vertex_color_buffer, element_buffer);
+		GLint temp;
+		glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &temp);
+		printf("\t%d\n", temp);
+		for(int i = 0; i < 7; i++)
+		{
+			glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &temp);
+			printf("\t\t%d: %d", i, temp);
+			glGetVertexAttribiv(i, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &temp);
+			printf(" %d\n", temp);
+		}
+	#endif
+
 	if(elements)
 		switch(primitive)
 		{
@@ -258,7 +315,7 @@ void Model::draw_raw()
 				break;
 			default:
 				for(int i = 0; i < num_primitives; i++)
-					glDrawElements(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(i * vertices_per_primitive * sizeof(int)));
+					glDrawElements(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(i * vertices_per_primitive * sizeof(GLuint)));
 				break;
 		}
 	else
@@ -278,7 +335,7 @@ void Model::draw_instanced(int count)
 				break;
 			default:
 				for(int i = 0; i < num_primitives; i++)
-					glDrawElementsInstanced(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(i * vertices_per_primitive * sizeof(int)), count);
+					glDrawElementsInstanced(primitive, vertices_per_primitive, GL_UNSIGNED_INT, (void*)(i * vertices_per_primitive * sizeof(GLuint)), count);
 				break;
 		}
 	else
@@ -303,6 +360,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 			glBindVertexArray(vertex_array);
 			program->set_vector("base_color", base_color);
 			draw_instanced(count);
+			glBindVertexArray(0);
 		};
 	}
 	else
@@ -316,12 +374,12 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 			program->use();
 			program->set_vector("base_color", base_color);
 			glBindVertexArray(raw_vertex_array);
-
 			for(int i = 0; i < count; i++)
 			{
 				program->set_matrix("model_view_xform", ~cam_mat * temp_xforms[i]);
 				draw_raw();
 			}
+			glBindVertexArray(0);
 		};
 	}
 }
@@ -343,6 +401,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 			program->use();
 			glBindVertexArray(vertex_array);
 			draw_instanced(count);
+			glBindVertexArray(0);
 		};
 	}
 	else
@@ -366,6 +425,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 				program->set_matrix("model_view_xform", ~cam_mat * temp_xforms[i]);
 				draw_raw();
 			}
+			glBindVertexArray(0);
 		};
 	}
 }
@@ -541,46 +601,19 @@ void Model::generate_normals()
 
 
 Model* Model::make_icosahedron(double scale, int subdivisions, bool normalize) {
-	//This is way more complicated than it should be. Perhaps there should be 
-	//a class R3Model that manages Vec3 vertices and elements?
-	int num_verts = 12;
-	int num_triangles = 20;
-	Vec3* verts = new Vec3[12];
-	GLuint* elements = new GLuint[3 * 20];
-
-	for(int i = 0; i < 12; i++)
-		verts[i] = icosahedron_verts[i];
-	for(int i = 0; i < 3 * 20; i++)
-		elements[i] = icosahedron_elements[i];
+	std::unique_ptr<TriangleModel> ico(new TriangleModel(12, 20, icosahedron_verts, icosahedron_elements));
 
 	for(int i = 0; i < subdivisions; i++)
-	{
-		int new_num_verts;
-		int new_num_triangles;
-		Vec3* new_verts;
-		GLuint* new_elements;
+		ico->subdivide(normalize);
 
-		subdivide_triangles(num_verts, num_triangles, verts, elements, new_num_verts, new_num_triangles, new_verts, new_elements, normalize);
-
-		num_verts = new_num_verts;
-		num_triangles = new_num_triangles;
-		delete[] verts;
-		verts = new_verts;
-		delete[] elements;
-		elements = new_elements;
-	}
-
-	Model* ret = new Model(
+	return new Model(
 		GL_TRIANGLES,
-		num_verts,
+		ico->get_num_vertices(),
 		3,
-		num_triangles,
-		s3ify(num_verts, scale, verts).get(),
-		elements
+		ico->get_num_triangles(),
+		s3ify(ico->get_num_vertices(), scale, ico->get_vertices()).get(),
+		ico->get_elements()
 	);
-	delete[] verts;
-	delete[] elements;
-	return ret;
 }
 
 Model* Model::make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips, bool make_normals)

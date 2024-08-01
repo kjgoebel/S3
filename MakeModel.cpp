@@ -128,86 +128,101 @@ std::shared_ptr<GLuint[]> make_torus_quad_indices(int long_segments, int trans_s
 }
 
 
-void subdivide_triangles(
-	int num_verts,
-	int num_triangles,
-	const Vec3* vertices,
-	const GLuint* elements,
-	int& out_new_num_verts,
-	int& out_new_num_triangles,
-	Vec3*& out_new_vertices,
-	GLuint*& out_new_elements,
-	bool normalize
-)
+TriangleModel::TriangleModel(GLuint num_verts, GLuint num_tris, const Vec3* verts, const GLuint* elems)
+		: num_vertices(num_verts), num_triangles(num_tris), vertices(new Vec3[num_verts]), elements(new GLuint[3 * num_tris])
 {
-	out_new_num_verts = num_verts + num_triangles * 3 / 2;
-	out_new_num_triangles = num_triangles * 4;
+	for(GLuint vert = 0; vert < num_vertices; vert++)
+		vertices[vert] = verts[vert];
+	for(GLuint elem = 0; elem < 3 * num_triangles; elem++)
+		elements[elem] = elems[elem];
+}
 
-	out_new_vertices = new Vec3[out_new_num_verts];
-	out_new_elements = new GLuint[3 * out_new_num_triangles];
+//#define DUMMY_SUBDIVIDE
 
-	for(int v = 0; v < num_verts; v++)
-	{
-		out_new_vertices[v] = vertices[v];
-		if(normalize)
-			out_new_vertices[v].normalize_in_place();
-	}
+void TriangleModel::subdivide(bool normalize)
+{
+	GLuint new_num_verts = num_vertices + num_triangles * 3 / 2;
+	GLuint new_num_tris = num_triangles * 4;
+	Vec3* new_verts = new Vec3[new_num_verts];
+	GLuint* new_elems = new GLuint[3 * new_num_tris];
 
-	GLuint next_vert_index = num_verts;
-	std::map<std::pair<GLuint, GLuint>, GLuint> edge_table;
-
-	for(int t = 0; t < num_triangles; t++)
-	{
-		GLuint old_vert_indices[3] = {
-			elements[3 * t],
-			elements[3 * t + 1],
-			elements[3 * t + 2]
-		};
-		GLuint new_vert_indices[3];
-
-		for(GLuint vi = 0; vi < 3; vi++)
+	#ifdef DUMMY_SUBDIVIDE
+		for(int v = 0; v < new_num_verts; v++)
+			new_verts[v] = rand_s2();
+		for(int e = 0; e < 3 * new_num_tris; e++)
+			new_elems[e] = rand() % new_num_verts;
+	#else
+		for(int v = 0; v < num_vertices; v++)
 		{
-			GLuint edge_start = old_vert_indices[vi], edge_end = old_vert_indices[(vi + 1) % 3];
-			if(edge_start > edge_end)
-			{
-				GLuint temp = edge_start;
-				edge_start = edge_end;
-				edge_end = temp;
-			}
-
-			if(edge_table.count({edge_start, edge_end}))
-				new_vert_indices[vi] = edge_table[{edge_start, edge_end}];
-			else
-			{
-				if(next_vert_index >= out_new_num_verts)
-					error("Out of vertices!\n");
-				new_vert_indices[vi] = next_vert_index;
-				out_new_vertices[next_vert_index] = vertices[edge_start] + vertices[edge_end];
-				if(normalize)
-					out_new_vertices[next_vert_index].normalize_in_place();
-				else
-					out_new_vertices[next_vert_index] = 0.5 * out_new_vertices[next_vert_index];
-				edge_table[{edge_start, edge_end}] = next_vert_index;
-				next_vert_index++;
-			}
+			new_verts[v] = vertices[v];
+			if(normalize)
+				new_verts[v].normalize_in_place();
 		}
 
-		out_new_elements[4 * 3 * t + 3 * 0 + 0] = old_vert_indices[0];
-		out_new_elements[4 * 3 * t + 3 * 0 + 1] = new_vert_indices[0];
-		out_new_elements[4 * 3 * t + 3 * 0 + 2] = new_vert_indices[2];
+		GLuint next_vert_index = num_vertices;
+		std::map<std::pair<GLuint, GLuint>, GLuint> edge_table;
+
+		for(GLuint t = 0; t < num_triangles; t++)
+		{
+			GLuint old_vert_indices[3] = {
+				elements[3 * t + 0],
+				elements[3 * t + 1],
+				elements[3 * t + 2]
+			};
+			GLuint new_vert_indices[3];
+
+			for(GLuint vi = 0; vi < 3; vi++)
+			{
+				GLuint edge_start = old_vert_indices[vi], edge_end = old_vert_indices[(vi + 1) % 3];
+				if(edge_start > edge_end)
+				{
+					GLuint temp = edge_start;
+					edge_start = edge_end;
+					edge_end = temp;
+				}
+
+				if(edge_table.count({edge_start, edge_end}))
+					new_vert_indices[vi] = edge_table[{edge_start, edge_end}];
+				else
+				{
+					if(next_vert_index >= new_num_verts)
+						error("Out of vertices!\n");
+					new_vert_indices[vi] = next_vert_index;
+					new_verts[next_vert_index] = vertices[edge_start] + vertices[edge_end];
+					if(normalize)
+						new_verts[next_vert_index].normalize_in_place();
+					else
+						new_verts[next_vert_index] = 0.5 * new_verts[next_vert_index];
+					edge_table[{edge_start, edge_end}] = next_vert_index;
+					next_vert_index++;
+				}
+			}
+
+			if(4 * 3 * t + 3 * 3 + 2 >= 3 * new_num_tris)
+				error("Out of elements!\n");
+
+			new_elems[4 * 3 * t + 3 * 0 + 0] = old_vert_indices[0];
+			new_elems[4 * 3 * t + 3 * 0 + 1] = new_vert_indices[0];
+			new_elems[4 * 3 * t + 3 * 0 + 2] = new_vert_indices[2];
 		
-		out_new_elements[4 * 3 * t + 3 * 1 + 0] = old_vert_indices[1];
-		out_new_elements[4 * 3 * t + 3 * 1 + 1] = new_vert_indices[1];
-		out_new_elements[4 * 3 * t + 3 * 1 + 2] = new_vert_indices[0];
+			new_elems[4 * 3 * t + 3 * 1 + 0] = old_vert_indices[1];
+			new_elems[4 * 3 * t + 3 * 1 + 1] = new_vert_indices[1];
+			new_elems[4 * 3 * t + 3 * 1 + 2] = new_vert_indices[0];
 		
-		out_new_elements[4 * 3 * t + 3 * 2 + 0] = old_vert_indices[2];
-		out_new_elements[4 * 3 * t + 3 * 2 + 1] = new_vert_indices[2];
-		out_new_elements[4 * 3 * t + 3 * 2 + 2] = new_vert_indices[1];
+			new_elems[4 * 3 * t + 3 * 2 + 0] = old_vert_indices[2];
+			new_elems[4 * 3 * t + 3 * 2 + 1] = new_vert_indices[2];
+			new_elems[4 * 3 * t + 3 * 2 + 2] = new_vert_indices[1];
 		
-		out_new_elements[4 * 3 * t + 3 * 3 + 0] = new_vert_indices[0];
-		out_new_elements[4 * 3 * t + 3 * 3 + 1] = new_vert_indices[1];
-		out_new_elements[4 * 3 * t + 3 * 3 + 2] = new_vert_indices[2];
-	}
+			new_elems[4 * 3 * t + 3 * 3 + 0] = new_vert_indices[0];
+			new_elems[4 * 3 * t + 3 * 3 + 1] = new_vert_indices[1];
+			new_elems[4 * 3 * t + 3 * 3 + 2] = new_vert_indices[2];
+		}
+	#endif
+
+	num_vertices = new_num_verts;
+	num_triangles = new_num_tris;
+	vertices.reset(new_verts);
+	elements.reset(new_elems);
 }
 
 

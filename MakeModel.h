@@ -31,17 +31,21 @@ std::shared_ptr<GLuint[]> make_torus_quad_strip_indices(int long_segments, int t
 std::shared_ptr<GLuint[]> make_torus_quad_indices(int long_segments, int trans_segments, bool loop_longitudinally = true);
 
 
-void subdivide_triangles(
-	int num_verts,
-	int num_triangles,
-	const Vec3* vertices,
-	const GLuint* elements,
-	int& out_new_num_verts,
-	int& out_new_num_triangles,
-	Vec3*& out_new_vertices,
-	GLuint*& out_new_elements,
-	bool normalize = false
-);
+class TriangleModel {
+	GLuint num_vertices, num_triangles;
+	std::unique_ptr<Vec3[]> vertices;
+	std::unique_ptr<GLuint[]> elements;
+
+public:
+	TriangleModel(GLuint num_verts, GLuint num_tris, const Vec3* verts, const GLuint* elems);
+
+	GLuint get_num_vertices() const {return num_vertices;}
+	GLuint get_num_triangles() const {return num_triangles;}
+	const Vec3* get_vertices() const {return vertices.get();}
+	const GLuint* get_elements() const {return elements.get();}
+
+	void subdivide(bool normalize);
+};
 
 extern const Vec3 icosahedron_verts[20];
 extern const GLuint icosahedron_elements[3 * 20];

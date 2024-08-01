@@ -30,7 +30,7 @@ public:
 
 	void dump() const;
 	
-	//generate_*() must be called before draw() or make_draw_func().
+	//generate_*() must be called before draw(), make_draw_func() or prepare_to_render().
 	//Passing scale <= 0 to generate_vertex_colors will allocate vertex_colors but not initialize it.
 	void generate_vertex_colors(double scale = -1);
 	/*
@@ -56,6 +56,14 @@ public:
 	static Model* make_torus_arc(int longitudinal_segments, int transverse_segments, double length, double hole_ratio, bool use_quad_strips = true, bool make_normals = false);
 	static Model* make_bumpy_torus(int longitudinal_segments, int transverse_segments, double bump_height, bool use_quad_strips = false);
 	static std::shared_ptr<Vec4[]> s3ify(int count, double scale, const Vec3* vertices);		//Project a list of R3 vertices onto S3.
+	
+	/*
+		Creates buffers and raw_vertex_array. Called automatically as needed by 
+		draw and make_draw_func(). Exposed as public because for some #$&(@ 
+		reason it sometimes causes segfaults unless it's manually called 
+		earlier.
+	*/
+	void prepare_to_render();
 
 private:
 	int primitive;						//GL_POINTS, GL_TRIANGLES, etc.
@@ -72,8 +80,6 @@ private:
 	GLuint raw_vertex_array;
 
 	GLuint make_vertex_array();			//Creates a VAO and binds vertex, vertex color and element buffer objects to it as appropriate.
-	void prepare_to_render();			//Creates vertex, vertex color and element buffer objects as appropriate, creates 
-										//shader programs, and creates raw_vertex_array with make_vertex_array().
 
 	ShaderProgram* get_shader_program(bool shadow, bool instanced_xforms, bool instanced_base_colors);
 
