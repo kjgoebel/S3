@@ -649,28 +649,28 @@ void init_shaders()
 					frag_position = true_position;
 				#endif
 				
-				//This could be better with a LUT that took true_position.w -> true_distance.
-				//And further improved by a LUT that took true_position.w -> true_distance / TAU.
-				vec4 delta = true_position - vec4(0, 0, 0, 1);
-				float true_distance = texture(chord2_lut, dot(delta, delta) * chord2_lut_scale + chord2_lut_offset).r;
-
-				//float true_distance = texture(view_w_lut, true_position.w * view_w_lut_scale + view_w_lut_offset).r;
 				/*
-					The reason this doesn't work is because it disagrees with the chord-based lookup 
-					the light shader is doing. This result gets stored in the light map, and then the 
-					light map is checked against the G-buffer position using the chord. The result 
-					seems to be that this distance is always smaller than the chord-computed distance.
+					This can't be improved by a LUT that takes true_position.w -> true_distance, 
+					because it disagrees with the chord-based lookup in the light shader. This 
+					result gets stored in the light map, and then the light map is checked against 
+					the position in the G-buffer using the chord. The end result seems to be that 
+					this distance is always smaller than the chord-computed distance, and all 
+					surfaces are in shadow.
 
 					Applying a bias just makes this value zig-zag above and below the chord-computed 
-					distance.
+					value.
 
-					A possible solution would be to draw only back faces during light map generation, 
-					but then something has to be done about the ground having no back faces.
+					A possible solution would be to draw only back faces during light map 
+					generation, but then something has to be done about the ground having no 
+					back faces. Or, some kind of stencil-like magic....
 				*/
-				if(distance > 3.141593)
-					true_distance = 6.283185 - true_distance;
+				vec4 delta = true_position - vec4(0, 0, 0, 1);
+				float true_distance_normalized = texture(chord2_lut, dot(delta, delta) * chord2_lut_scale + chord2_lut_offset).r;
 
-				gl_FragDepth = clamp(true_distance / 6.283185, 0, 1);
+				if(distance > 3.141593)
+					true_distance_normalized = 6.283185 - true_distance_normalized;
+
+				gl_FragDepth = clamp(true_distance_normalized, 0, 1);
 			}
 		)",
 		[](ShaderProgram* program) {
@@ -794,7 +794,7 @@ void init_shaders()
 				light_to_frag.w = 0;
 				light_to_frag = normalize(light_to_frag);
 				float bias = max(0.003 * (1 - abs(normal_factor.x)), 0.0003);
-				light_to_frag.w = (lut_data.x / 6.283185) - bias;
+				light_to_frag.w = lut_data.x - bias;
 				vec2 shadow_factor = vec2(0);		//(short_way, long_way)
 				#ifdef USE_PCF
 					for(int i = 0; i < 10; i++)

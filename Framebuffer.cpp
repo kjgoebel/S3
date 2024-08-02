@@ -24,8 +24,9 @@ void init_luts()
 	for(int i = 0; i < CHORD2_LUT_SIZE; i++)
 	{
 		float c = 4.0 * i / (CHORD2_LUT_SIZE - 1);
-		chord2_data[2 * i] = 2.0 * asin(0.5 * sqrt(c));
-		float temp = sin(chord2_data[2 * i]);
+		float distance = 2.0 * asin(0.5 * sqrt(c));
+		chord2_data[2 * i] = distance / TAU;
+		float temp = sin(2.0 * asin(0.5 * sqrt(c)));
 		chord2_data[2 * i + 1] = 1.0 / (temp * temp);
 	}
 	//1 / sin^2(0) is infinite and my GPU doesn't seem to like infinity.

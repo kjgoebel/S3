@@ -79,8 +79,8 @@ extern bool is_shadow_pass;
 /*
 	LUT for chord length
 	c2 = (chord length)^2 ->
-		R) 2 asin(1/2 sqrt(c2))
-			(the S3 distance for that chord)
+		R) 2asin(1/2 sqrt(c2)) / tau
+			(the S3 distance for that chord, normalized by tau because that's what the depth buffer needs)
 		G) 1 / sin^2(2 asin(1/2 sqrt(c2)))
 			(the intensity factor for a point light at that distance)
 */
