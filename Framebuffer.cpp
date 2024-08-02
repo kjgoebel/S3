@@ -3,7 +3,8 @@
 #include "Vector.h"
 #include "Utils.h"
 
-#define CHORD_DISTANCE_LUT_SIZE		(64)
+#define CHORD2_LUT_SIZE		(64)
+#define VIEW_W_LUT_SIZE		(64)
 
 
 GLuint gbuffer = 0, gbuffer_albedo = 0, gbuffer_position = 0, gbuffer_normal = 0, gbuffer_depth = 0;
@@ -12,29 +13,51 @@ GLuint lbuffer = 0, light_map = 0;
 bool is_shadow_pass = false;
 
 LookupTable* chord2_lut;
+LookupTable* view_w_lut;
 
 GLuint fsq_vertex_array = 0;
 
 
 void init_luts()
 {
-	float* chord2_data = new float[2 * CHORD_DISTANCE_LUT_SIZE];
-	for(int i = 0; i < CHORD_DISTANCE_LUT_SIZE; i++)
+	float* chord2_data = new float[2 * CHORD2_LUT_SIZE];
+	for(int i = 0; i < CHORD2_LUT_SIZE; i++)
 	{
-		float c = 4.0 * i / (CHORD_DISTANCE_LUT_SIZE - 1);
+		float c = 4.0 * i / (CHORD2_LUT_SIZE - 1);
 		chord2_data[2 * i] = 2.0 * asin(0.5 * sqrt(c));
 		float temp = sin(chord2_data[2 * i]);
 		chord2_data[2 * i + 1] = 1.0 / (temp * temp);
 	}
 	//1 / sin^2(0) is infinite and my GPU doesn't seem to like infinity.
-	//FLT_MAX is also too big, because it makes for a visible discontinuity at distance = 2 / (CHORD_DISTANCE_LUT_SIZE - 1).
+	//FLT_MAX is also too big, because it makes for a visible discontinuity at distance = 2 / (CHORD2_LUT_SIZE - 1).
 	//Could try to model the actual size of point lights.
 	chord2_data[1] = 3 * chord2_data[3];
 		
-	chord2_lut = new LookupTable(GL_TEXTURE_1D, CHORD_DISTANCE_LUT_SIZE, GL_RG32F, GL_RG, chord2_data, 0.25);
-	check_gl_errors("chord distance lut setup");
+	chord2_lut = new LookupTable(GL_TEXTURE_1D, CHORD2_LUT_SIZE, GL_RG32F, GL_RG, chord2_data, 0, 4);
+	check_gl_errors("chord squared LUT setup");
 
 	delete[] chord2_data;
+
+	float* view_w_data = new float[2 * VIEW_W_LUT_SIZE];
+	for(int i = 0; i < VIEW_W_LUT_SIZE; i++)
+	{
+		float w = 2.0 * i / (VIEW_W_LUT_SIZE - 1) - 1.0;
+		view_w_data[2 * i] = acos(w);
+		view_w_data[2 * i + 1] = view_w_data[2 * i] / sqrt(1.0 - w * w);
+	}
+	//1 / sqrt(1 - w^2) is infinite for w = {1, -1}, so the ends have to be fudged.
+	view_w_data[1] = 30;
+	view_w_data[2 * VIEW_W_LUT_SIZE - 1] = 1;
+
+	for(int i = 0; i < VIEW_W_LUT_SIZE; i++)
+		printf("%f -> %f %f\n", 2.0 * i / (VIEW_W_LUT_SIZE - 1) - 1.0, view_w_data[2 * i], view_w_data[2 * i + 1]);
+
+	view_w_lut = new LookupTable(GL_TEXTURE_1D, VIEW_W_LUT_SIZE, GL_RG32F, GL_RG, view_w_data, -1, 2);
+	printf("%f, %f\n", view_w_lut->get_scale(), view_w_lut->get_offset());
+
+	check_gl_errors("view W LUT setup");
+
+	delete[] view_w_data;
 }
 
 void init_framebuffer(int w, int h, int light_map_size)
@@ -199,6 +222,10 @@ void init_framebuffer(int w, int h, int light_map_size)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glNamedFramebufferTexture(abuffer, GL_COLOR_ATTACHMENT0, abuffer_color, 0);
 
+		/*
+			Attach the G-buffer's depth buffer to the abuffer so we can draw things 
+			into the scene with depth checking during the accumulation phase.
+		*/
 		glNamedFramebufferTexture(abuffer, GL_DEPTH_ATTACHMENT, gbuffer_depth, 0);
 
 		if(light_map_size)

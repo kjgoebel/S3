@@ -249,6 +249,9 @@ void init_shaders()
 		"vert",
 		GL_VERTEX_SHADER,
 		R"(
+			uniform sampler1D view_w_lut;
+			uniform float view_w_lut_scale, view_w_lut_offset;
+
 			layout (location = 0) in vec4 position;
 
 			#ifndef SHADOW
@@ -291,9 +294,7 @@ void init_shaders()
 				#endif
 				vg_r4pos = model_view_xform * position;
 
-				//*** Next two lines could be replaced with a LUT fetch.
-				float distance = acos(vg_r4pos.w);
-				gl_Position.xyz = distance * normalize(vg_r4pos.xyz);
+				gl_Position.xyz = vg_r4pos.xyz * texture(view_w_lut, vg_r4pos.w * view_w_lut_scale + view_w_lut_offset).g;
 				gl_Position.w = 1;
 
 				#ifndef SHADOW
@@ -309,7 +310,9 @@ void init_shaders()
 				#endif
 			}
 		)",
-		NULL,
+		[](ShaderProgram* program) {
+			program->set_lut("view_w_lut", 15, view_w_lut);
+		},
 		NULL,
 		NULL,
 		{
@@ -649,6 +652,7 @@ void init_shaders()
 					frag_position = true_position;
 				#endif
 				
+				//This could be better with a LUT that took true_position.w -> true_distance.
 				vec4 delta = true_position - vec4(0, 0, 0, 1);
 				float true_distance = texture(chord2_lut, dot(delta, delta) * chord2_lut_scale + chord2_lut_offset).r;
 				if(distance > 3.141593)
@@ -930,13 +934,14 @@ void init_shaders()
 		GL_FRAGMENT_SHADER,
 		R"(
 			uniform sampler1D tex;
+			uniform float output_scale, output_offset;
 
 			in vec2 vf_tex_coord;
 
 			out vec4 frag_color;
 
 			void main() {
-				frag_color = texture(tex, vf_tex_coord.x);
+				frag_color = texture(tex, vf_tex_coord.x) * output_scale + output_offset;
 			}
 		)",
 		NULL,

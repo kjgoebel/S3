@@ -20,10 +20,12 @@ class LookupTable
 	Even if textureSize() is fast, calculating offset and scale involve int to 
 	float conversion and more arithmetic than "scale * thing + offset".
 
-	Using a uniform also allows us to do automate the squeezing of the range: if 
-	your input is supposed to go from 0 to 4, pass in a scale factor of 0.25 and 
-	that will be multiplied into the LUT's scale, so you don't have to in your 
-	shader.
+	Using a uniform also allows us to automate the squeezing of the range: if 
+	your input is supposed to go from 1 to 4, pass in a domain_offset of 1 and 
+	a domain_size of 3. Those will be applied to the generated offset and scale 
+	so that your shader doesn't have to do separate work for that. Your shader 
+	will have
+		texture(blah_lut, argument * blah_lut_scale + blah_lut_offset)
 */
 
 private:
@@ -33,11 +35,11 @@ private:
 
 public:
 	//Assume for now that all LUT textures will be square (so that offset and scale can be scalars).
-	LookupTable(GLenum targ, GLsizei tex_size, GLenum internal_format, GLenum format, const float* data, float scale_factor)
+	LookupTable(GLenum targ, GLsizei tex_size, GLenum internal_format, GLenum format, const float* data, float domain_offset, float domain_size)
 	{
 		target = targ;
-		offset = 0.5 / tex_size;
-		scale = scale_factor * ((float)tex_size - 1) / tex_size;
+		offset = 0.5 / tex_size - domain_offset / domain_size;
+		scale = ((float)tex_size - 1) / (tex_size * domain_size);
 
 		glGenTextures(1, &texture);
 		glBindTexture(target, texture);
@@ -74,8 +76,25 @@ extern GLuint lbuffer, light_map;
 
 extern bool is_shadow_pass;
 
-//LUT for R4 chord length squared -> R) S3 distance, G) 1 / sin^2(S3 distance)
+/*
+	LUT for chord length
+	c2 = (chord length)^2 ->
+		R) 2 asin(1/2 sqrt(c2))
+			(the S3 distance for that chord)
+		G) 1 / sin^2(2 asin(1/2 sqrt(c2)))
+			(the intensity factor for a point light at that distance)
+*/
 extern LookupTable* chord2_lut;
+
+/*
+	LUT for "view" space (R4 with camera at (0, 0, 0, 1)) W coordinate
+	pos.w ->
+		R) acos(pos.w)
+			(the S3 distance from the camera to pos)
+		G) acos(pos.w) / sqrt(1 - (pos.w)^2)
+			(which is the normalization factor for pos.xyz times the S3 distance)
+*/
+extern LookupTable* view_w_lut;
 
 void init_luts();
 
