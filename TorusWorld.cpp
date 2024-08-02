@@ -126,7 +126,7 @@ void init()
 
 	light_model = Model::make_icosahedron(0.02, 1, true);
 
-	boulder_model =  Model::make_icosahedron(0.1, 2);
+	boulder_model =  Model::make_icosahedron(0.1, 1);
 	boulder_model->generate_primitive_colors(0.3);
 	boulder_model->generate_normals();
 

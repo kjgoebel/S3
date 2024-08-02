@@ -249,9 +249,6 @@ void init_shaders()
 		"vert",
 		GL_VERTEX_SHADER,
 		R"(
-			uniform sampler1D view_w_lut;
-			uniform float view_w_lut_scale, view_w_lut_offset;
-
 			layout (location = 0) in vec4 position;
 
 			#ifndef SHADOW
@@ -294,7 +291,9 @@ void init_shaders()
 				#endif
 				vg_r4pos = model_view_xform * position;
 
-				gl_Position.xyz = vg_r4pos.xyz * texture(view_w_lut, vg_r4pos.w * view_w_lut_scale + view_w_lut_offset).g;
+				//The next two lines can be replaced with a table lookup, but it makes the shader slower (?!)
+				float distance = acos(vg_r4pos.w);
+				gl_Position.xyz = distance * normalize(vg_r4pos.xyz);
 				gl_Position.w = 1;
 
 				#ifndef SHADOW
@@ -310,9 +309,7 @@ void init_shaders()
 				#endif
 			}
 		)",
-		[](ShaderProgram* program) {
-			program->set_lut("view_w_lut", 15, view_w_lut);
-		},
+		NULL,
 		NULL,
 		NULL,
 		{
