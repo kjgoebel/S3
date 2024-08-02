@@ -650,8 +650,23 @@ void init_shaders()
 				#endif
 				
 				//This could be better with a LUT that took true_position.w -> true_distance.
+				//And further improved by a LUT that took true_position.w -> true_distance / TAU.
 				vec4 delta = true_position - vec4(0, 0, 0, 1);
 				float true_distance = texture(chord2_lut, dot(delta, delta) * chord2_lut_scale + chord2_lut_offset).r;
+
+				//float true_distance = texture(view_w_lut, true_position.w * view_w_lut_scale + view_w_lut_offset).r;
+				/*
+					The reason this doesn't work is because it disagrees with the chord-based lookup 
+					the light shader is doing. This result gets stored in the light map, and then the 
+					light map is checked against the G-buffer position using the chord. The result 
+					seems to be that this distance is always smaller than the chord-computed distance.
+
+					Applying a bias just makes this value zig-zag above and below the chord-computed 
+					distance.
+
+					A possible solution would be to draw only back faces during light map generation, 
+					but then something has to be done about the ground having no back faces.
+				*/
 				if(distance > 3.141593)
 					true_distance = 6.283185 - true_distance;
 

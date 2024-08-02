@@ -37,27 +37,6 @@ void init_luts()
 	check_gl_errors("chord squared LUT setup");
 
 	delete[] chord2_data;
-
-	float* view_w_data = new float[2 * VIEW_W_LUT_SIZE];
-	for(int i = 0; i < VIEW_W_LUT_SIZE; i++)
-	{
-		float w = 2.0 * i / (VIEW_W_LUT_SIZE - 1) - 1.0;
-		view_w_data[2 * i] = acos(w);
-		view_w_data[2 * i + 1] = view_w_data[2 * i] / sqrt(1.0 - w * w);
-	}
-	//1 / sqrt(1 - w^2) is infinite for w = {1, -1}, so the ends have to be fudged.
-	view_w_data[1] = 30;
-	view_w_data[2 * VIEW_W_LUT_SIZE - 1] = 1;
-
-	for(int i = 0; i < VIEW_W_LUT_SIZE; i++)
-		printf("%f -> %f %f\n", 2.0 * i / (VIEW_W_LUT_SIZE - 1) - 1.0, view_w_data[2 * i], view_w_data[2 * i + 1]);
-
-	view_w_lut = new LookupTable(GL_TEXTURE_1D, VIEW_W_LUT_SIZE, GL_RG32F, GL_RG, view_w_data, -1, 2);
-	printf("%f, %f\n", view_w_lut->get_scale(), view_w_lut->get_offset());
-
-	check_gl_errors("view W LUT setup");
-
-	delete[] view_w_data;
 }
 
 void init_framebuffer(int w, int h, int light_map_size)

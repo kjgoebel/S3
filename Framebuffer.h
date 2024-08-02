@@ -86,16 +86,6 @@ extern bool is_shadow_pass;
 */
 extern LookupTable* chord2_lut;
 
-/*
-	LUT for "view" space (R4 with camera at (0, 0, 0, 1)) W coordinate
-	pos.w ->
-		R) acos(pos.w)
-			(the S3 distance from the camera to pos)
-		G) acos(pos.w) / sqrt(1 - (pos.w)^2)
-			(which is the normalization factor for pos.xyz times the S3 distance)
-*/
-extern LookupTable* view_w_lut;
-
 void init_luts();
 
 /*

@@ -124,7 +124,7 @@ void init()
 
 	sun_model = Model::make_icosahedron(0.05, 2, true);
 
-	light_model = Model::make_icosahedron(0.02, 1, true);
+	light_model = Model::make_icosahedron(0.02, 2, true);
 
 	boulder_model =  Model::make_icosahedron(0.1, 1);
 	boulder_model->generate_primitive_colors(0.3);
@@ -347,7 +347,7 @@ void display()
 					Shader::get(frag_dump_texture1d, {})
 				);
 				dump_program->use();
-				dump_program->set_texture("tex", 0, view_w_lut->get_texture(), view_w_lut->get_target());
+				dump_program->set_texture("tex", 0, chord2_lut->get_texture(), chord2_lut->get_target());
 				dump_program->set_float("output_scale", 0.1);
 				dump_program->set_float("output_offset", 0);
 				draw_fsq();
