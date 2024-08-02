@@ -32,7 +32,7 @@ enum Mode {
 	DUMP_NORMAL,
 	DUMP_DEPTH,
 	DUMP_LIGHT_MAP,
-	DUMP_CHORD_DISTANCE_LUT
+	DUMP_LUT
 };
 
 
@@ -144,6 +144,10 @@ void init()
 
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
 	player_state.set_cam();
+
+	GLint num_texture_units;
+	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &num_texture_units);
+	printf("There are %d texture units available.\n", num_texture_units);
 }
 
 int window_width = 0, window_height = 0;
@@ -271,6 +275,7 @@ void display()
 
 	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
+	glDepthMask(GL_TRUE);
 	glEnable(GL_CULL_FACE);
 
 	set_perspective((double)window_width / window_height);
@@ -334,7 +339,7 @@ void display()
 			}
 			break;
 
-		case DUMP_CHORD_DISTANCE_LUT:
+		case DUMP_LUT:
 			{
 				ShaderProgram* dump_program = ShaderProgram::get(
 					Shader::get(vert_screenspace, {}),
@@ -342,7 +347,9 @@ void display()
 					Shader::get(frag_dump_texture1d, {})
 				);
 				dump_program->use();
-				dump_program->set_texture("tex", 0, chord2_lut->get_texture(), chord2_lut->get_target());
+				dump_program->set_texture("tex", 0, view_w_lut->get_texture(), view_w_lut->get_target());
+				dump_program->set_float("output_scale", 0.1);
+				dump_program->set_float("output_offset", 0);
 				draw_fsq();
 			}
 			break;
@@ -482,7 +489,7 @@ void special(int key, int x, int y)
 			mode = DUMP_LIGHT_MAP;
 			break;
 		case GLUT_KEY_F8:
-			mode = DUMP_CHORD_DISTANCE_LUT;
+			mode = DUMP_LUT;
 			break;
 	}
 }
