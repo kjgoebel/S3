@@ -6,8 +6,9 @@ s3
 glut*
 freeglut*
 x64
-Wrangle*
 TorusWorld
 GL
 glew*
-plan.txt
+*.txt
+Screenshots
+*.py
