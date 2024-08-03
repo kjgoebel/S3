@@ -781,21 +781,23 @@ void init_shaders()
 				float distance_factor = lut_data.y;		//1 / sin^2(distance)
 				vec4 frag_to_light = normalize(delta - position * dot(position, delta));
 
-				vec2 normal_factor;			//(short_way, long_way)
-				if(dot(normal, normal) > 0.5)
-				{
-					float short_dot = dot(normal, frag_to_light);
-					normal_factor = clamp(vec2(short_dot, -short_dot), 0, 1);
-				}
-				else
-					normal_factor = vec2(1);
+				/*
+					Dot product between the surface normal and the near image of the light.
+					If this is positive, we can see the near image of the light. If it's 
+					negative, we can see the far image. Either way, we are illuminated 
+					according to the magnitude of the dot product (if we're not in shadow).
+				*/
+				float short_dot = dot(normal, frag_to_light);
+				float normal_factor = abs(short_dot);
 
+				//Alas, light_to_frag != -frag_to_light.
 				vec4 light_to_frag = light_xform * position;
-				light_to_frag.w = 0;
-				light_to_frag = normalize(light_to_frag);
-				float bias = max(0.003 * (1 - abs(normal_factor.x)), 0.0003);
-				light_to_frag.w = lut_data.x - bias;
-				vec2 shadow_factor = vec2(0);		//(short_way, long_way)
+				//The correct light_to_frag.xyz would be normalized, but we're feeding it to a cube map.
+				light_to_frag.w = lut_data.x;		//normalized distance
+				if(short_dot < 0)			//If we're facing the far image of the light, check the complimentary distance in the opposite direction.
+					light_to_frag = vec4(0, 0, 0, 1) - light_to_frag;
+				light_to_frag.w -= max(0.003 * (1 - normal_factor), 0.0003);
+				float shadow_factor = 0.0;
 				#ifdef USE_PCF
 					for(int i = 0; i < 10; i++)
 					{
@@ -805,16 +807,14 @@ void init_shaders()
 							bnoise(pixel_coords + ivec2(0, 227 * i)),
 							0
 						);
-						shadow_factor.x += texture(light_map, light_to_frag + offset);
-						shadow_factor.y += texture(light_map, vec4(0, 0, 0, 1 - 2 * bias) - light_to_frag + offset);
+						shadow_factor += texture(light_map, light_to_frag + offset);
 					}
 					shadow_factor *= 0.1;
 				#else
-					shadow_factor.x = texture(light_map, light_to_frag);
-					shadow_factor.y = texture(light_map, vec4(0, 0, 0, 1 - 2 * bias) - light_to_frag);
+					shadow_factor = texture(light_map, light_to_frag);
 				#endif
 
-				frag_color.rgb = (shadow_factor.x * normal_factor.x + shadow_factor.y * normal_factor.y) * distance_factor * light_emission * albedo.rgb;
+				frag_color.rgb = shadow_factor * normal_factor * distance_factor * light_emission * albedo.rgb;
 				frag_color.a = 1;
 			}
 		)",
