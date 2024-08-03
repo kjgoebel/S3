@@ -52,23 +52,12 @@ void set_perspective(double ar, double vfov, double near)
 }
 
 
-//#include <stdio.h>
-
-Mat4 basis_around(Vec4 a, Vec4 b, double* length)
+Mat4 basis_around(Vec4 a, Vec4 b, double* chord)
 {
-	/*printf("a, b:\n");
-	printf("\t"); print_vector(a);
-	printf("\t"); print_vector(b);*/
-
 	double dp = a * b;
-	//printf("length = %f\n", acos(dp));
-	if(length)
-		*length = acos(dp);
+	if(chord)
+		*chord = acos(dp);
 	b = (b - dp * a).normalize();
-
-	/*printf("Corrected a, b:\n");
-	printf("\t"); print_vector(a);
-	printf("\t"); print_vector(b);*/
 
 	Vec4 temp1;
 	do {
@@ -83,17 +72,9 @@ Mat4 basis_around(Vec4 a, Vec4 b, double* length)
 	temp2 = (temp2 - a * (a * temp2) - b * (b * temp2) - temp1 * (temp1 * temp2)).normalize();
 
 	Mat4 ret = Mat4::from_columns(temp1, temp2, b, a);
-		
-	/*printf("ret =\n");
-	print_matrix(ret);
-	printf("whose determinant is %s.n\n", ret.determinant() > 0 ? "positive" : "negative");*/
 
 	if(ret.determinant() < 0)
 		ret.set_column(0, -temp1);
-		
-	/*printf("ret =\n");
-	print_matrix(ret);
-	printf("whose determinant is %s.n\n", ret.determinant() > 0 ? "positive" : "negative");*/
 
 	return ret;
 }

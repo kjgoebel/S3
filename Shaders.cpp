@@ -810,7 +810,8 @@ void init_shaders()
 					}
 					shadow_factor *= 0.1;
 				#else
-					shadow_factor = texture(light_map, light_to_frag);
+					shadow_factor.x = texture(light_map, light_to_frag);
+					shadow_factor.y = texture(light_map, vec4(0, 0, 0, 1 - 2 * bias) - light_to_frag);
 				#endif
 
 				frag_color.rgb = (shadow_factor.x * normal_factor.x + shadow_factor.y * normal_factor.y) * distance_factor * light_emission * albedo.rgb;

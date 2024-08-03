@@ -112,6 +112,7 @@ void init()
 		Shader::get(frag_final_color, {})
 	);
 
+	//Note: Should make half as many dots but only on the right side of the torus.
 	Vec4* dots = new Vec4[NUM_DOTS];
 	for(int i = 0; i < NUM_DOTS; i++)
 		dots[i] = rand_s3();
