@@ -668,7 +668,7 @@ void init_shaders()
 				float true_distance_normalized = texture(chord2_lut, dot(delta, delta) * chord2_lut_scale + chord2_lut_offset).r;
 
 				if(distance > 3.141593)
-					true_distance_normalized = 6.283185 - true_distance_normalized;
+					true_distance_normalized = 1 - true_distance_normalized;
 
 				gl_FragDepth = clamp(true_distance_normalized, 0, 1);
 			}
