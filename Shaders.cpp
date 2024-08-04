@@ -320,7 +320,10 @@ void init_shaders()
 				NULL,
 				NULL,
 				[](ShaderProgram* program) {
-					program->set_matrix("view_xform", s_cam_mat);
+					if(s_is_shadow_pass)
+						program->set_matrix("view_xform", s_light_mat);
+					else
+						program->set_matrix("view_xform", s_cam_mat);
 				}
 			),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
@@ -424,8 +427,16 @@ void init_shaders()
 		},
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_float("aspect_ratio", s_screen_aspect_ratio);
-			program->set_matrix("proj_xform", s_cam_projection);
+			if(s_is_shadow_pass)
+			{
+				program->set_float("aspect_ratio", 1);
+				program->set_matrix("proj_xform", s_light_projection);
+			}
+			else
+			{
+				program->set_float("aspect_ratio", s_screen_aspect_ratio);
+				program->set_matrix("proj_xform", s_cam_projection);
+			}
 		},
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR),
@@ -515,8 +526,16 @@ void init_shaders()
 		},
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_float("aspect_ratio", s_screen_aspect_ratio);
-			program->set_matrix("proj_xform", s_cam_projection);
+			if(s_is_shadow_pass)
+			{
+				program->set_float("aspect_ratio", 1);
+				program->set_matrix("proj_xform", s_light_projection);
+			}
+			else
+			{
+				program->set_float("aspect_ratio", s_screen_aspect_ratio);
+				program->set_matrix("proj_xform", s_cam_projection);
+			}
 		},
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR),

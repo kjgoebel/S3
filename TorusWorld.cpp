@@ -160,20 +160,18 @@ void reshape(int w, int h)
 		window_width = w;
 		window_height = h;
 		init_framebuffer(window_width, window_height, LIGHT_MAP_SIZE);
+		set_perspective((double)window_width / window_height);
 	}
 
 	ShaderProgram::init_all();
 }
 
-void draw_scene(bool shadow)
+void draw_scene()
 {
-	s_is_shadow_pass = shadow;
-
+	printf("draw_scene() %d\n", s_is_shadow_pass);
 	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
 	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
 	render_boulders();
-
-	s_is_shadow_pass = false;
 }
 
 void render_point_light(Mat4& light_mat, Vec3 light_emission)
@@ -182,13 +180,10 @@ void render_point_light(Mat4& light_mat, Vec3 light_emission)
 	glClear(GL_DEPTH_BUFFER_BIT);
 	glViewport(0, 0, LIGHT_MAP_SIZE, LIGHT_MAP_SIZE);
 	
-	set_perspective(1);
-
-	//This is filthy. This is why we don't communicate through globals.
-	Mat4 temp = s_cam_mat;
-	s_cam_mat = light_mat;
-	draw_scene(true);
-	s_cam_mat = temp;
+	s_light_mat = light_mat;
+	s_is_shadow_pass = true;
+	draw_scene();
+	s_is_shadow_pass = false;
 
 	use_abuffer();
 	glViewport(0, 0, window_width, window_height);
@@ -241,9 +236,8 @@ void display()
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glViewport(0, 0, window_width, window_height);
-	set_perspective((double)window_width / window_height);
 	glDisable(GL_BLEND);
-	draw_scene(false);
+	draw_scene();
 
 	check_gl_errors("display 3");
 
@@ -279,8 +273,6 @@ void display()
 	glDepthMask(GL_TRUE);
 	glEnable(GL_CULL_FACE);
 
-	set_perspective((double)window_width / window_height);
-
 	sun_model->draw(sun_xform, Vec4(10, 10, 10, 1));
 
 	for(int i = 0; i < NUM_LIGHTS; i++)
@@ -292,7 +284,6 @@ void display()
 	use_default_framebuffer();
 
 	glViewport(0, 0, window_width, window_height);
-	set_perspective((double)window_width / window_height);
 	glDisable(GL_BLEND);
 
 	switch(mode)

@@ -22,8 +22,8 @@
 
 //extern const Vec4 xhat, yhat, zhat, what;
 
-extern Mat4 s_cam_mat;
-extern Mat4 s_cam_projection;
+extern Mat4 s_cam_mat, s_light_mat;
+extern Mat4 s_cam_projection, s_light_projection;
 
 extern double s_screen_aspect_ratio, s_fog_scale;
 

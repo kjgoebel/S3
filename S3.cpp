@@ -5,8 +5,10 @@
 //const Vec4 xhat(1, 0, 0, 0), yhat(0, 1, 0, 0), zhat(0, 0, 1, 0), what(0, 0, 0, 1);
 
 Mat4 s_cam_mat = Mat4::identity();
+Mat4 s_light_mat = Mat4::identity();
 
 Mat4 s_cam_projection = Mat4::identity();
+Mat4 s_light_projection = Mat4::identity();
 
 double s_screen_aspect_ratio = 1;
 double s_fog_scale = 1.5;
@@ -48,6 +50,14 @@ void set_perspective(double ar, double vfov, double near)
 		0,					-1.0 / q,		0,								0,
 		0,					0,				(FAR + near) / (FAR - near),	2.0 * near * FAR / (near - FAR),
 		0,					0,				1,								0
+	);
+
+	//This is for rendering cube maps, so fov is always TAU / 4 and aspect ratio is always 1.
+	s_light_projection = Mat4(
+		1,			0,			0,								0,
+		0,			-1,			0,								0,
+		0,			0,			(FAR + near) / (FAR - near),	2.0 * near * FAR / (near - FAR),
+		0,			0,			1,								0
 	);
 }
 
