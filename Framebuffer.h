@@ -13,6 +13,8 @@ extern GLuint s_lbuffer, s_light_map;
 
 extern bool s_is_shadow_pass;
 
+extern int window_width, window_height;
+
 
 /*
 	Call this in reshape(). It can be called multiple times.

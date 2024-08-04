@@ -18,7 +18,6 @@
 
 #define NUM_DOTS		(4000)
 #define NUM_BOULDERS	(40)
-#define LIGHT_MAP_SIZE	(4096)
 
 #define WALK_SPEED		(TAU / 50)
 #define SUN_SPEED		(TAU / 30)
@@ -41,7 +40,7 @@ Model* dots_model;
 Model* torus_model;
 Model* boulder_model;
 DrawFunc render_boulders;
-ShaderProgram *light_program, *final_program;
+ShaderProgram *final_program;
 Mode mode = NORMAL;
 
 std::vector<Light*> lights;
@@ -102,12 +101,6 @@ void init()
 	init_luts();
 	init_shaders();
 
-	light_program = ShaderProgram::get(
-		Shader::get(vert_screenspace, {}),
-		NULL,
-		Shader::get(frag_point_light, {})
-	);
-
 	final_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
 		NULL,
@@ -163,8 +156,6 @@ void init()
 	player_state.set_cam();
 }
 
-int window_width = 0, window_height = 0;
-
 void reshape(int w, int h)
 {
 	if(w != window_width || h != window_height)
@@ -183,29 +174,6 @@ void draw_scene()
 	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
 	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
 	render_boulders();
-}
-
-void render_point_light(const Mat4& light_mat, Vec3 light_emission)
-{
-	use_lbuffer();
-	glClear(GL_DEPTH_BUFFER_BIT);
-	glViewport(0, 0, LIGHT_MAP_SIZE, LIGHT_MAP_SIZE);
-	
-	Camera light_cam(light_mat);
-	s_curcam = &light_cam;
-	s_is_shadow_pass = true;
-	draw_scene();
-	s_is_shadow_pass = false;
-	s_curcam = &cam;
-
-	use_abuffer();
-	glViewport(0, 0, window_width, window_height);
-	light_program->use();
-	light_program->set_matrix("light_xform", ~light_mat * cam.get_mat());
-	light_program->set_vector("light_pos", ~cam.get_mat() * light_mat.get_column(_w));
-	light_program->set_vector("light_emission", light_emission);
-
-	draw_fsq();
 }
 
 void display()
@@ -265,7 +233,7 @@ void display()
 	lights[0]->set_mat(sun_xform());
 
 	for(auto light : lights)
-		render_point_light(light->get_mat(), light->emission);
+		light->render(draw_scene);
 
 	check_gl_errors("display 4");
 
@@ -275,7 +243,7 @@ void display()
 	glEnable(GL_CULL_FACE);
 
 	for(auto light : lights)
-		light->model->draw(light->get_mat(), 10 * light->emission);
+		light->draw();
 
 	check_gl_errors("display 5");
 

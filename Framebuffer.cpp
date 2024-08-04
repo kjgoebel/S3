@@ -9,6 +9,8 @@ GLuint s_abuffer = 0, s_abuffer_color = 0;
 GLuint s_lbuffer = 0, s_light_map = 0;
 bool s_is_shadow_pass = false;
 
+int window_width = 0, window_height = 0;
+
 GLuint fsq_vertex_array = 0;
 
 

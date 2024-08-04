@@ -22,6 +22,7 @@
 
 class Camera
 {
+protected:
 	Mat4 mat;
 	double aspect_ratio;
 	Mat4 projection;
