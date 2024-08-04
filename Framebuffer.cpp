@@ -3,42 +3,14 @@
 #include "Vector.h"
 #include "Utils.h"
 
-#define CHORD2_LUT_SIZE		(64)
-#define VIEW_W_LUT_SIZE		(64)
 
-
-GLuint gbuffer = 0, gbuffer_albedo = 0, gbuffer_position = 0, gbuffer_normal = 0, gbuffer_depth = 0;
-GLuint abuffer = 0, abuffer_color = 0;
-GLuint lbuffer = 0, light_map = 0;
-bool is_shadow_pass = false;
-
-LookupTable* chord2_lut;
-LookupTable* view_w_lut;
+GLuint s_gbuffer = 0, s_gbuffer_albedo = 0, s_gbuffer_position = 0, s_gbuffer_normal = 0, s_gbuffer_depth = 0;
+GLuint s_abuffer = 0, s_abuffer_color = 0;
+GLuint s_lbuffer = 0, s_light_map = 0;
+bool s_is_shadow_pass = false;
 
 GLuint fsq_vertex_array = 0;
 
-
-void init_luts()
-{
-	float* chord2_data = new float[2 * CHORD2_LUT_SIZE];
-	for(int i = 0; i < CHORD2_LUT_SIZE; i++)
-	{
-		float c = 4.0 * i / (CHORD2_LUT_SIZE - 1);
-		float distance = 2.0 * asin(0.5 * sqrt(c));
-		chord2_data[2 * i] = distance / TAU;
-		float temp = sin(2.0 * asin(0.5 * sqrt(c)));
-		chord2_data[2 * i + 1] = 1.0 / (temp * temp);
-	}
-	//1 / sin^2(0) is infinite and my GPU doesn't seem to like infinity.
-	//FLT_MAX is also too big, because it makes for a visible discontinuity at distance = 2 / (CHORD2_LUT_SIZE - 1).
-	//Could try to model the actual size of point lights.
-	chord2_data[1] = 3 * chord2_data[3];
-		
-	chord2_lut = new LookupTable(GL_TEXTURE_1D, CHORD2_LUT_SIZE, GL_RG32F, GL_RG, chord2_data, 0, 4);
-	check_gl_errors("chord squared LUT setup");
-
-	delete[] chord2_data;
-}
 
 void init_framebuffer(int w, int h, int light_map_size)
 {
@@ -124,24 +96,24 @@ void init_framebuffer(int w, int h, int light_map_size)
 		glEnableVertexAttribArray(1);
 	}
 
-	if(gbuffer)		//init_framebuffer() has been called before
+	if(s_gbuffer)		//init_framebuffer() has been called before
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, gbuffer);
-		glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
+		glBindFramebuffer(GL_FRAMEBUFFER, s_gbuffer);
+		glBindTexture(GL_TEXTURE_2D, s_gbuffer_albedo);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-		glBindTexture(GL_TEXTURE_2D, gbuffer_position);
+		glBindTexture(GL_TEXTURE_2D, s_gbuffer_position);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-		glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
+		glBindTexture(GL_TEXTURE_2D, s_gbuffer_normal);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-		glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
+		glBindTexture(GL_TEXTURE_2D, s_gbuffer_depth);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
-		glBindTexture(GL_TEXTURE_2D, abuffer_color);
+		glBindTexture(GL_TEXTURE_2D, s_abuffer_color);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 
-		if(light_map_size && light_map)
+		if(light_map_size && s_light_map)
 		{
-			glBindTexture(GL_TEXTURE_CUBE_MAP, light_map);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, s_light_map);
 			for(int face = 0; face < 6; face++)
 				glTexImage2D(
 					GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
@@ -158,65 +130,65 @@ void init_framebuffer(int w, int h, int light_map_size)
 	}
 	else
 	{
-		glGenFramebuffers(1, &gbuffer);
-		glBindFramebuffer(GL_FRAMEBUFFER, gbuffer);
+		glGenFramebuffers(1, &s_gbuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, s_gbuffer);
 
-		glGenTextures(1, &gbuffer_albedo);
-		glBindTexture(GL_TEXTURE_2D, gbuffer_albedo);
+		glGenTextures(1, &s_gbuffer_albedo);
+		glBindTexture(GL_TEXTURE_2D, s_gbuffer_albedo);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glNamedFramebufferTexture(gbuffer, GL_COLOR_ATTACHMENT0, gbuffer_albedo, 0);
+		glNamedFramebufferTexture(s_gbuffer, GL_COLOR_ATTACHMENT0, s_gbuffer_albedo, 0);
 
-		glGenTextures(1, &gbuffer_position);
-		glBindTexture(GL_TEXTURE_2D, gbuffer_position);
+		glGenTextures(1, &s_gbuffer_position);
+		glBindTexture(GL_TEXTURE_2D, s_gbuffer_position);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glNamedFramebufferTexture(gbuffer, GL_COLOR_ATTACHMENT1, gbuffer_position, 0);
+		glNamedFramebufferTexture(s_gbuffer, GL_COLOR_ATTACHMENT1, s_gbuffer_position, 0);
 
-		glGenTextures(1, &gbuffer_normal);
-		glBindTexture(GL_TEXTURE_2D, gbuffer_normal);
+		glGenTextures(1, &s_gbuffer_normal);
+		glBindTexture(GL_TEXTURE_2D, s_gbuffer_normal);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glNamedFramebufferTexture(gbuffer, GL_COLOR_ATTACHMENT2, gbuffer_normal, 0);
+		glNamedFramebufferTexture(s_gbuffer, GL_COLOR_ATTACHMENT2, s_gbuffer_normal, 0);
 		
-		glGenTextures(1, &gbuffer_depth);
-		glBindTexture(GL_TEXTURE_2D, gbuffer_depth);
+		glGenTextures(1, &s_gbuffer_depth);
+		glBindTexture(GL_TEXTURE_2D, s_gbuffer_depth);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glNamedFramebufferTexture(gbuffer, GL_DEPTH_ATTACHMENT, gbuffer_depth, 0);
+		glNamedFramebufferTexture(s_gbuffer, GL_DEPTH_ATTACHMENT, s_gbuffer_depth, 0);
 
 		GLuint attachments[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
 		glDrawBuffers(3, attachments);
 
-		glGenFramebuffers(1, &abuffer);
-		glBindFramebuffer(GL_FRAMEBUFFER, abuffer);
+		glGenFramebuffers(1, &s_abuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, s_abuffer);
 
-		glGenTextures(1, &abuffer_color);
-		glBindTexture(GL_TEXTURE_2D, abuffer_color);
+		glGenTextures(1, &s_abuffer_color);
+		glBindTexture(GL_TEXTURE_2D, s_abuffer_color);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glNamedFramebufferTexture(abuffer, GL_COLOR_ATTACHMENT0, abuffer_color, 0);
+		glNamedFramebufferTexture(s_abuffer, GL_COLOR_ATTACHMENT0, s_abuffer_color, 0);
 
 		/*
 			Attach the G-buffer's depth buffer to the abuffer so we can draw things 
 			into the scene with depth checking during the accumulation phase.
 		*/
-		glNamedFramebufferTexture(abuffer, GL_DEPTH_ATTACHMENT, gbuffer_depth, 0);
+		glNamedFramebufferTexture(s_abuffer, GL_DEPTH_ATTACHMENT, s_gbuffer_depth, 0);
 
 		if(light_map_size)
 		{
-			glGenFramebuffers(1, &lbuffer);
-			glBindFramebuffer(GL_FRAMEBUFFER, lbuffer);
+			glGenFramebuffers(1, &s_lbuffer);
+			glBindFramebuffer(GL_FRAMEBUFFER, s_lbuffer);
 
 			glDrawBuffers(0, NULL);		//Lights only need depth.
 
-			glGenTextures(1, &light_map);
-			glBindTexture(GL_TEXTURE_CUBE_MAP, light_map);
+			glGenTextures(1, &s_light_map);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, s_light_map);
 			for(int face = 0; face < 6; face++)
 				glTexImage2D(
 					GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
@@ -235,24 +207,24 @@ void init_framebuffer(int w, int h, int light_map_size)
 			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-			glNamedFramebufferTexture(lbuffer, GL_DEPTH_ATTACHMENT, light_map, 0);
+			glNamedFramebufferTexture(s_lbuffer, GL_DEPTH_ATTACHMENT, s_light_map, 0);
 		}
 	}
 
-	if(glCheckNamedFramebufferStatus(gbuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		error("G-Buffer status is %d\n", glCheckNamedFramebufferStatus(gbuffer, GL_FRAMEBUFFER));
+	if(glCheckNamedFramebufferStatus(s_gbuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		error("G-Buffer status is %d\n", glCheckNamedFramebufferStatus(s_gbuffer, GL_FRAMEBUFFER));
 
-	if(glCheckNamedFramebufferStatus(abuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		error("A-Buffer status is %d\n", glCheckNamedFramebufferStatus(abuffer, GL_FRAMEBUFFER));
+	if(glCheckNamedFramebufferStatus(s_abuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		error("A-Buffer status is %d\n", glCheckNamedFramebufferStatus(s_abuffer, GL_FRAMEBUFFER));
 
-	if(glCheckNamedFramebufferStatus(lbuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		error("L-Buffer status is %d\n", glCheckNamedFramebufferStatus(lbuffer, GL_FRAMEBUFFER));
+	if(glCheckNamedFramebufferStatus(s_lbuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		error("L-Buffer status is %d\n", glCheckNamedFramebufferStatus(s_lbuffer, GL_FRAMEBUFFER));
 
 }
 
 void use_gbuffer()
 {
-	glBindFramebuffer(GL_FRAMEBUFFER, gbuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, s_gbuffer);
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthMask(true);
@@ -261,7 +233,7 @@ void use_gbuffer()
 
 void use_lbuffer()
 {
-	glBindFramebuffer(GL_FRAMEBUFFER, lbuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, s_lbuffer);
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthMask(true);
@@ -270,7 +242,7 @@ void use_lbuffer()
 
 void use_abuffer()
 {
-	glBindFramebuffer(GL_FRAMEBUFFER, abuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, s_abuffer);
 
 	glDisable(GL_DEPTH_TEST);
 	glDepthMask(false);

@@ -22,12 +22,12 @@
 
 //extern const Vec4 xhat, yhat, zhat, what;
 
-extern Mat4 cam_mat;
-extern Mat4 proj_mat;
+extern Mat4 s_cam_mat;
+extern Mat4 s_cam_projection;
 
-extern double aspect_ratio, fog_scale;
+extern double s_screen_aspect_ratio, s_fog_scale;
 
-extern const Mat4 cube_xforms[6];
+extern const Mat4 s_cube_xforms[6];
 
 void translate_cam(double right, double down, double fwd);
 void rotate_cam(double pitch, double yaw, double roll);

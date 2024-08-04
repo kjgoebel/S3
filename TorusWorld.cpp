@@ -83,7 +83,7 @@ struct PlayerState
 
 	void set_cam() const
 	{
-		cam_mat = torus_world_xform(b, a, 0.03, yaw, pitch, 0);
+		s_cam_mat = torus_world_xform(b, a, 0.03, yaw, pitch, 0);
 		double ca = cos(a), sa = sin(a), cb = cos(b), sb = sin(b);
 	}
 };
@@ -167,13 +167,13 @@ void reshape(int w, int h)
 
 void draw_scene(bool shadow)
 {
-	is_shadow_pass = shadow;
+	s_is_shadow_pass = shadow;
 
 	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
 	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
 	render_boulders();
 
-	is_shadow_pass = false;
+	s_is_shadow_pass = false;
 }
 
 void render_point_light(Mat4& light_mat, Vec3 light_emission)
@@ -185,16 +185,16 @@ void render_point_light(Mat4& light_mat, Vec3 light_emission)
 	set_perspective(1);
 
 	//This is filthy. This is why we don't communicate through globals.
-	Mat4 temp = cam_mat;
-	cam_mat = light_mat;
+	Mat4 temp = s_cam_mat;
+	s_cam_mat = light_mat;
 	draw_scene(true);
-	cam_mat = temp;
+	s_cam_mat = temp;
 
 	use_abuffer();
 	glViewport(0, 0, window_width, window_height);
 	light_program->use();
-	light_program->set_matrix("light_xform", ~light_mat * cam_mat);
-	light_program->set_vector("light_pos", ~cam_mat * light_mat.get_column(_w));
+	light_program->set_matrix("light_xform", ~light_mat * s_cam_mat);
+	light_program->set_vector("light_pos", ~s_cam_mat * light_mat.get_column(_w));
 	light_program->set_vector("light_emission", light_emission);
 
 	draw_fsq();
@@ -226,7 +226,7 @@ void display()
 
 	#ifdef PRINT_FRAME_RATE
 		printf("%f\n", 1.0 / dt);
-		print_matrix(cam_mat);
+		print_matrix(s_cam_mat);
 		printf("\n");
 	#endif
 
@@ -312,13 +312,13 @@ void display()
 
 				dump_program->use();
 			
-				dump_program->set_texture("tex", 0, gbuffer_albedo);
+				dump_program->set_texture("tex", 0, s_gbuffer_albedo);
 				draw_qsq(0);
-				dump_program->set_texture("tex", 0, gbuffer_position);
+				dump_program->set_texture("tex", 0, s_gbuffer_position);
 				draw_qsq(1);
-				dump_program->set_texture("tex", 0, gbuffer_normal);
+				dump_program->set_texture("tex", 0, s_gbuffer_normal);
 				draw_qsq(2);
-				dump_program->set_texture("tex", 0, gbuffer_depth);
+				dump_program->set_texture("tex", 0, s_gbuffer_depth);
 				draw_qsq(3);
 			}
 			break;
@@ -332,7 +332,7 @@ void display()
 				);
 				glClear(GL_COLOR_BUFFER_BIT);
 				dump_cube_program->use();
-				dump_cube_program->set_texture("tex", 0, light_map, GL_TEXTURE_CUBE_MAP);
+				dump_cube_program->set_texture("tex", 0, s_light_map, GL_TEXTURE_CUBE_MAP);
 				dump_cube_program->set_float("z_mult", 1);
 				draw_hsq(0);
 				dump_cube_program->set_float("z_mult", -1);
@@ -348,7 +348,7 @@ void display()
 					Shader::get(frag_dump_texture1d, {})
 				);
 				dump_program->use();
-				dump_program->set_texture("tex", 0, chord2_lut->get_texture(), chord2_lut->get_target());
+				dump_program->set_texture("tex", 0, s_chord2_lut->get_texture(), s_chord2_lut->get_target());
 				dump_program->set_float("output_scale", 0.1);
 				dump_program->set_float("output_offset", 0);
 				draw_fsq();
@@ -366,16 +366,16 @@ void display()
 				switch(mode) 
 				{
 					case DUMP_ALBEDO:
-						dump_program->set_texture("tex", 0, gbuffer_albedo);
+						dump_program->set_texture("tex", 0, s_gbuffer_albedo);
 						break;
 					case DUMP_POSITION:
-						dump_program->set_texture("tex", 0, gbuffer_position);
+						dump_program->set_texture("tex", 0, s_gbuffer_position);
 						break;
 					case DUMP_NORMAL:
-						dump_program->set_texture("tex", 0, gbuffer_normal);
+						dump_program->set_texture("tex", 0, s_gbuffer_normal);
 						break;
 					case DUMP_DEPTH:
-						dump_program->set_texture("tex", 0, gbuffer_depth);
+						dump_program->set_texture("tex", 0, s_gbuffer_depth);
 						break;
 				}
 				draw_fsq();
@@ -435,12 +435,12 @@ void keyboard(unsigned char key, int x, int y)
 			break;
 
 		case '[':
-			fog_scale -= FOG_INCREMENT;
-			if(fog_scale < 0.0)
-				fog_scale = 0.0;
+			s_fog_scale -= FOG_INCREMENT;
+			if(s_fog_scale < 0.0)
+				s_fog_scale = 0.0;
 			break;
 		case ']':
-			fog_scale += FOG_INCREMENT;
+			s_fog_scale += FOG_INCREMENT;
 			break;
 	}
 }

@@ -320,7 +320,7 @@ void init_shaders()
 				NULL,
 				NULL,
 				[](ShaderProgram* program) {
-					program->set_matrix("view_xform", cam_mat);
+					program->set_matrix("view_xform", s_cam_mat);
 				}
 			),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
@@ -420,12 +420,12 @@ void init_shaders()
 			}
 		)",
 		[](ShaderProgram* program) {
-			program->set_matrices("cube_xforms", cube_xforms, 6);
+			program->set_matrices("cube_xforms", s_cube_xforms, 6);
 		},
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_float("aspect_ratio", aspect_ratio);
-			program->set_matrix("proj_xform", proj_mat);
+			program->set_float("aspect_ratio", s_screen_aspect_ratio);
+			program->set_matrix("proj_xform", s_cam_projection);
 		},
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR),
@@ -511,12 +511,12 @@ void init_shaders()
 			}
 		)",
 		[](ShaderProgram* program) {
-			program->set_matrices("cube_xforms", cube_xforms, 6);
+			program->set_matrices("cube_xforms", s_cube_xforms, 6);
 		},
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_float("aspect_ratio", aspect_ratio);
-			program->set_matrix("proj_xform", proj_mat);
+			program->set_float("aspect_ratio", s_screen_aspect_ratio);
+			program->set_matrix("proj_xform", s_cam_projection);
 		},
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR),
@@ -674,7 +674,7 @@ void init_shaders()
 			}
 		)",
 		[](ShaderProgram* program) {
-			program->set_lut("chord2_lut", 0, chord2_lut);
+			program->set_lut("chord2_lut", 0, s_chord2_lut);
 		},
 		NULL,
 		NULL,
@@ -727,11 +727,11 @@ void init_shaders()
 		)",
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_float("fog_scale", fog_scale);
+			program->set_float("fog_scale", s_fog_scale);
 		},
 		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, gbuffer_albedo);
-			program->set_texture("depth_tex", 1, gbuffer_depth);
+			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
+			program->set_texture("depth_tex", 1, s_gbuffer_depth);
 		},
 		{}
 	);
@@ -819,14 +819,14 @@ void init_shaders()
 			}
 		)",
 		[](ShaderProgram* program) {
-			program->set_lut("chord2_lut", 4, chord2_lut);
+			program->set_lut("chord2_lut", 4, s_chord2_lut);
 		},
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, gbuffer_albedo);
-			program->set_texture("position_tex", 1, gbuffer_position);
-			program->set_texture("normal_tex", 2, gbuffer_normal);
-			program->set_texture("light_map", 3, light_map, GL_TEXTURE_CUBE_MAP);
+			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
+			program->set_texture("position_tex", 1, s_gbuffer_position);
+			program->set_texture("normal_tex", 2, s_gbuffer_normal);
+			program->set_texture("light_map", 3, s_light_map, GL_TEXTURE_CUBE_MAP);
 		},
 		{}
 	);
@@ -850,7 +850,7 @@ void init_shaders()
 		NULL,
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_texture("color_tex", 0, abuffer_color);
+			program->set_texture("color_tex", 0, s_abuffer_color);
 		},
 		{}
 	);
@@ -887,10 +887,10 @@ void init_shaders()
 		NULL,
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, gbuffer_albedo);
-			program->set_texture("position_tex", 1, gbuffer_position);
-			program->set_texture("normal_tex", 2, gbuffer_normal);
-			program->set_texture("depth_tex", 3, gbuffer_depth);
+			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
+			program->set_texture("position_tex", 1, s_gbuffer_position);
+			program->set_texture("normal_tex", 2, s_gbuffer_normal);
+			program->set_texture("depth_tex", 3, s_gbuffer_depth);
 		},
 		{}
 	);

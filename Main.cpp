@@ -236,7 +236,7 @@ void display()
 
 	#ifdef PRINT_FRAME_RATE
 		printf("%f\n", 1.0 / dt);
-		print_matrix(cam_mat);
+		print_matrix(s_cam_mat);
 		printf("\n");
 	#endif
 
@@ -340,12 +340,12 @@ void keyboard(unsigned char key, int x, int y)
 			break;
 
 		case '[':
-			fog_scale -= FOG_INCREMENT;
-			if(fog_scale < 0.0)
-				fog_scale = 0.0;
+			s_fog_scale -= FOG_INCREMENT;
+			if(s_fog_scale < 0.0)
+				s_fog_scale = 0.0;
 			break;
 		case ']':
-			fog_scale += FOG_INCREMENT;
+			s_fog_scale += FOG_INCREMENT;
 			break;
 	}
 }

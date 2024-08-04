@@ -7,6 +7,7 @@
 #include <functional>
 #include <map>
 #include <set>
+#include "LookupTable.h"
 
 
 /*

@@ -4,14 +4,14 @@
 
 //const Vec4 xhat(1, 0, 0, 0), yhat(0, 1, 0, 0), zhat(0, 0, 1, 0), what(0, 0, 0, 1);
 
-Mat4 cam_mat = Mat4::identity();
+Mat4 s_cam_mat = Mat4::identity();
 
-Mat4 proj_mat = Mat4::identity();
+Mat4 s_cam_projection = Mat4::identity();
 
-double aspect_ratio = 1;
-double fog_scale = 1.5;
+double s_screen_aspect_ratio = 1;
+double s_fog_scale = 1.5;
 
-const Mat4 cube_xforms[6] = {
+const Mat4 s_cube_xforms[6] = {
 	Mat4::axial_rotation(_x, _z, TAU / 4),		//+X
 	Mat4::axial_rotation(_z, _x, TAU / 4),		//-X
 	Mat4::axial_rotation(_y, _z, TAU / 4),		//+Y
@@ -27,12 +27,12 @@ const Mat4 cube_xforms[6] = {
 */
 void translate_cam(double right, double down, double fwd)
 {
-	cam_mat = cam_mat * Mat4::axial_rotation(_w, _x, right) * Mat4::axial_rotation(_w, _y, down) * Mat4::axial_rotation(_w, _z, fwd);
+	s_cam_mat = s_cam_mat * Mat4::axial_rotation(_w, _x, right) * Mat4::axial_rotation(_w, _y, down) * Mat4::axial_rotation(_w, _z, fwd);
 }
 
 void rotate_cam(double pitch, double yaw, double roll)
 {
-	cam_mat = cam_mat * Mat4::axial_rotation(_y, _z, pitch) * Mat4::axial_rotation(_z, _x, yaw) * Mat4::axial_rotation(_x, _y, roll);
+	s_cam_mat = s_cam_mat * Mat4::axial_rotation(_y, _z, pitch) * Mat4::axial_rotation(_z, _x, yaw) * Mat4::axial_rotation(_x, _y, roll);
 }
 
 
@@ -40,10 +40,10 @@ void rotate_cam(double pitch, double yaw, double roll)
 
 void set_perspective(double ar, double vfov, double near)
 {
-	aspect_ratio = ar;
+	s_screen_aspect_ratio = ar;
 	double q = tan(0.5 * vfov);
 
-	proj_mat = Mat4(
+	s_cam_projection = Mat4(
 		1.0 / (ar * q),		0,				0,								0,
 		0,					-1.0 / q,		0,								0,
 		0,					0,				(FAR + near) / (FAR - near),	2.0 * near * FAR / (near - FAR),
