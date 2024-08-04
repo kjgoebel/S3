@@ -5,7 +5,7 @@
 #include "Shaders.h"
 #include "Utils.h"
 #include "Model.h"
-#include "S3.h"
+#include "Camera.h"
 #include "Framebuffer.h"
 
 #include <stdio.h>
@@ -225,7 +225,7 @@ void init()
 void reshape(int w, int h)
 {
 	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
-	set_perspective((double)w / h);
+	cam.set_perspective((double)w / h);
 	init_framebuffer(w, h);
 	ShaderProgram::init_all();
 }
@@ -236,7 +236,7 @@ void display()
 
 	#ifdef PRINT_FRAME_RATE
 		printf("%f\n", 1.0 / dt);
-		print_matrix(s_cam_mat);
+		print_matrix(cam.get_mat());
 		printf("\n");
 	#endif
 
@@ -244,12 +244,12 @@ void display()
 		(positive && !negative) ? speed * dt : \
 			(negative && !positive) ? -speed * dt : 0\
 	)
-	translate_cam(
+	cam.translate(
 		CONTROL_SPEED(controls.right, controls.left, TRANSLATION_SPEED),
 		CONTROL_SPEED(controls.down, controls.up, TRANSLATION_SPEED),
 		CONTROL_SPEED(controls.fwd, controls.back, TRANSLATION_SPEED)
 	);
-	rotate_cam(
+	cam.rotate(
 		CONTROL_SPEED(controls.pitch_up, controls.pitch_down, ROTATION_SPEED),
 		CONTROL_SPEED(controls.yaw_right, controls.yaw_left, ROTATION_SPEED),
 		CONTROL_SPEED(controls.roll_right, controls.roll_left, ROTATION_SPEED)

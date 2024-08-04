@@ -366,5 +366,12 @@ struct Mat4
 	}
 };
 
+
+//extern const Vec4 xhat, yhat, zhat, what;
+
+//a and b are assumed to be normalized but not necessarily orthogonal.
+//If chord is non-NULL, it will be filled in with the distance between a and b.
+Mat4 basis_around(Vec4 a, Vec4 b, double *chord = NULL);
+
 void print_vector(const Vec4& v, FILE* fout = stdout);
 void print_matrix(const Mat4& m, FILE* fout = stdout);

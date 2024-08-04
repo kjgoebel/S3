@@ -83,7 +83,7 @@ struct PlayerState
 
 	void set_cam() const
 	{
-		s_cam_mat = torus_world_xform(b, a, 0.03, yaw, pitch, 0);
+		cam.set_mat(torus_world_xform(b, a, 0.03, yaw, pitch, 0));
 		double ca = cos(a), sa = sin(a), cb = cos(b), sb = sin(b);
 	}
 };
@@ -160,7 +160,7 @@ void reshape(int w, int h)
 		window_width = w;
 		window_height = h;
 		init_framebuffer(window_width, window_height, LIGHT_MAP_SIZE);
-		set_perspective((double)window_width / window_height);
+		cam.set_perspective((double)window_width / window_height);
 	}
 
 	ShaderProgram::init_all();
@@ -168,7 +168,6 @@ void reshape(int w, int h)
 
 void draw_scene()
 {
-	printf("draw_scene() %d\n", s_is_shadow_pass);
 	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
 	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
 	render_boulders();
@@ -180,16 +179,18 @@ void render_point_light(Mat4& light_mat, Vec3 light_emission)
 	glClear(GL_DEPTH_BUFFER_BIT);
 	glViewport(0, 0, LIGHT_MAP_SIZE, LIGHT_MAP_SIZE);
 	
-	s_light_mat = light_mat;
+	Camera light_cam(light_mat);
+	s_curcam = &light_cam;
 	s_is_shadow_pass = true;
 	draw_scene();
 	s_is_shadow_pass = false;
+	s_curcam = &cam;
 
 	use_abuffer();
 	glViewport(0, 0, window_width, window_height);
 	light_program->use();
-	light_program->set_matrix("light_xform", ~light_mat * s_cam_mat);
-	light_program->set_vector("light_pos", ~s_cam_mat * light_mat.get_column(_w));
+	light_program->set_matrix("light_xform", ~light_mat * cam.get_mat());
+	light_program->set_vector("light_pos", ~cam.get_mat() * light_mat.get_column(_w));
 	light_program->set_vector("light_emission", light_emission);
 
 	draw_fsq();
@@ -221,7 +222,7 @@ void display()
 
 	#ifdef PRINT_FRAME_RATE
 		printf("%f\n", 1.0 / dt);
-		print_matrix(s_cam_mat);
+		print_matrix(cam.get_mat());
 		printf("\n");
 	#endif
 

@@ -240,10 +240,7 @@ void Model::draw(const Mat4& xform, const Vec4& base_color)
 	ShaderProgram* raw_program = get_shader_program(s_is_shadow_pass, false, false);
 	raw_program->use();
 	raw_program->set_vector("base_color", base_color);
-	if(s_is_shadow_pass)
-		raw_program->set_matrix("model_view_xform", ~s_light_mat * xform);
-	else
-		raw_program->set_matrix("model_view_xform", ~s_cam_mat * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
+	raw_program->set_matrix("model_view_xform", ~s_curcam->get_mat() * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
 	
 	glBindVertexArray(raw_vertex_array);
 	draw_raw();
@@ -379,10 +376,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 			glBindVertexArray(raw_vertex_array);
 			for(int i = 0; i < count; i++)
 			{
-				if(s_is_shadow_pass)
-					program->set_matrix("model_view_xform", ~s_light_mat * temp_xforms[i]);
-				else
-					program->set_matrix("model_view_xform", ~s_cam_mat * temp_xforms[i]);
+				program->set_matrix("model_view_xform", ~s_curcam->get_mat() * temp_xforms[i]);
 				draw_raw();
 			}
 			glBindVertexArray(0);
@@ -428,10 +422,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 			{
 				Vec4 base_color = temp_colors[i];
 				program->set_vector("base_color", base_color);
-				if(s_is_shadow_pass)
-					program->set_matrix("model_view_xform", ~s_light_mat * temp_xforms[i]);
-				else
-					program->set_matrix("model_view_xform", ~s_cam_mat * temp_xforms[i]);
+				program->set_matrix("model_view_xform", ~s_curcam->get_mat() * temp_xforms[i]);
 				draw_raw();
 			}
 			glBindVertexArray(0);

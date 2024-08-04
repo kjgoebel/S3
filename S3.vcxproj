@@ -125,7 +125,7 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="MakeModel.cpp" />
     <ClCompile Include="Model.cpp" />
-    <ClCompile Include="S3.cpp" />
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Shaders.cpp" />
     <ClCompile Include="Utils.cpp" />
     <ClCompile Include="Vector.cpp" />
@@ -142,7 +142,7 @@
     <ClInclude Include="LookupTable.h" />
     <ClInclude Include="MakeModel.h" />
     <ClInclude Include="Model.h" />
-    <ClInclude Include="S3.h" />
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="Shaders.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="Vector.h" />
