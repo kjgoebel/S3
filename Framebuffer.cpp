@@ -6,7 +6,6 @@
 
 GLuint s_gbuffer = 0, s_gbuffer_albedo = 0, s_gbuffer_position = 0, s_gbuffer_normal = 0, s_gbuffer_depth = 0;
 GLuint s_abuffer = 0, s_abuffer_color = 0;
-GLuint s_lbuffer = 0, s_light_map = 0;
 bool s_is_shadow_pass = false;
 
 int window_width = 0, window_height = 0;
@@ -14,7 +13,7 @@ int window_width = 0, window_height = 0;
 GLuint fsq_vertex_array = 0;
 
 
-void init_framebuffer(int w, int h, int light_map_size)
+void init_framebuffer(int w, int h)
 {
 	glClearColor(0, 0, 0, 0);
 	//glEnable(GL_PROGRAM_POINT_SIZE);
@@ -112,23 +111,6 @@ void init_framebuffer(int w, int h, int light_map_size)
 
 		glBindTexture(GL_TEXTURE_2D, s_abuffer_color);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, w, h, 0, GL_RGBA, GL_FLOAT, NULL);
-
-		if(light_map_size && s_light_map)
-		{
-			glBindTexture(GL_TEXTURE_CUBE_MAP, s_light_map);
-			for(int face = 0; face < 6; face++)
-				glTexImage2D(
-					GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
-					0,
-					GL_DEPTH_COMPONENT32F,
-					light_map_size,
-					light_map_size,
-					0,
-					GL_DEPTH_COMPONENT,
-					GL_FLOAT,
-					NULL
-				);
-		}
 	}
 	else
 	{
@@ -181,36 +163,6 @@ void init_framebuffer(int w, int h, int light_map_size)
 			into the scene with depth checking during the accumulation phase.
 		*/
 		glNamedFramebufferTexture(s_abuffer, GL_DEPTH_ATTACHMENT, s_gbuffer_depth, 0);
-
-		if(light_map_size)
-		{
-			glGenFramebuffers(1, &s_lbuffer);
-			glBindFramebuffer(GL_FRAMEBUFFER, s_lbuffer);
-
-			glDrawBuffers(0, NULL);		//Lights only need depth.
-
-			glGenTextures(1, &s_light_map);
-			glBindTexture(GL_TEXTURE_CUBE_MAP, s_light_map);
-			for(int face = 0; face < 6; face++)
-				glTexImage2D(
-					GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
-					0,
-					GL_DEPTH_COMPONENT32F,
-					light_map_size,
-					light_map_size,
-					0,
-					GL_DEPTH_COMPONENT,
-					GL_FLOAT,
-					NULL
-				);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-			glNamedFramebufferTexture(s_lbuffer, GL_DEPTH_ATTACHMENT, s_light_map, 0);
-		}
 	}
 
 	if(glCheckNamedFramebufferStatus(s_gbuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
@@ -219,23 +171,11 @@ void init_framebuffer(int w, int h, int light_map_size)
 	if(glCheckNamedFramebufferStatus(s_abuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		error("A-Buffer status is %d\n", glCheckNamedFramebufferStatus(s_abuffer, GL_FRAMEBUFFER));
 
-	if(glCheckNamedFramebufferStatus(s_lbuffer, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		error("L-Buffer status is %d\n", glCheckNamedFramebufferStatus(s_lbuffer, GL_FRAMEBUFFER));
-
 }
 
 void use_gbuffer()
 {
 	glBindFramebuffer(GL_FRAMEBUFFER, s_gbuffer);
-
-	glEnable(GL_DEPTH_TEST);
-	glDepthMask(true);
-	glEnable(GL_CULL_FACE);
-}
-
-void use_lbuffer()
-{
-	glBindFramebuffer(GL_FRAMEBUFFER, s_lbuffer);
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthMask(true);

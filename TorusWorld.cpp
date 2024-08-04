@@ -162,7 +162,7 @@ void reshape(int w, int h)
 	{
 		window_width = w;
 		window_height = h;
-		init_framebuffer(window_width, window_height, LIGHT_MAP_SIZE);
+		init_framebuffer(window_width, window_height);
 		cam.set_perspective((double)window_width / window_height);
 	}
 
@@ -290,7 +290,7 @@ void display()
 				);
 				glClear(GL_COLOR_BUFFER_BIT);
 				dump_cube_program->use();
-				dump_cube_program->set_texture("tex", 0, s_light_map, GL_TEXTURE_CUBE_MAP);
+				dump_cube_program->set_texture("tex", 0, lights[0]->shadow_map, GL_TEXTURE_CUBE_MAP);
 				dump_cube_program->set_float("z_mult", 1);
 				draw_hsq(0);
 				dump_cube_program->set_float("z_mult", -1);

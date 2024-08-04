@@ -827,7 +827,6 @@ void init_shaders()
 			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
 			program->set_texture("position_tex", 1, s_gbuffer_position);
 			program->set_texture("normal_tex", 2, s_gbuffer_normal);
-			program->set_texture("light_map", 3, s_light_map, GL_TEXTURE_CUBE_MAP);
 		},
 		{}
 	);
