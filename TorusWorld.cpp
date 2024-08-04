@@ -6,6 +6,7 @@
 #include "Shaders.h"
 #include "Utils.h"
 #include "Framebuffer.h"
+#include "Light.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -38,19 +39,20 @@ enum Mode {
 
 Model* dots_model;
 Model* torus_model;
-Model* sun_model;
-Model* light_model;
 Model* boulder_model;
 DrawFunc render_boulders;
 ShaderProgram *light_program, *final_program;
 Mode mode = NORMAL;
 
-#define NUM_LIGHTS (4)
-Mat4 light_xforms[NUM_LIGHTS];
-Vec3 light_emissions[NUM_LIGHTS];
+std::vector<Light*> lights;
 
 double last_frame_time;
 
+
+Mat4 sun_xform()
+{
+	return Mat4::axial_rotation(_x, _y, SUN_SPEED * last_frame_time) * Mat4::axial_rotation(_w, _x, TAU / 4) * Mat4::axial_rotation(_z, _y, TAU / 4);
+}
 
 Mat4 torus_world_xform(double x, double y, double z, double yaw, double pitch, double roll)
 {
@@ -123,10 +125,6 @@ void init()
 	torus_model->generate_normals();
 	torus_model->generate_primitive_colors(0.7);
 
-	sun_model = Model::make_icosahedron(0.05, 2, true);
-
-	light_model = Model::make_icosahedron(0.02, 2, true);
-
 	boulder_model =  Model::make_icosahedron(0.1, 1);
 	boulder_model->generate_primitive_colors(0.3);
 	boulder_model->generate_normals();
@@ -137,18 +135,32 @@ void init()
 	render_boulders = boulder_model->make_draw_func(NUM_BOULDERS, boulders, Vec4(0.7, 0.7, 0.7, 1));
 	delete[] boulders;
 
-	for(int i = 0; i < NUM_LIGHTS; i++)
-	{
-		light_xforms[i] = torus_world_xform(frand() * TAU, frand() * TAU, 0.15 + 0.15 * frand(), 0, 0, 0);
-		light_emissions[i] = 0.25 * Vec3(frand(), frand(), frand());
-	}
+	//The Sun
+	lights.push_back(new Light(
+		sun_xform(),
+		Vec3(1, 1, 1),
+		Model::make_icosahedron(0.05, 2, true)
+	));
+
+	Model* light_model = Model::make_icosahedron(0.02, 2, true);
+
+	//The Unlight
+	lights.push_back(new Light(
+		Mat4::axial_rotation(_w, _x, TAU / 6),
+		-Vec3(0.6, 0.6, 0.6),
+		light_model
+	));
+
+	//Generic lights
+	for(int i = 0; i < 4; i++)
+		lights.push_back(new Light(
+			torus_world_xform(frand() * TAU, frand() * TAU, 0.15 + 0.15 * frand(), 0, 0, 0),
+			0.25 * Vec3(frand(), frand(), frand()),
+			light_model
+		));
 
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
 	player_state.set_cam();
-
-	GLint num_texture_units;
-	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &num_texture_units);
-	printf("There are %d texture units available.\n", num_texture_units);
 }
 
 int window_width = 0, window_height = 0;
@@ -173,7 +185,7 @@ void draw_scene()
 	render_boulders();
 }
 
-void render_point_light(Mat4& light_mat, Vec3 light_emission)
+void render_point_light(const Mat4& light_mat, Vec3 light_emission)
 {
 	use_lbuffer();
 	glClear(GL_DEPTH_BUFFER_BIT);
@@ -250,22 +262,10 @@ void display()
 	glBlendEquation(GL_FUNC_ADD);
 	glBlendFunc(GL_ONE, GL_ONE);
 
-	render_point_light(
-		Mat4::axial_rotation(_w, _x, TAU / 6),
-		-Vec3(0.6, 0.6, 0.6)
-	);
-	for(int i = 0; i < NUM_LIGHTS; i++)
-		render_point_light(light_xforms[i], Vec3(light_emissions[i].components));
+	lights[0]->set_mat(sun_xform());
 
-	Mat4 sun_xform = Mat4::axial_rotation(_x, _y, SUN_SPEED * last_frame_time) * Mat4::axial_rotation(_w, _x, TAU / 4) * Mat4::axial_rotation(_z, _y, TAU / 4);
-	render_point_light(
-		sun_xform,
-		Vec3(1, 1, 1)
-	);
-	/*render_point_light(
-		cam_mat * Mat4::axial_rotation(_w, _x, 0.01) * Mat4::axial_rotation(_w, _y, 0.005),
-		Vec3(0.2, 0.1, 0.05)
-	);*/
+	for(auto light : lights)
+		render_point_light(light->get_mat(), light->emission);
 
 	check_gl_errors("display 4");
 
@@ -274,10 +274,8 @@ void display()
 	glDepthMask(GL_TRUE);
 	glEnable(GL_CULL_FACE);
 
-	sun_model->draw(sun_xform, Vec4(10, 10, 10, 1));
-
-	for(int i = 0; i < NUM_LIGHTS; i++)
-		light_model->draw(light_xforms[i], 10 * light_emissions[i]);
+	for(auto light : lights)
+		light->model->draw(light->get_mat(), 10 * light->emission);
 
 	check_gl_errors("display 5");
 

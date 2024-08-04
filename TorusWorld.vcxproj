@@ -123,6 +123,7 @@
   <ItemGroup>
     <ClCompile Include="Framebuffer.cpp" />
     <ClCompile Include="glew.c" />
+    <ClCompile Include="Light.cpp" />
     <ClCompile Include="LookupTable.cpp" />
     <ClCompile Include="MakeModel.cpp" />
     <ClCompile Include="Model.cpp" />
@@ -141,6 +142,7 @@
     <ClInclude Include="gl\glew.h" />
     <ClInclude Include="gl\glxew.h" />
     <ClInclude Include="gl\wglew.h" />
+    <ClInclude Include="Light.h" />
     <ClInclude Include="LookupTable.h" />
     <ClInclude Include="MakeModel.h" />
     <ClInclude Include="Model.h" />

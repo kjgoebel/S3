@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include "Utils.h"
 #include "Framebuffer.h"
+#include "Light.h"
 
 #pragma warning(disable : 4244)		//conversion from double to float
 #pragma warning(disable : 4996)		//VS doesn't like old-school string manipulation.
