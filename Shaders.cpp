@@ -724,6 +724,7 @@ void init_shaders()
 				float distance = texelFetch(depth_tex, pixel_coords, 0).r;
 				vec4 color = texelFetch(albedo_tex, pixel_coords, 0);
 				frag_color = exp(-distance * fog_scale) * color;
+				//frag_color = vec4(0.5, 0, 0, 1);
 			}
 		)",
 		NULL,
@@ -731,8 +732,8 @@ void init_shaders()
 			program->set_float("fog_scale", s_fog_scale);
 		},
 		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
-			program->set_texture("depth_tex", 1, s_gbuffer_depth);
+			program->set_texture("albedo_tex", 0, s_gbuffer->albedo);
+			program->set_texture("depth_tex", 1, s_gbuffer->depth);
 		},
 		{}
 	);
@@ -824,9 +825,9 @@ void init_shaders()
 		},
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
-			program->set_texture("position_tex", 1, s_gbuffer_position);
-			program->set_texture("normal_tex", 2, s_gbuffer_normal);
+			program->set_texture("albedo_tex", 0, s_gbuffer->albedo);
+			program->set_texture("position_tex", 1, s_gbuffer->position);
+			program->set_texture("normal_tex", 2, s_gbuffer->normal);
 		},
 		{}
 	);
@@ -850,7 +851,7 @@ void init_shaders()
 		NULL,
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_texture("color_tex", 0, s_abuffer_color);
+			program->set_texture("color_tex", 0, s_abuffer->color);
 		},
 		{}
 	);
@@ -887,10 +888,10 @@ void init_shaders()
 		NULL,
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
-			program->set_texture("position_tex", 1, s_gbuffer_position);
-			program->set_texture("normal_tex", 2, s_gbuffer_normal);
-			program->set_texture("depth_tex", 3, s_gbuffer_depth);
+			program->set_texture("albedo_tex", 0, s_gbuffer->albedo);
+			program->set_texture("position_tex", 1, s_gbuffer->position);
+			program->set_texture("normal_tex", 2, s_gbuffer->normal);
+			program->set_texture("depth_tex", 3, s_gbuffer->depth);
 		},
 		{}
 	);

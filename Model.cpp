@@ -237,7 +237,7 @@ void Model::draw(const Mat4& xform, const Vec4& base_color)
 	if(!vertex_buffer)
 		prepare_to_render();
 		
-	ShaderProgram* raw_program = get_shader_program(s_is_shadow_pass, false, false);
+	ShaderProgram* raw_program = get_shader_program(s_is_shadow_pass(), false, false);
 	raw_program->use();
 	raw_program->set_vector("base_color", base_color);
 	raw_program->set_matrix("model_view_xform", ~s_curcam->get_mat() * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
@@ -355,7 +355,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 		bind_xform_array(vertex_array, count, xforms);
 
 		return [count, vertex_array, base_color, this]() {
-			ShaderProgram* program = get_shader_program(s_is_shadow_pass, true, false);
+			ShaderProgram* program = get_shader_program(s_is_shadow_pass(), true, false);
 			program->use();
 			glBindVertexArray(vertex_array);
 			program->set_vector("base_color", base_color);
@@ -370,7 +370,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 			temp_xforms[i] = xforms[i];
 
 		return [count, temp_xforms, base_color, this]() {
-			ShaderProgram* program = get_shader_program(s_is_shadow_pass, false, false);
+			ShaderProgram* program = get_shader_program(s_is_shadow_pass(), false, false);
 			program->use();
 			program->set_vector("base_color", base_color);
 			glBindVertexArray(raw_vertex_array);
@@ -397,7 +397,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 		bind_color_array(vertex_array, count, base_colors);
 
 		return [count, vertex_array, this]() {
-			ShaderProgram* program = get_shader_program(s_is_shadow_pass, true, true);
+			ShaderProgram* program = get_shader_program(s_is_shadow_pass(), true, true);
 			program->use();
 			glBindVertexArray(vertex_array);
 			draw_instanced(count);
@@ -415,7 +415,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 		}
 
 		return [count, temp_xforms, temp_colors, this]() {
-			ShaderProgram* program = get_shader_program(s_is_shadow_pass, false, false);
+			ShaderProgram* program = get_shader_program(s_is_shadow_pass(), false, false);
 			program->use();
 			glBindVertexArray(raw_vertex_array);
 			for(int i = 0; i < count; i++)

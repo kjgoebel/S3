@@ -3,6 +3,17 @@
 #include "Camera.h"
 
 #include "Model.h"
+#include "Framebuffer.h"
+
+
+struct Shadowbuffer : public Framebuffer
+{
+	GLuint shadow_map;
+
+	Shadowbuffer(GLsizei shadow_map_size);
+
+	static TextureSpec shadow_map_spec;
+};
 
 
 struct Light : public Camera
@@ -10,7 +21,8 @@ struct Light : public Camera
 	Vec3 emission;
 	Model* model;
 
-	GLuint framebuffer, shadow_map;
+	Shadowbuffer* shadowbuffer;
+	Pass *shadow_pass, *light_pass;
 	bool shadow_map_dirty;
 
 	Light(Mat4& mat, Vec3& emission, Model* model, double near_clip = 0.001);

@@ -12,16 +12,7 @@
 #include <time.h>
 
 
-#define PRINT_FRAME_RATE
-
-Model* dots_model = NULL;
-Model* pole_model = NULL;
-Model* geodesic_model = NULL;
-Model* torus_model = NULL;
-
-Model* tesseract_arc = NULL;
-
-ShaderProgram* fog_quad_program = NULL;
+//#define PRINT_FRAME_RATE
 
 #define NUM_DOTS		(2000)
 
@@ -29,6 +20,17 @@ ShaderProgram* fog_quad_program = NULL;
 #define ROTATION_SPEED			(TAU / 6)
 
 #define FOG_INCREMENT		(0.5)
+
+Pass* gpass = NULL;
+Pass* fog_pass = NULL;
+
+ShaderProgram* fog_quad_program = NULL;
+
+Model* dots_model = NULL;
+Model* pole_model = NULL;
+Model* geodesic_model = NULL;
+Model* torus_model = NULL;
+Model* tesseract_arc = NULL;
 
 struct Controls
 {
@@ -82,12 +84,19 @@ void init()
 {
 	srand(clock());
 
-	//glEnable(GL_PROGRAM_POINT_SIZE);
 	glClearColor(0, 0, 0, 0);
-	glCullFace(GL_BACK);
+	//glEnable(GL_PROGRAM_POINT_SIZE);
 
 	init_luts();
 	init_shaders();
+	init_screenspace();
+
+	s_gbuffer = new GBuffer();
+	gpass = new Pass(s_gbuffer);
+	fog_pass = new Pass(NULL);
+	fog_pass->clear_mask = 0;
+	fog_pass->depth_test = false;
+	fog_pass->depth_mask = false;
 
 	fog_quad_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
@@ -224,9 +233,8 @@ void init()
 
 void reshape(int w, int h)
 {
-	glViewport(0, 0, (GLsizei)w, (GLsizei)h);
 	cam.set_perspective((double)w / h);
-	init_framebuffer(w, h);
+	resize_screenbuffers(w, h);
 	ShaderProgram::init_all();
 }
 
@@ -257,7 +265,7 @@ void display()
 
 	last_fame_time += dt;
 
-	use_gbuffer();
+	gpass->start();
 
 	ShaderProgram::frame_all();
 
@@ -301,7 +309,7 @@ void display()
 	if(draw_superhopf)
 		render_superhopf();
 
-	use_default_framebuffer();
+	fog_pass->start();
 	fog_quad_program->use();
 	draw_fsq();
 

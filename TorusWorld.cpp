@@ -43,6 +43,8 @@ DrawFunc render_boulders;
 ShaderProgram *final_program;
 Mode mode = NORMAL;
 
+Pass *gpass, *apass, *unlit_pass, *final_pass;
+
 std::vector<Light*> lights;
 
 double last_frame_time;
@@ -95,17 +97,54 @@ void init()
 {
 	srand(clock());
 
-	glCullFace(GL_BACK);
+	check_gl_errors("init 0");
+	
+	glClearColor(0, 0, 0, 0);
+	//glEnable(GL_PROGRAM_POINT_SIZE);
+	glBlendEquation(GL_FUNC_ADD);
+	glBlendFunc(GL_ONE, GL_ONE);
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 	init_luts();
 	init_shaders();
+	init_screenspace();
+
+	check_gl_errors("init 1");
+
+	s_gbuffer = new GBuffer();
+	s_abuffer = new ABuffer(s_gbuffer);
+
+	gpass = new Pass(s_gbuffer);
+
+	/*
+		This pass only exists to clear the A-buffer. All the actual drawing 
+		into the A-buffer will be done by light passes and then the unlit 
+		pass.
+	*/
+	apass = new Pass(s_abuffer);
+	apass->clear_mask = GL_COLOR_BUFFER_BIT;
+
+	unlit_pass = new Pass(s_abuffer);
+	unlit_pass->clear_mask = 0;
+	unlit_pass->depth_test = unlit_pass->depth_mask = true;
+	unlit_pass->cull_face = GL_BACK;
+	unlit_pass->blend = false;
+
+	final_pass = new Pass(NULL);
+	final_pass->clear_mask = 0;
+	final_pass->depth_test = final_pass->depth_mask = false;
+	final_pass->cull_face = 0;
+	final_pass->blend = false;
+
+	check_gl_errors("init 2");
 
 	final_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
 		NULL,
 		Shader::get(frag_final_color, {})
 	);
+
+	check_gl_errors("init 3");
 
 	//Note: Should make half as many dots but only on the right side of the torus.
 	Vec4* dots = new Vec4[NUM_DOTS];
@@ -127,6 +166,8 @@ void init()
 		boulders[i] = torus_world_xform(frand() * TAU, frand() * TAU, 0.05, frand() * TAU, fsrand() * 0.5 * TAU, fsrand() * 0.5 * TAU);
 	render_boulders = boulder_model->make_draw_func(NUM_BOULDERS, boulders, Vec4(0.7, 0.7, 0.7, 1));
 	delete[] boulders;
+
+	check_gl_errors("init 4");
 
 	//The Sun
 	lights.push_back(new Light(
@@ -151,20 +192,17 @@ void init()
 			0.25 * Vec3(frand(), frand(), frand()),
 			light_model
 		));
-
+	
+	check_gl_errors("init 5");
+	
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
 	player_state.set_cam();
 }
 
 void reshape(int w, int h)
 {
-	if(w != window_width || h != window_height)
-	{
-		window_width = w;
-		window_height = h;
-		init_framebuffer(window_width, window_height);
-		cam.set_perspective((double)window_width / window_height);
-	}
+	resize_screenbuffers(w, h);
+	cam.set_perspective((double)window_width / window_height);
 
 	ShaderProgram::init_all();
 }
@@ -213,45 +251,30 @@ void display()
 	check_gl_errors("display 2");
 
 	//Geometry Pass
-	use_gbuffer();
-
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glViewport(0, 0, window_width, window_height);
-	glDisable(GL_BLEND);
+	gpass->start();
 	draw_scene();
 
 	check_gl_errors("display 3");
-
+	
 	//Light (Accumulation) Pass
-	use_abuffer();
-
-	glClear(GL_COLOR_BUFFER_BIT);
-	glEnable(GL_BLEND);
-	glBlendEquation(GL_FUNC_ADD);
-	glBlendFunc(GL_ONE, GL_ONE);
-
+	apass->start();
 	lights[0]->set_mat(sun_xform());
 
 	for(auto light : lights)
 		light->render(draw_scene);
 
 	check_gl_errors("display 4");
-
-	glDisable(GL_BLEND);
-	glEnable(GL_DEPTH_TEST);
-	glDepthMask(GL_TRUE);
-	glEnable(GL_CULL_FACE);
+	
+	//Unlit PASS
+	unlit_pass->start();
 
 	for(auto light : lights)
 		light->draw();
 
 	check_gl_errors("display 5");
-
+	
 	//Final Pass
-	use_default_framebuffer();
-
-	glViewport(0, 0, window_width, window_height);
-	glDisable(GL_BLEND);
+	final_pass->start();
 
 	switch(mode)
 	{
@@ -270,13 +293,13 @@ void display()
 
 				dump_program->use();
 			
-				dump_program->set_texture("tex", 0, s_gbuffer_albedo);
+				dump_program->set_texture("tex", 0, s_gbuffer->albedo);
 				draw_qsq(0);
-				dump_program->set_texture("tex", 0, s_gbuffer_position);
+				dump_program->set_texture("tex", 0, s_gbuffer->position);
 				draw_qsq(1);
-				dump_program->set_texture("tex", 0, s_gbuffer_normal);
+				dump_program->set_texture("tex", 0, s_gbuffer->normal);
 				draw_qsq(2);
-				dump_program->set_texture("tex", 0, s_gbuffer_depth);
+				dump_program->set_texture("tex", 0, s_gbuffer->depth);
 				draw_qsq(3);
 			}
 			break;
@@ -290,7 +313,7 @@ void display()
 				);
 				glClear(GL_COLOR_BUFFER_BIT);
 				dump_cube_program->use();
-				dump_cube_program->set_texture("tex", 0, lights[0]->shadow_map, GL_TEXTURE_CUBE_MAP);
+				dump_cube_program->set_texture("tex", 0, lights[0]->shadowbuffer->shadow_map, GL_TEXTURE_CUBE_MAP);
 				dump_cube_program->set_float("z_mult", 1);
 				draw_hsq(0);
 				dump_cube_program->set_float("z_mult", -1);
@@ -324,16 +347,16 @@ void display()
 				switch(mode) 
 				{
 					case DUMP_ALBEDO:
-						dump_program->set_texture("tex", 0, s_gbuffer_albedo);
+						dump_program->set_texture("tex", 0, s_gbuffer->albedo);
 						break;
 					case DUMP_POSITION:
-						dump_program->set_texture("tex", 0, s_gbuffer_position);
+						dump_program->set_texture("tex", 0, s_gbuffer->position);
 						break;
 					case DUMP_NORMAL:
-						dump_program->set_texture("tex", 0, s_gbuffer_normal);
+						dump_program->set_texture("tex", 0, s_gbuffer->normal);
 						break;
 					case DUMP_DEPTH:
-						dump_program->set_texture("tex", 0, s_gbuffer_depth);
+						dump_program->set_texture("tex", 0, s_gbuffer->depth);
 						break;
 				}
 				draw_fsq();
