@@ -6,26 +6,23 @@
 #include "Framebuffer.h"
 
 
-struct Shadowbuffer : public Framebuffer
-{
-	GLuint shadow_map;
-
-	Shadowbuffer(GLsizei shadow_map_size);
-
-	static TextureSpec shadow_map_spec;
-};
-
+//To be created in TorusWorld.cpp:
+//I don't like this.
+extern Screenbuffer* s_abuffer;
+#define s_abuffer_color (s_abuffer->textures[0])
 
 struct Light : public Camera
 {
 	Vec3 emission;
 	Model* model;
 
-	Shadowbuffer* shadowbuffer;
+	Framebuffer* shadow_buffer;
 	Pass *shadow_pass, *light_pass;
 	bool shadow_map_dirty;
 
 	Light(Mat4& mat, Vec3& emission, Model* model, double near_clip = 0.001);
+
+	inline GLuint shadow_map() {return shadow_buffer->textures[0];}
 
 	void set_mat(Mat4& new_mat)
 	{

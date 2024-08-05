@@ -32,7 +32,10 @@ enum Mode {
 	DUMP_NORMAL,
 	DUMP_DEPTH,
 	DUMP_LIGHT_MAP,
-	DUMP_LUT
+	DUMP_LUT,
+	DUMP_BLOOM_MAIN_COLOR,
+	DUMP_BLOOM_BRIGHT_COLOR,
+	DUMP_BLOOM_RESULT
 };
 
 
@@ -40,10 +43,12 @@ Model* dots_model;
 Model* torus_model;
 Model* boulder_model;
 DrawFunc render_boulders;
-ShaderProgram *final_program;
+ShaderProgram* final_program;
+ShaderProgram *bloom_separate_program, *bloom_program_h, *bloom_program_v;
 Mode mode = NORMAL;
 
-Pass *gpass, *apass, *unlit_pass, *final_pass;
+Framebuffer *bloom_separate, *bloom_h, *bloom_v;
+Pass *gpass, *apass, *unlit_pass, *bloom_separate_pass, *bloom_h_pass, *bloom_v_pass, *final_pass;
 
 std::vector<Light*> lights;
 
@@ -107,12 +112,29 @@ void init()
 
 	init_luts();
 	init_shaders();
-	init_screenspace();
+	init_framebuffers();
 
 	check_gl_errors("init 1");
 
-	s_gbuffer = new GBuffer();
-	s_abuffer = new ABuffer(s_gbuffer);
+	s_abuffer = new Screenbuffer("A-Buffer", {{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT0}}, {{GL_DEPTH_ATTACHMENT, s_gbuffer_depth}});
+	bloom_separate = new Screenbuffer(
+		"Bloom Separate",
+		{
+			{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT0},
+			{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT1}
+		},
+		{}
+	);
+	bloom_h = new Screenbuffer(
+		"Bloom H",
+		{{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT0}},
+		{}
+	);
+	bloom_v = new Screenbuffer(
+		"Bloom V",
+		{{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT0}},
+		{}
+	);
 
 	gpass = new Pass(s_gbuffer);
 
@@ -130,6 +152,16 @@ void init()
 	unlit_pass->cull_face = GL_BACK;
 	unlit_pass->blend = false;
 
+	bloom_separate_pass = new Pass(bloom_separate);
+	bloom_separate_pass->clear_mask = 0;
+	bloom_separate_pass->depth_test = bloom_separate_pass->depth_mask = false;
+	bloom_separate_pass->cull_face = 0;
+	bloom_separate_pass->blend = false;
+
+	bloom_h_pass = new Pass(bloom_h, bloom_separate_pass);
+
+	bloom_v_pass = new Pass(bloom_v, bloom_separate_pass);
+
 	final_pass = new Pass(NULL);
 	final_pass->clear_mask = 0;
 	final_pass->depth_test = final_pass->depth_mask = false;
@@ -137,6 +169,24 @@ void init()
 	final_pass->blend = false;
 
 	check_gl_errors("init 2");
+
+	bloom_separate_program = ShaderProgram::get(
+		Shader::get(vert_screenspace, {}),
+		NULL,
+		Shader::get(frag_bloom_separate, {})
+	);
+
+	bloom_program_h = ShaderProgram::get(
+		Shader::get(vert_screenspace, {}),
+		NULL,
+		Shader::get(frag_bloom, {DEFINE_HORIZONTAL})
+	);
+
+	bloom_program_v = ShaderProgram::get(
+		Shader::get(vert_screenspace, {}),
+		NULL,
+		Shader::get(frag_bloom, {})
+	);
 
 	final_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
@@ -265,7 +315,7 @@ void display()
 
 	check_gl_errors("display 4");
 	
-	//Unlit PASS
+	//Unlit Pass
 	unlit_pass->start();
 
 	for(auto light : lights)
@@ -273,8 +323,26 @@ void display()
 
 	check_gl_errors("display 5");
 	
+	//Bloom Passes
+	bloom_separate_pass->start();
+	bloom_separate_program->use();
+	bloom_separate_program->set_texture("color_tex", 0, s_abuffer_color);
+	draw_fsq();
+
+	bloom_h_pass->start();
+	bloom_program_h->use();
+	bloom_program_h->set_texture("color_tex", 0, bloom_separate->textures[1]);
+	draw_fsq();
+
+	bloom_v_pass->start();
+	bloom_program_v->use();
+	bloom_program_v->set_texture("color_tex", 0, bloom_h->textures[0]);
+	draw_fsq();
+
 	//Final Pass
 	final_pass->start();
+	final_program->set_texture("main_color_tex", 0, bloom_separate->textures[0]);
+	final_program->set_texture("bright_color_tex", 1, bloom_v->textures[0]);
 
 	switch(mode)
 	{
@@ -293,13 +361,13 @@ void display()
 
 				dump_program->use();
 			
-				dump_program->set_texture("tex", 0, s_gbuffer->albedo);
+				dump_program->set_texture("tex", 0, s_gbuffer_albedo);
 				draw_qsq(0);
-				dump_program->set_texture("tex", 0, s_gbuffer->position);
+				dump_program->set_texture("tex", 0, s_gbuffer_position);
 				draw_qsq(1);
-				dump_program->set_texture("tex", 0, s_gbuffer->normal);
+				dump_program->set_texture("tex", 0, s_gbuffer_normal);
 				draw_qsq(2);
-				dump_program->set_texture("tex", 0, s_gbuffer->depth);
+				dump_program->set_texture("tex", 0, s_gbuffer_depth);
 				draw_qsq(3);
 			}
 			break;
@@ -313,7 +381,7 @@ void display()
 				);
 				glClear(GL_COLOR_BUFFER_BIT);
 				dump_cube_program->use();
-				dump_cube_program->set_texture("tex", 0, lights[0]->shadowbuffer->shadow_map, GL_TEXTURE_CUBE_MAP);
+				dump_cube_program->set_texture("tex", 0, lights[0]->shadow_map(), GL_TEXTURE_CUBE_MAP);
 				dump_cube_program->set_float("z_mult", 1);
 				draw_hsq(0);
 				dump_cube_program->set_float("z_mult", -1);
@@ -347,16 +415,25 @@ void display()
 				switch(mode) 
 				{
 					case DUMP_ALBEDO:
-						dump_program->set_texture("tex", 0, s_gbuffer->albedo);
+						dump_program->set_texture("tex", 0, s_gbuffer_albedo);
 						break;
 					case DUMP_POSITION:
-						dump_program->set_texture("tex", 0, s_gbuffer->position);
+						dump_program->set_texture("tex", 0, s_gbuffer_position);
 						break;
 					case DUMP_NORMAL:
-						dump_program->set_texture("tex", 0, s_gbuffer->normal);
+						dump_program->set_texture("tex", 0, s_gbuffer_normal);
 						break;
 					case DUMP_DEPTH:
-						dump_program->set_texture("tex", 0, s_gbuffer->depth);
+						dump_program->set_texture("tex", 0, s_gbuffer_depth);
+						break;
+					case DUMP_BLOOM_RESULT:
+						dump_program->set_texture("tex", 0, bloom_h->textures[0]);
+						break;
+					case DUMP_BLOOM_MAIN_COLOR:
+						dump_program->set_texture("tex", 0, bloom_separate->textures[0]);
+						break;
+					case DUMP_BLOOM_BRIGHT_COLOR:
+						dump_program->set_texture("tex", 0, bloom_separate->textures[1]);
 						break;
 				}
 				draw_fsq();
@@ -472,6 +549,15 @@ void special(int key, int x, int y)
 			break;
 		case GLUT_KEY_F8:
 			mode = DUMP_LUT;
+			break;
+		case GLUT_KEY_F9:
+			mode = DUMP_BLOOM_RESULT;
+			break;
+		case GLUT_KEY_F11:
+			mode = DUMP_BLOOM_MAIN_COLOR;
+			break;
+		case GLUT_KEY_F12:
+			mode = DUMP_BLOOM_BRIGHT_COLOR;
 			break;
 	}
 }

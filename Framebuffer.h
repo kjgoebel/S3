@@ -25,71 +25,59 @@ struct TextureSpec
 		GLenum wrap_mode = GL_CLAMP_TO_EDGE
 	);
 
-	void make_texture(GLuint* out_tex_name, GLuint framebuffer, GLsizei width, GLsizei height);
+	GLuint make_texture(GLuint framebuffer, GLsizei width, GLsizei height);
 	
 	//There really isn't a good name for this, 'cuz all it does is call glTexImage*(), and that's not a good name.
 	void tex_image(GLuint tex_name, GLsizei width, GLsizei height, void* data = NULL);
 };
 
+struct ExtraAttachment
+{
+	GLenum attachment_point;
+	GLuint tex_name;
+};
 
-//A framebuffer with no attachments. Don't use this directly.
+
 struct Framebuffer
 {
 	GLuint name;
 	GLsizei width, height;
 
-	Framebuffer();
+	const char* display_name;
+
+	std::vector<GLuint> textures;
+	std::vector<TextureSpec> texture_specs;
+
+	Framebuffer(
+		const char* display_name,
+		std::vector<TextureSpec> texture_specs,
+		std::vector<ExtraAttachment> extra_attachments,
+		GLsizei width = 0,
+		GLsizei height = 0
+	);
+
+	void check_status() const;
 };
 
-//A framebuffer whose attachments are screen resolution. Don't use this directly, except to call resize_all.
 struct Screenbuffer : public Framebuffer
 {
-	virtual void post_resize()
-	{
-		width = window_width;
-		height = window_height;
-	}
-	Screenbuffer() {all_screenbuffers.push_back(this);}
+	virtual void post_resize();
+	Screenbuffer(
+		const char* display_name,
+		std::vector<TextureSpec> texture_specs,
+		std::vector<ExtraAttachment> extra_attachments,
+		GLsizei width = 0,
+		GLsizei height = 0
+	);
 	static std::vector<Screenbuffer*> all_screenbuffers;
 	static void post_resize_all();
 };
 
-//A G-buffer with albedo, position, normal and depth buffers in 32F formats.
-struct GBuffer : public Screenbuffer
-{
-	GLuint albedo, position, normal, depth;
-
-	GBuffer();
-
-	void post_resize();
-
-	static TextureSpec albedo_spec, position_spec, normal_spec, depth_spec;
-};
-//It is left up to the app (S3 or TorusWorld) to actually create this if needed:
-extern GBuffer* s_gbuffer;
-
-//A for Accumulation. This is what lights should draw into.
-/*
-	It has one color attachment, and also attaches the depth buffer from 
-	a GBuffer so that non-lit (or even transparent) objects can be drawn 
-	into it after the lighting passes.
-*/
-struct ABuffer : public Screenbuffer
-{
-	GLuint color;
-
-	ABuffer(GBuffer* gbuffer);
-
-	void post_resize();
-
-	static TextureSpec color_spec;
-};
-extern ABuffer* s_abuffer;
-/*
-	Main.cpp doesn't use an A-Buffer, so this will just stay NULL in that app. 
-	Shaders refer to it, but S3/Main doesn't use those shaders.
-*/
-
+extern Screenbuffer* s_gbuffer;
+#define s_gbuffer_albedo (s_gbuffer->textures[0])
+#define s_gbuffer_position (s_gbuffer->textures[1])
+#define s_gbuffer_normal (s_gbuffer->textures[2])
+#define s_gbuffer_depth (s_gbuffer->textures[3])
 
 
 struct Pass
@@ -103,14 +91,14 @@ struct Pass
 	bool blend;						//default false
 	bool is_shadow_pass;			//default false
 
-	Pass(Framebuffer* fb);		//Sets framebuffer and the defaults shown above.
+	Pass(Framebuffer* fb, Pass* copy = NULL);		//If copy is NULL, set the defaults above.
 	void start() const;
 
 	static const Pass* current;
 };
 
 
-void init_screenspace();
+void init_framebuffers();
 void resize_screenbuffers(int w, int h);
 inline bool s_is_shadow_pass() {return Pass::current->is_shadow_pass;}
 

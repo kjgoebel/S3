@@ -89,9 +89,8 @@ void init()
 
 	init_luts();
 	init_shaders();
-	init_screenspace();
+	init_framebuffers();
 
-	s_gbuffer = new GBuffer();
 	gpass = new Pass(s_gbuffer);
 	fog_pass = new Pass(NULL);
 	fog_pass->clear_mask = 0;

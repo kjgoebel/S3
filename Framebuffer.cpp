@@ -4,9 +4,6 @@
 #include "Utils.h"
 
 
-GBuffer* s_gbuffer = NULL;
-ABuffer* s_abuffer = NULL;
-
 int window_width = 0, window_height = 0;
 
 GLuint fsq_vertex_array = 0;
@@ -24,16 +21,17 @@ TextureSpec::TextureSpec(GLenum target, GLenum internal_format, GLenum format, G
 	this->wrap_mode = wrap_mode;
 }
 
-void TextureSpec::make_texture(GLuint* out_tex_name, GLuint framebuffer, GLsizei width, GLsizei height)
+GLuint TextureSpec::make_texture(GLuint framebuffer, GLsizei width, GLsizei height)
 {
 	check_gl_errors("TextureSpec::make_texture() 0");
 
-	glGenTextures(1, out_tex_name);
-	tex_image(*out_tex_name, width, height, NULL);
+	GLuint ret;
+	glGenTextures(1, &ret);
+	tex_image(ret, width, height, NULL);
 	
 	check_gl_errors("TextureSpec::make_texture() 1");
 
-	glBindTexture(target, *out_tex_name);
+	glBindTexture(target, ret);
 	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, min_filter);
 	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, mag_filter);
 	glTexParameteri(target, GL_TEXTURE_WRAP_S, wrap_mode);
@@ -46,9 +44,11 @@ void TextureSpec::make_texture(GLuint* out_tex_name, GLuint framebuffer, GLsizei
 
 	//framebuffer has to be bound as GL_FRAMEBUFFER, or glNamedFramebufferTexture() doesn't work (?!)
 	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-	glNamedFramebufferTexture(framebuffer, attachment_point, *out_tex_name, 0);
+	glNamedFramebufferTexture(framebuffer, attachment_point, ret, 0);
 
 	check_gl_errors("TextureSpec::make_texture() 3");
+
+	return ret;
 }
 
 void TextureSpec::tex_image(GLuint tex_name, GLsizei width, GLsizei height, void* data)
@@ -83,11 +83,76 @@ void TextureSpec::tex_image(GLuint tex_name, GLsizei width, GLsizei height, void
 }
 
 
-Framebuffer::Framebuffer()
+Framebuffer::Framebuffer(const char* display_name, std::vector<TextureSpec> texture_specs, std::vector<ExtraAttachment> extra_attachments, GLsizei width, GLsizei height)
 {
+	this->width = width;
+	this->height = height;
+
+	this->display_name = display_name;
+
+	this->texture_specs = texture_specs;
+
+	check_gl_errors("Framebuffer::Framebuffer() 0");
+
 	glGenFramebuffers(1, &name);
+	glBindFramebuffer(GL_FRAMEBUFFER, name);
+
+	check_gl_errors("Framebuffer::Framebuffer() 1");
+
+	std::vector<GLenum> attachment_points;
+
+	for(auto& spec : texture_specs)
+	{
+		textures.push_back(spec.make_texture(name, width, height));
+		if(spec.attachment_point >= GL_COLOR_ATTACHMENT0 && spec.attachment_point <= GL_COLOR_ATTACHMENT15)
+			attachment_points.push_back(spec.attachment_point);
+	}
+
+	check_gl_errors("Framebuffer::Framebuffer() 2");
+
+	glDrawBuffers(attachment_points.size(), attachment_points.data());
+
+	for(auto extra : extra_attachments)
+		glNamedFramebufferTexture(name, extra.attachment_point, extra.tex_name, 0);
+
+	check_gl_errors("Framebuffer::Framebuffer() 3");
+
+	/*
+		We don't check the status here because Screenbuffers are created 
+		with zero-size textures. Wait until they're resized.
+	*/
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void Framebuffer::check_status() const
+{
+	/*
+		So, glCheckNamedFramebufferStatus() returns incomplete attachment unless 
+		the named framebuffer is currently bound as GL_FRAMEBUFFER. In other words, 
+		glCheckNamedFramebufferStatus() doesn't work, I guess.
+	*/
+	glBindFramebuffer(GL_FRAMEBUFFER, name);
+	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		error("%s %d status is 0x%X\n", display_name, name, glCheckFramebufferStatus(GL_FRAMEBUFFER));
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+
+Screenbuffer::Screenbuffer(const char* display_name, std::vector<TextureSpec> texture_specs, std::vector<ExtraAttachment> extra_attachments, GLsizei width, GLsizei height)
+	: Framebuffer(display_name, texture_specs, extra_attachments, width, height)
+{
+	all_screenbuffers.push_back(this);
+}
+
+void Screenbuffer::post_resize()
+{
+	width = window_width;
+	height = window_height;
+
+	for(int i = 0; i < texture_specs.size(); i++)
+		texture_specs[i].tex_image(textures[i], window_width, window_height);
+}
 
 void Screenbuffer::post_resize_all()
 {
@@ -98,99 +163,32 @@ void Screenbuffer::post_resize_all()
 std::vector<Screenbuffer*> Screenbuffer::all_screenbuffers;
 
 
-TextureSpec GBuffer::albedo_spec(GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT0),
-	GBuffer::position_spec(GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT1),
-	GBuffer::normal_spec(GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT2),
-	GBuffer::depth_spec(GL_TEXTURE_2D, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_ATTACHMENT);
-
-GBuffer::GBuffer() : Screenbuffer()
-{
-	width = window_width;
-	height = window_height;
-
-	glBindFramebuffer(GL_FRAMEBUFFER, name);
-
-	albedo_spec.make_texture(&albedo, name, window_width, window_height);
-	position_spec.make_texture(&position, name, window_width, window_height);
-	normal_spec.make_texture(&normal, name, window_width, window_height);
-	depth_spec.make_texture(&depth, name, window_width, window_height);
-
-	GLuint attachments[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
-	glDrawBuffers(3, attachments);
-
-	/*
-		Wait till post_resize() to check the status, because framebuffers are 
-		created before the first call to resize(), so they start with textures 
-		of zero size.
-	*/
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-void GBuffer::post_resize()
-{
-	Screenbuffer::post_resize();
-
-	albedo_spec.tex_image(albedo, window_width, window_height);
-	position_spec.tex_image(position, window_width, window_height);
-	normal_spec.tex_image(normal, window_width, window_height);
-	depth_spec.tex_image(depth, window_width, window_height);
-
-	/*
-		So, glCheckNamedFramebufferStatus() returns incomplete attachment unless 
-		the named framebuffer is currently bound as GL_FRAMEBUFFER. In other words, 
-		glCheckNamedFramebufferStatus() doesn't work, I guess.
-	*/
-	glBindFramebuffer(GL_FRAMEBUFFER, name);
-	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		error("G-Buffer %d status is 0x%X\n", name, glCheckFramebufferStatus(GL_FRAMEBUFFER));
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-
-TextureSpec ABuffer::color_spec(GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT0);
-
-ABuffer::ABuffer(GBuffer* gbuffer) : Screenbuffer()
-{
-	width = window_width;
-	height = window_height;
-
-	glBindFramebuffer(GL_FRAMEBUFFER, name);
-
-	color_spec.make_texture(&color, name, window_width, window_height);
-	
-	/*
-		Attach the G-buffer's depth buffer so we can draw things into the 
-		scene with depth checking during the accumulation phase.
-	*/
-	glNamedFramebufferTexture(name, GL_DEPTH_ATTACHMENT, gbuffer->depth, 0);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-void ABuffer::post_resize()
-{
-	Screenbuffer::post_resize();
-
-	color_spec.tex_image(color, window_width, window_height);
-	
-	glBindFramebuffer(GL_FRAMEBUFFER, name);
-	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		error("G-Buffer %d status is 0x%X\n", name, glCheckFramebufferStatus(GL_FRAMEBUFFER));
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
+Screenbuffer* s_gbuffer;
 
 
 const Pass* Pass::current = NULL;
 
-Pass::Pass(Framebuffer* fb)
+Pass::Pass(Framebuffer* fb, Pass* copy)
 {
 	framebuffer = fb;
-	clear_mask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
-	depth_test = depth_mask = true;
-	blend = false;
-	cull_face = GL_BACK;
-	is_shadow_pass = false;
+
+	if(copy)
+	{
+		clear_mask = copy->clear_mask;
+		depth_test = copy->depth_test;
+		depth_mask = copy->depth_mask;
+		blend = copy->blend;
+		cull_face = copy->cull_face;
+		is_shadow_pass = copy->is_shadow_pass;
+	}
+	else
+	{
+		clear_mask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
+		depth_test = depth_mask = true;
+		blend = false;
+		cull_face = GL_BACK;
+		is_shadow_pass = false;
+	}
 }
 
 void Pass::start() const
@@ -223,7 +221,7 @@ void Pass::start() const
 }
 
 
-void init_screenspace()
+void init_framebuffers()
 {
 	Vec4 fsq_vertices[4 * 7] = {
 		//full-screen quad
@@ -299,6 +297,17 @@ void init_screenspace()
 		
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(1);
+
+	s_gbuffer = new Screenbuffer(
+		"G-Buffer",
+		{
+			{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT0},
+			{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT1},
+			{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT2},
+			{GL_TEXTURE_2D, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_ATTACHMENT}
+		},
+		{}
+	);
 }
 
 

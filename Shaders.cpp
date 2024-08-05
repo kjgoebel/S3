@@ -240,7 +240,7 @@ std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
 
 
 ShaderCore *vert, *geom_points, *geom_triangles, *frag_points, *frag;
-ShaderCore *vert_screenspace, *frag_fog, *frag_point_light, *frag_final_color;
+ShaderCore *vert_screenspace, *frag_fog, *frag_point_light, *frag_bloom, *frag_bloom_separate, *frag_final_color;
 ShaderCore *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_dump_texture1d;
 
 void init_shaders()
@@ -732,8 +732,8 @@ void init_shaders()
 			program->set_float("fog_scale", s_fog_scale);
 		},
 		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, s_gbuffer->albedo);
-			program->set_texture("depth_tex", 1, s_gbuffer->depth);
+			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
+			program->set_texture("depth_tex", 1, s_gbuffer_depth);
 		},
 		{}
 	);
@@ -825,24 +825,87 @@ void init_shaders()
 		},
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, s_gbuffer->albedo);
-			program->set_texture("position_tex", 1, s_gbuffer->position);
-			program->set_texture("normal_tex", 2, s_gbuffer->normal);
+			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
+			program->set_texture("position_tex", 1, s_gbuffer_position);
+			program->set_texture("normal_tex", 2, s_gbuffer_normal);
 		},
 		{}
+	);
+
+	frag_bloom_separate = new ShaderCore(
+		"frag_bloom_separate",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform sampler2D color_tex;
+
+			layout (location = 0) out vec4 main_frag_color;
+			layout (location = 1) out vec4 bright_frag_color;
+
+			void main() {
+				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
+				vec3 input_color = texelFetch(color_tex, pixel_coords, 0).rgb;
+				float brightness = abs(dot(input_color, vec3(1, 1, 1)) / 3);
+				main_frag_color.rgb = input_color / clamp(brightness, 1, 999);
+				bright_frag_color.rgb = clamp(input_color - main_frag_color.rgb, -80, 80);
+				bright_frag_color.a = main_frag_color.a = 1;
+			}
+		)",
+		NULL,
+		NULL,
+		NULL,
+		{}
+	);
+
+	frag_bloom = new ShaderCore(
+		"frag_bloom",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform sampler2D color_tex;
+
+			uniform float sample_strength[8] = {1, 0.960789439152, 0.852143788966, 0.697676326071, 0.527292424043, 0.367879441171, 0.236927758682, 0.140858420921};
+			uniform float normalization_constant = 0.114655958964;
+
+			#ifdef HORIZONTAL
+				#define direction (ivec2(1, 0))
+			#else
+				#define direction (ivec2(0, 1))
+			#endif
+
+			out vec4 frag_color;
+
+			void main() {
+				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
+				vec3 color = vec3(0);
+
+				for(int i = -7; i <= 7; i++)
+					color += sample_strength[abs(i)] * texelFetch(color_tex, pixel_coords + i * direction, 0).rgb;
+
+				color *= normalization_constant;
+
+				frag_color.rgb = color;
+				frag_color.a = 1;
+			}
+		)",
+		NULL,
+		NULL,
+		NULL,
+		{
+			new ShaderOption(DEFINE_HORIZONTAL)
+		}
 	);
 
 	frag_final_color = new ShaderCore(
 		"frag_final_color",
 		GL_FRAGMENT_SHADER,
 		R"(
-			uniform sampler2D color_tex;
+			uniform sampler2D main_color_tex;
+			uniform sampler2D bright_color_tex;
 
 			out vec4 frag_color;
 
 			void main() {
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
-				vec3 color = texelFetch(color_tex, pixel_coords, 0).rgb;
+				vec3 color = texelFetch(main_color_tex, pixel_coords, 0).rgb + texelFetch(bright_color_tex, pixel_coords, 0).rgb;
 				float value = max(color.r, max(color.g, color.b));
 				frag_color.rgb = tanh(value) * color / value;
 				frag_color.a = 1;
@@ -850,9 +913,7 @@ void init_shaders()
 		)",
 		NULL,
 		NULL,
-		[](ShaderProgram* program) {
-			program->set_texture("color_tex", 0, s_abuffer->color);
-		},
+		NULL,
 		{}
 	);
 	
@@ -888,10 +949,10 @@ void init_shaders()
 		NULL,
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, s_gbuffer->albedo);
-			program->set_texture("position_tex", 1, s_gbuffer->position);
-			program->set_texture("normal_tex", 2, s_gbuffer->normal);
-			program->set_texture("depth_tex", 3, s_gbuffer->depth);
+			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
+			program->set_texture("position_tex", 1, s_gbuffer_position);
+			program->set_texture("normal_tex", 2, s_gbuffer_normal);
+			program->set_texture("depth_tex", 3, s_gbuffer_depth);
 		},
 		{}
 	);
