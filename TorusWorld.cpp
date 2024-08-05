@@ -27,16 +27,14 @@
 enum Mode {
 	NORMAL,
 	COPY_TEXTURES,
-	DUMP_ALBEDO,
-	DUMP_POSITION,
-	DUMP_NORMAL,
-	DUMP_DEPTH,
 	DUMP_LIGHT_MAP,
 	DUMP_LUT,
 	DUMP_BLOOM_MAIN_COLOR,
 	DUMP_BLOOM_BRIGHT_COLOR,
 	DUMP_BLOOM_RESULT
 };
+
+bool bloom = true;
 
 
 Model* dots_model;
@@ -324,25 +322,47 @@ void display()
 	check_gl_errors("display 5");
 	
 	//Bloom Passes
-	bloom_separate_pass->start();
-	bloom_separate_program->use();
-	bloom_separate_program->set_texture("color_tex", 0, s_abuffer_color);
-	draw_fsq();
+	if(bloom)
+	{
+		bloom_separate_pass->start();
+		bloom_separate_program->use();
+		bloom_separate_program->set_texture("color_tex", 0, s_abuffer_color);
+		draw_fsq();
 
-	bloom_h_pass->start();
-	bloom_program_h->use();
-	bloom_program_h->set_texture("color_tex", 0, bloom_separate->textures[1]);
-	draw_fsq();
+		bloom_h_pass->start();
+		bloom_program_h->use();
+		bloom_program_h->set_texture("color_tex", 0, bloom_separate->textures[1]);
+		draw_fsq();
 
-	bloom_v_pass->start();
-	bloom_program_v->use();
-	bloom_program_v->set_texture("color_tex", 0, bloom_h->textures[0]);
-	draw_fsq();
+		bloom_v_pass->start();
+		bloom_program_v->use();
+		bloom_program_v->set_texture("color_tex", 0, bloom_h->textures[0]);
+		draw_fsq();
 
-	//Final Pass
-	final_pass->start();
-	final_program->set_texture("main_color_tex", 0, bloom_separate->textures[0]);
-	final_program->set_texture("bright_color_tex", 1, bloom_v->textures[0]);
+		for(int i = 0; i < 2; i++)
+		{
+			bloom_h_pass->start();
+			bloom_program_h->use();
+			bloom_program_h->set_texture("color_tex", 0, bloom_v->textures[0]);
+			draw_fsq();
+
+			bloom_v_pass->start();
+			bloom_program_v->use();
+			bloom_program_v->set_texture("color_tex", 0, bloom_h->textures[0]);
+			draw_fsq();
+		}
+
+		//Final Pass
+		final_pass->start();
+		final_program->set_texture("main_color_tex", 0, bloom_separate->textures[0]);
+		final_program->set_texture("bright_color_tex", 1, bloom_v->textures[0]);
+	}
+	else
+	{
+		final_pass->start();
+		final_program->set_texture("main_color_tex", 0, s_abuffer_color);
+		final_program->set_texture("bright_color_tex", 1, 0);
+	}
 
 	switch(mode)
 	{
@@ -414,18 +434,6 @@ void display()
 				dump_program->use();
 				switch(mode) 
 				{
-					case DUMP_ALBEDO:
-						dump_program->set_texture("tex", 0, s_gbuffer_albedo);
-						break;
-					case DUMP_POSITION:
-						dump_program->set_texture("tex", 0, s_gbuffer_position);
-						break;
-					case DUMP_NORMAL:
-						dump_program->set_texture("tex", 0, s_gbuffer_normal);
-						break;
-					case DUMP_DEPTH:
-						dump_program->set_texture("tex", 0, s_gbuffer_depth);
-						break;
 					case DUMP_BLOOM_RESULT:
 						dump_program->set_texture("tex", 0, bloom_h->textures[0]);
 						break;
@@ -533,31 +541,22 @@ void special(int key, int x, int y)
 			mode = COPY_TEXTURES;
 			break;
 		case GLUT_KEY_F3:
-			mode = DUMP_ALBEDO;
-			break;
-		case GLUT_KEY_F4:
-			mode = DUMP_POSITION;
-			break;
-		case GLUT_KEY_F5:
-			mode = DUMP_NORMAL;
-			break;
-		case GLUT_KEY_F6:
-			mode = DUMP_DEPTH;
-			break;
-		case GLUT_KEY_F7:
 			mode = DUMP_LIGHT_MAP;
 			break;
-		case GLUT_KEY_F8:
+		case GLUT_KEY_F4:
 			mode = DUMP_LUT;
 			break;
-		case GLUT_KEY_F9:
+		case GLUT_KEY_F5:
 			mode = DUMP_BLOOM_RESULT;
 			break;
-		case GLUT_KEY_F11:
+		case GLUT_KEY_F6:
 			mode = DUMP_BLOOM_MAIN_COLOR;
 			break;
-		case GLUT_KEY_F12:
+		case GLUT_KEY_F7:
 			mode = DUMP_BLOOM_BRIGHT_COLOR;
+			break;
+		case GLUT_KEY_F8:
+			bloom = !bloom;
 			break;
 	}
 }

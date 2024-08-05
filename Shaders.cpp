@@ -845,8 +845,8 @@ void init_shaders()
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
 				vec3 input_color = texelFetch(color_tex, pixel_coords, 0).rgb;
 				float brightness = abs(dot(input_color, vec3(1, 1, 1)) / 3);
-				main_frag_color.rgb = input_color / clamp(brightness, 1, 999);
-				bright_frag_color.rgb = clamp(input_color - main_frag_color.rgb, -80, 80);
+				main_frag_color.rgb = input_color / max(brightness, 1);
+				bright_frag_color.rgb = clamp(input_color - main_frag_color.rgb, -120, 120);
 				bright_frag_color.a = main_frag_color.a = 1;
 			}
 		)",

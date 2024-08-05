@@ -71,5 +71,5 @@ void Light::render(DrawFunc draw_scene)
 
 void Light::draw()
 {
-	model->draw(mat, 3 * emission);
+	model->draw(mat, 10 * emission);
 }
