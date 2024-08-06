@@ -327,6 +327,8 @@ void init_framebuffers()
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(1);
 
+	glBindVertexArray(0);
+
 	s_gbuffer = new Screenbuffer(
 		"G-Buffer",
 		{
@@ -353,16 +355,19 @@ void draw_fsq()
 {
 	glBindVertexArray(fsq_vertex_array);
 	glDrawArrays(GL_QUADS, 0, 4);
+	glBindVertexArray(0);
 }
 
 void draw_hsq(int i)
 {
 	glBindVertexArray(fsq_vertex_array);
 	glDrawArrays(GL_QUADS, 4 + 4 * i, 4);
+	glBindVertexArray(0);
 }
 
 void draw_qsq(int i)
 {
 	glBindVertexArray(fsq_vertex_array);
 	glDrawArrays(GL_QUADS, 12 + 4 * i, 4);
+	glBindVertexArray(0);
 }
