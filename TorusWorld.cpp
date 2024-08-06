@@ -218,7 +218,13 @@ void init()
 	Mat4* boulders = new Mat4[NUM_BOULDERS];
 	for(int i = 0; i < NUM_BOULDERS; i++)
 		boulders[i] = torus_world_xform(frand() * TAU, frand() * TAU, 0.05, frand() * TAU, fsrand() * 0.5 * TAU, fsrand() * 0.5 * TAU);
-	render_boulders = boulder_model->make_draw_func(NUM_BOULDERS, boulders, Vec4(0.7, 0.7, 0.7, 1));
+	render_boulders = boulder_model->make_draw_func(
+		NUM_BOULDERS,
+		boulders,
+		Vec4(0.7, 0.7, 0.7, 1),
+		false,
+		torus_model->get_num_vertices() + dots_model->get_num_vertices()
+	);
 	delete[] boulders;
 
 	check_gl_errors("init 4");
@@ -263,8 +269,8 @@ void reshape(int w, int h)
 
 void draw_scene()
 {
-	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1));
-	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1));
+	torus_model->draw(Mat4::identity(), Vec4(0.3, 0.3, 0.3, 1), 0);
+	dots_model->draw(Mat4::identity(), Vec4(1, 1, 1, 1), torus_model->get_num_vertices());
 	render_boulders();
 }
 

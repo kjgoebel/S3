@@ -45,11 +45,11 @@ public:
 
 	void generate_normals();
 
-	void draw(const Mat4& xform, const Vec4& base_color);
+	void draw(const Mat4& xform, const Vec4& base_color, unsigned int primitive_index_offset = 0);
 
 	//Note: Instancing is broken. Dunno why, but passing use_instancing = true makes rendering much slower.
-	DrawFunc make_draw_func(int count, const Mat4* xforms, Vec4 base_color, bool use_instancing = false);
-	DrawFunc make_draw_func(int count, const Mat4* xforms, const Vec4* base_colors, bool use_instancing = false);
+	DrawFunc make_draw_func(int count, const Mat4* xforms, Vec4 base_color, bool use_instancing = false, unsigned int primitive_index_offset = 0);
+	DrawFunc make_draw_func(int count, const Mat4* xforms, const Vec4* base_colors, bool use_instancing = false, unsigned int primitive_index_offset = 0);
 	
 	static Model* make_icosahedron(double scale, int subdivisions = 0, bool normalize = false);
 	static Model* make_torus(int longitudinal_segments, int transverse_segments, double hole_ratio, bool use_quad_strips = true, bool make_normals = false);
@@ -57,13 +57,7 @@ public:
 	static Model* make_bumpy_torus(int longitudinal_segments, int transverse_segments, double bump_height, bool use_quad_strips = false);
 	static std::shared_ptr<Vec4[]> s3ify(int count, double scale, const Vec3* vertices);		//Project a list of R3 vertices onto S3.
 	
-	/*
-		Creates buffers and raw_vertex_array. Called automatically as needed by 
-		draw and make_draw_func(). Exposed as public because for some #$&(@ 
-		reason it sometimes causes segfaults unless it's manually called 
-		earlier.
-	*/
-	void prepare_to_render();
+	int get_num_vertices() const {return num_vertices;}
 
 private:
 	int primitive;						//GL_POINTS, GL_TRIANGLES, etc.
@@ -76,12 +70,15 @@ private:
 	std::unique_ptr<Vec4[]> normals;					//If this is NULL, lighting calculation will ignore effects of surface normal (only distance and shadow will be used).
 
 	GLuint vertex_buffer, vertex_color_buffer, element_buffer, normal_buffer;
+	GLuint index_buffer;
 	
 	GLuint raw_vertex_array;
 
 	GLuint make_vertex_array();			//Creates a VAO and binds vertex, vertex color and element buffer objects to it as appropriate.
 
 	ShaderProgram* get_shader_program(bool shadow, bool instanced_xforms, bool instanced_base_colors);
+
+	void prepare_to_render();
 
 	void bind_xform_array(GLuint vertex_array, int count, const Mat4* xforms);		//Creates a vertex buffer for the given xforms and binds it the given VAO.
 	void bind_color_array(GLuint vertex_array, int count, const Vec4* base_colors);
