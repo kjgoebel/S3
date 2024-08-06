@@ -339,19 +339,6 @@ void display()
 		bloom_program_v->set_texture("color_tex", 0, bloom_h->textures[0]);
 		draw_fsq();
 
-		for(int i = 0; i < 2; i++)
-		{
-			bloom_h_pass->start();
-			bloom_program_h->use();
-			bloom_program_h->set_texture("color_tex", 0, bloom_v->textures[0]);
-			draw_fsq();
-
-			bloom_v_pass->start();
-			bloom_program_v->use();
-			bloom_program_v->set_texture("color_tex", 0, bloom_h->textures[0]);
-			draw_fsq();
-		}
-
 		//Final Pass
 		final_pass->start();
 		final_program->set_texture("main_color_tex", 0, bloom_separate->textures[0]);
@@ -418,7 +405,7 @@ void display()
 				);
 				dump_program->use();
 				dump_program->set_texture("tex", 0, s_chord2_lut->get_texture(), s_chord2_lut->get_target());
-				dump_program->set_float("output_scale", 0.1);
+				dump_program->set_float("output_scale", 0.01);
 				dump_program->set_float("output_offset", 0);
 				draw_fsq();
 			}
