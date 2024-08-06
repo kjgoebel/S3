@@ -16,11 +16,11 @@
 
 #define PRINT_FRAME_RATE
 
-#define NUM_DOTS		(4000)
+#define NUM_DOTS		(2000)
 #define NUM_BOULDERS	(40)
 
-#define WALK_SPEED		(TAU / 50)
-#define SUN_SPEED		(TAU / 30)
+#define WALK_SPEED		(TAU / 50)		//Note that this isn't on the same scale as distances on the Sphere.
+#define SUN_SPEED		(TAU / 60)
 
 #define FOG_INCREMENT	(0.5)
 
@@ -327,9 +327,9 @@ void display()
 
 	check_gl_errors("display 5");
 	
-	//Bloom Passes
 	if(bloom)
 	{
+		//Bloom Passes
 		bloom_separate_pass->start();
 		bloom_separate_program->use();
 		bloom_separate_program->set_texture("color_tex", 0, s_abuffer_color);
@@ -352,9 +352,10 @@ void display()
 	}
 	else
 	{
+		//Final Pass
 		final_pass->start();
 		final_program->set_texture("main_color_tex", 0, s_abuffer_color);
-		final_program->set_texture("bright_color_tex", 1, 0);
+		final_program->set_texture("bright_color_tex", 1, 0);		//This is naughty.
 	}
 
 	switch(mode)

@@ -27,11 +27,11 @@ void init_luts()
 	chord2_data[1] = 3 * chord2_data[3];
 	chord2_data[2 * CHORD2_LUT_SIZE - 1] = chord2_data[1];
 		
-	for(int i = 0; i < CHORD2_LUT_SIZE; i++)
+	/*for(int i = 0; i < CHORD2_LUT_SIZE; i++)
 	{
 		float c = 4.0 * i / (CHORD2_LUT_SIZE - 1);
 		printf("%f: %f, %f\n", c, chord2_data[2 * i], chord2_data[2 * i + 1]);
-	}
+	}*/
 
 	s_chord2_lut = new LookupTable(GL_TEXTURE_1D, CHORD2_LUT_SIZE, GL_RG32F, GL_RG, chord2_data, 0, 4);
 	check_gl_errors("chord squared LUT setup");
