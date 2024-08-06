@@ -591,6 +591,9 @@ void init_shaders()
 				layout (location = 0) out vec4 frag_albedo;
 				layout (location = 1) out vec4 frag_position;
 				layout (location = 2) out vec4 frag_normal;
+				#ifdef USE_PRIM_INDEX
+					layout (location = 3) out uint frag_index;
+				#endif
 			#endif
 			layout (depth_any) out float gl_FragDepth;
 
@@ -610,22 +613,17 @@ void init_shaders()
 				float normal_z = -sqrt(1 - point_coord_l2);
 
 				#ifndef SHADOW
-					#ifdef USE_PRIM_INDEX
-						/*frag_albedo.r = float(gf_primitive_index & 0xFF) / 255;
-						frag_albedo.g = float((gf_primitive_index >> 8) & 0xFF) / 255;
-						frag_albedo.b = float((gf_primitive_index >> 16) & 0xFF) / 255;
-						frag_albedo.a = 1;*/
-						frag_albedo.rgb = vec3(1);
-						frag_albedo.a = 1;
+					#ifdef INSTANCED_BASE_COLOR
+						vec4 base_color = gf_base_color;
+					#endif
+					#ifdef VERTEX_COLOR
+						frag_albedo = clamp(base_color + gf_color, 0, 1);
 					#else
-						#ifdef INSTANCED_BASE_COLOR
-							vec4 base_color = gf_base_color;
-						#endif
-						#ifdef VERTEX_COLOR
-							frag_albedo = clamp(base_color + gf_color, 0, 1);
-						#else
-							frag_albedo = base_color;
-						#endif
+						frag_albedo = base_color;
+					#endif
+
+					#ifdef USE_PRIM_INDEX
+						frag_index = gf_primitive_index;
 					#endif
 
 					frag_normal = vec4(point_coord.x, point_coord.y, normal_z, 0);
@@ -680,6 +678,9 @@ void init_shaders()
 				layout (location = 0) out vec4 frag_albedo;
 				layout (location = 1) out vec4 frag_position;
 				layout (location = 2) out vec4 frag_normal;
+				#ifdef USE_PRIM_INDEX
+					layout (location = 3) out uint frag_index;
+				#endif
 			#endif
 			layout (depth_any) out float gl_FragDepth;
 
@@ -687,20 +688,13 @@ void init_shaders()
 				vec4 true_position = normalize(gf_r4pos);
 
 				#ifndef SHADOW
-					#ifdef USE_PRIM_INDEX
-						frag_albedo.r = float(gf_primitive_index & 0xFF) / 255;
-						frag_albedo.g = float((gf_primitive_index >> 8) & 0xFF) / 255;
-						frag_albedo.b = float((gf_primitive_index >> 16) & 0xFF) / 255;
-						frag_albedo.a = 1;
+					#ifdef INSTANCED_BASE_COLOR
+						vec4 base_color = gf_base_color;
+					#endif
+					#ifdef VERTEX_COLOR
+						frag_albedo = clamp(base_color + gf_color, 0, 1);
 					#else
-						#ifdef INSTANCED_BASE_COLOR
-							vec4 base_color = gf_base_color;
-						#endif
-						#ifdef VERTEX_COLOR
-							frag_albedo = clamp(base_color + gf_color, 0, 1);
-						#else
-							frag_albedo = base_color;
-						#endif
+						frag_albedo = base_color;
 					#endif
 					
 					#ifdef VERTEX_NORMAL
@@ -710,6 +704,10 @@ void init_shaders()
 					#endif
 
 					frag_position = true_position;
+
+					#ifdef USE_PRIM_INDEX
+						frag_index = gf_primitive_index;
+					#endif
 				#endif
 				
 				/*
@@ -1025,20 +1023,35 @@ void init_shaders()
 		"frag_dump_texture",
 		GL_FRAGMENT_SHADER,
 		R"(
-			uniform sampler2D tex;
+			#ifdef INTEGER_TEX
+				uniform usampler2D tex;
+			#else
+				uniform sampler2D tex;
+			#endif
 
 			in vec2 vf_tex_coord;
 
 			out vec4 frag_color;
 
 			void main() {
-				frag_color = texture(tex, vf_tex_coord);
+				#ifdef INTEGER_TEX
+					uint samp = texture(tex, vf_tex_coord).r;
+
+					frag_color.r = float(samp & 0xFF) / 255;
+					frag_color.g = float((samp >> 8) & 0xFF) / 255;
+					frag_color.b = float((samp >> 16) & 0xFF) / 255;
+					frag_color.a = 1;
+				#else
+					frag_color = texture(tex, vf_tex_coord);
+				#endif
 			}
 		)",
 		NULL,
 		NULL,
 		NULL,
-		{}
+		{
+			new ShaderOption(DEFINE_INTEGER_TEX)
+		}
 	);
 
 	frag_dump_cubemap = new ShaderCore(

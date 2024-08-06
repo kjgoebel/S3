@@ -29,6 +29,7 @@ enum Mode {
 	COPY_TEXTURES,
 	DUMP_LIGHT_MAP,
 	DUMP_LUT,
+	DUMP_INDEX_BUFFER,
 	DUMP_BLOOM_MAIN_COLOR,
 	DUMP_BLOOM_BRIGHT_COLOR,
 	DUMP_BLOOM_RESULT
@@ -424,6 +425,19 @@ void display()
 			}
 			break;
 
+		case DUMP_INDEX_BUFFER:
+			{
+				ShaderProgram* dump_program = ShaderProgram::get(
+					Shader::get(vert_screenspace, {}),
+					NULL,
+					Shader::get(frag_dump_texture, {DEFINE_INTEGER_TEX})
+				);
+				dump_program->use();
+				dump_program->set_texture("tex", 0, s_gbuffer_index);
+				draw_fsq();
+			}
+			break;
+
 		default:
 			{
 				ShaderProgram* dump_program = ShaderProgram::get(
@@ -546,6 +560,7 @@ void special(int key, int x, int y)
 		case GLUT_KEY_F4:
 			mode = DUMP_LUT;
 			break;
+
 		case GLUT_KEY_F5:
 			mode = DUMP_BLOOM_RESULT;
 			break;
@@ -557,6 +572,10 @@ void special(int key, int x, int y)
 			break;
 		case GLUT_KEY_F8:
 			bloom = !bloom;
+			break;
+		
+		case GLUT_KEY_F9:
+			mode = DUMP_INDEX_BUFFER;
 			break;
 	}
 }

@@ -78,6 +78,7 @@ extern Screenbuffer* s_gbuffer;
 #define s_gbuffer_position (s_gbuffer->textures[1])
 #define s_gbuffer_normal (s_gbuffer->textures[2])
 #define s_gbuffer_depth (s_gbuffer->textures[3])
+#define s_gbuffer_index (s_gbuffer->textures[4])
 
 
 struct Pass
