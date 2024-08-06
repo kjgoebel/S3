@@ -174,6 +174,11 @@ void ShaderProgram::set_int(const char* name, int i)
 	glProgramUniform1i(id, glGetUniformLocation(id, name), i);
 }
 
+void ShaderProgram::set_uint(const char* name, unsigned int i)
+{
+	glProgramUniform1ui(id, glGetUniformLocation(id, name), i);
+}
+
 void ShaderProgram::set_texture(const char* name, int tex_unit, GLuint texture, GLenum target)
 {
 	set_int(name, tex_unit);
@@ -274,6 +279,12 @@ void init_shaders()
 				uniform mat4 model_view_xform;
 			#endif
 
+			#ifdef USE_PRIM_INDEX
+				uniform uint primitive_index_offset;
+				layout (location = 8) in uint primitive_index;
+				out uint vg_primitive_index;
+			#endif
+
 			/*
 				Pass along the transformed position in R4, so that the fragment shader 
 				can compensate for the inaccuracy of the depth calculation for the 
@@ -287,6 +298,10 @@ void init_shaders()
 			out vec4 vg_r4pos;
 				
 			void main() {
+				#ifdef USE_PRIM_INDEX
+					vg_primitive_index = primitive_index + primitive_index_offset;
+				#endif
+
 				#ifdef INSTANCED_XFORM
 					mat4 model_view_xform = transpose(view_xform) * model_xform;
 				#endif
@@ -325,7 +340,8 @@ void init_shaders()
 				}
 			),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
-			new ShaderOption(DEFINE_SHADOW)
+			new ShaderOption(DEFINE_SHADOW),
+			new ShaderOption(DEFINE_USE_PRIM_INDEX)
 		}
 	);
 
@@ -356,6 +372,11 @@ void init_shaders()
 				#endif
 			#endif
 
+			#ifdef USE_PRIM_INDEX
+				in uint vg_primitive_index[];
+				out uint gf_primitive_index;
+			#endif
+
 			in vec4 vg_r4pos[];
 			out vec4 gf_r4pos;
 
@@ -366,6 +387,10 @@ void init_shaders()
 			#define BASE_POINT_SIZE		(0.002)
 
 			void main() {
+				#ifdef USE_PRIM_INDEX
+					gf_primitive_index = vg_primitive_index[0];
+				#endif
+
 				gf_r4pos = vg_r4pos[0];
 
 				float dist = length(gl_in[0].gl_Position.xyz);
@@ -431,7 +456,8 @@ void init_shaders()
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
-			new ShaderOption(DEFINE_SHADOW)
+			new ShaderOption(DEFINE_SHADOW),
+			new ShaderOption(DEFINE_USE_PRIM_INDEX)
 		}
 	);
 
@@ -465,6 +491,11 @@ void init_shaders()
 				#endif
 			#endif
 
+			#ifdef USE_PRIM_INDEX
+				in uint vg_primitive_index[];
+				out uint gf_primitive_index;
+			#endif
+
 			in vec4 vg_r4pos[];
 			out vec4 gf_r4pos;
 
@@ -490,6 +521,11 @@ void init_shaders()
 							#else
 								gl_Position = proj_xform * point;
 							#endif
+
+							#ifdef USE_PRIM_INDEX
+								gf_primitive_index = vg_primitive_index[i];
+							#endif
+
 							gf_r4pos = vg_r4pos[i];
 
 							#ifndef SHADOW
@@ -523,7 +559,8 @@ void init_shaders()
 			new ShaderOption(DEFINE_VERTEX_COLOR),
 			new ShaderOption(DEFINE_VERTEX_NORMAL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
-			new ShaderOption(DEFINE_SHADOW)
+			new ShaderOption(DEFINE_SHADOW),
+			new ShaderOption(DEFINE_USE_PRIM_INDEX)
 		}
 	);
 
@@ -542,6 +579,10 @@ void init_shaders()
 				#endif
 			#endif
 			
+			#ifdef USE_PRIM_INDEX
+				flat in uint gf_primitive_index;
+			#endif
+
 			in vec4 gf_r4pos;
 			in float distance;
 			in vec2 point_coord;
@@ -569,13 +610,22 @@ void init_shaders()
 				float normal_z = -sqrt(1 - point_coord_l2);
 
 				#ifndef SHADOW
-					#ifdef INSTANCED_BASE_COLOR
-						vec4 base_color = gf_base_color;
-					#endif
-					#ifdef VERTEX_COLOR
-						frag_albedo = clamp(base_color + gf_color, 0, 1);
+					#ifdef USE_PRIM_INDEX
+						/*frag_albedo.r = float(gf_primitive_index & 0xFF) / 255;
+						frag_albedo.g = float((gf_primitive_index >> 8) & 0xFF) / 255;
+						frag_albedo.b = float((gf_primitive_index >> 16) & 0xFF) / 255;
+						frag_albedo.a = 1;*/
+						frag_albedo.rgb = vec3(1);
+						frag_albedo.a = 1;
 					#else
-						frag_albedo = base_color;
+						#ifdef INSTANCED_BASE_COLOR
+							vec4 base_color = gf_base_color;
+						#endif
+						#ifdef VERTEX_COLOR
+							frag_albedo = clamp(base_color + gf_color, 0, 1);
+						#else
+							frag_albedo = base_color;
+						#endif
 					#endif
 
 					frag_normal = vec4(point_coord.x, point_coord.y, normal_z, 0);
@@ -592,7 +642,8 @@ void init_shaders()
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
-			new ShaderOption(DEFINE_SHADOW)
+			new ShaderOption(DEFINE_SHADOW),
+			new ShaderOption(DEFINE_USE_PRIM_INDEX)
 		}
 	);
 
@@ -618,6 +669,10 @@ void init_shaders()
 				#endif
 			#endif
 			
+			#ifdef USE_PRIM_INDEX
+				flat in uint gf_primitive_index;
+			#endif
+
 			in vec4 gf_r4pos;
 			in float distance;
 				
@@ -632,13 +687,20 @@ void init_shaders()
 				vec4 true_position = normalize(gf_r4pos);
 
 				#ifndef SHADOW
-					#ifdef INSTANCED_BASE_COLOR
-						vec4 base_color = gf_base_color;
-					#endif
-					#ifdef VERTEX_COLOR
-						frag_albedo = clamp(base_color + gf_color, 0, 1);
+					#ifdef USE_PRIM_INDEX
+						frag_albedo.r = float(gf_primitive_index & 0xFF) / 255;
+						frag_albedo.g = float((gf_primitive_index >> 8) & 0xFF) / 255;
+						frag_albedo.b = float((gf_primitive_index >> 16) & 0xFF) / 255;
+						frag_albedo.a = 1;
 					#else
-						frag_albedo = base_color;
+						#ifdef INSTANCED_BASE_COLOR
+							vec4 base_color = gf_base_color;
+						#endif
+						#ifdef VERTEX_COLOR
+							frag_albedo = clamp(base_color + gf_color, 0, 1);
+						#else
+							frag_albedo = base_color;
+						#endif
 					#endif
 					
 					#ifdef VERTEX_NORMAL
@@ -683,7 +745,8 @@ void init_shaders()
 			new ShaderOption(DEFINE_VERTEX_COLOR),
 			new ShaderOption(DEFINE_VERTEX_NORMAL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
-			new ShaderOption(DEFINE_SHADOW)
+			new ShaderOption(DEFINE_SHADOW),
+			new ShaderOption(DEFINE_USE_PRIM_INDEX)
 		}
 	);
 

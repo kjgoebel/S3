@@ -207,7 +207,7 @@ void init()
 	dots_model = new Model(NUM_DOTS, dots);
 	delete[] dots;
 
-	torus_model = Model::make_bumpy_torus(64, 64, 0.03);
+	torus_model = Model::make_bumpy_torus(50, 50, 0.03);
 	torus_model->generate_normals();
 	torus_model->generate_primitive_colors(0.7);
 

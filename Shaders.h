@@ -42,6 +42,8 @@ typedef std::function<void(class ShaderProgram*)> ShaderPullFunc;
 #define DEFINE_VERTEX_NORMAL		"#define VERTEX_NORMAL\n"
 #define DEFINE_SHADOW				"#define SHADOW\n"
 #define DEFINE_HORIZONTAL			"#define HORIZONTAL\n"
+#define DEFINE_USE_PRIM_INDEX		"#define USE_PRIM_INDEX\n"
+#define DEFINE_INTEGER_TEX			"#define INTEGER_TEX\n"
 
 
 struct ShaderOption
@@ -152,6 +154,7 @@ public:
 	void set_vector(const char* name, const Vec3& v);
 	void set_float(const char* name, float f);
 	void set_int(const char* name, int i);
+	void set_uint(const char* name, unsigned int i);
 	void set_texture(const char* name, int tex_unit, GLuint texture, GLenum target = GL_TEXTURE_2D);
 	void set_lut(const char* name, int tex_unit, LookupTable* lut);
 

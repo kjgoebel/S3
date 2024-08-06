@@ -122,7 +122,7 @@ GLuint Model::make_vertex_array()
 	glEnableVertexAttribArray(0);
 
 	glBindBuffer(GL_ARRAY_BUFFER, index_buffer);
-	glVertexAttribPointer(8, 1, GL_UNSIGNED_INT, GL_FALSE, sizeof(unsigned int), (void*)0);
+	glVertexAttribIPointer(8, 1, GL_UNSIGNED_INT, sizeof(unsigned int), (void*)0);
 	glEnableVertexAttribArray(8);
 
 	if(vertex_color_buffer)
@@ -225,6 +225,7 @@ void Model::prepare_to_render()
 ShaderProgram* Model::get_shader_program(bool shadow, bool instanced_xforms, bool instanced_base_colors)
 {
 	auto options = std::set<const char*>();
+	options.insert(DEFINE_USE_PRIM_INDEX);
 	if(vertex_colors)
 		options.insert(DEFINE_VERTEX_COLOR);
 	if(normals)
@@ -253,7 +254,7 @@ void Model::draw(const Mat4& xform, const Vec4& base_color, unsigned int primiti
 	raw_program->use();
 	raw_program->set_vector("base_color", base_color);
 	raw_program->set_matrix("model_view_xform", ~s_curcam->get_mat() * xform);		//That should be the inverse of cam_mat, but it _should_ always be SO(4), so the inverse _should_ always be the transpose....
-	raw_program->set_int("primitive_index_offset", primitive_index_offset);
+	raw_program->set_uint("primitive_index_offset", primitive_index_offset);
 	
 	glBindVertexArray(raw_vertex_array);
 	draw_raw();
@@ -372,7 +373,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 			program->use();
 			glBindVertexArray(vertex_array);
 			program->set_vector("base_color", base_color);
-			program->set_int("primitive_index_offset", primitive_index_offset);
+			program->set_uint("primitive_index_offset", primitive_index_offset);
 			draw_instanced(count);
 			glBindVertexArray(0);
 		};
@@ -391,7 +392,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, Vec4 base_color, b
 			for(int i = 0; i < count; i++)
 			{
 				program->set_matrix("model_view_xform", ~s_curcam->get_mat() * temp_xforms[i]);
-				program->set_int("primitive_index_offset", primitive_index_offset + i * num_vertices);
+				program->set_uint("primitive_index_offset", primitive_index_offset + i * num_vertices);
 				draw_raw();
 			}
 			glBindVertexArray(0);
@@ -414,7 +415,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 		return [count, primitive_index_offset, vertex_array, this]() {
 			ShaderProgram* program = get_shader_program(s_is_shadow_pass(), true, true);
 			program->use();
-			program->set_int("primitive_index_offset", primitive_index_offset);
+			program->set_uint("primitive_index_offset", primitive_index_offset);
 			glBindVertexArray(vertex_array);
 			draw_instanced(count);
 			glBindVertexArray(0);
@@ -439,7 +440,7 @@ DrawFunc Model::make_draw_func(int count, const Mat4* xforms, const Vec4* base_c
 				Vec4 base_color = temp_colors[i];
 				program->set_vector("base_color", base_color);
 				program->set_matrix("model_view_xform", ~s_curcam->get_mat() * temp_xforms[i]);
-				program->set_int("primitive_index_offset", primitive_index_offset + i * num_vertices);
+				program->set_uint("primitive_index_offset", primitive_index_offset + i * num_vertices);
 				draw_raw();
 			}
 			glBindVertexArray(0);
