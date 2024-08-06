@@ -3,6 +3,8 @@
 #include "GL/glew.h"
 #include "Utils.h"
 
+#pragma warning(disable : 4244)		//conversion from double to float
+
 
 class LookupTable
 {
