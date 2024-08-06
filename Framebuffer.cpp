@@ -2,6 +2,7 @@
 
 #include "Vector.h"
 #include "Utils.h"
+#include <set>
 
 
 int window_width = 0, window_height = 0;
@@ -99,18 +100,44 @@ Framebuffer::Framebuffer(const char* display_name, std::vector<TextureSpec> text
 
 	check_gl_errors("Framebuffer::Framebuffer() 1");
 
-	std::vector<GLenum> attachment_points;
+	int max_color = 0;
+	std::set<GLenum> color_attachments;
 
 	for(auto& spec : texture_specs)
 	{
 		textures.push_back(spec.make_texture(name, width, height));
-		if(spec.attachment_point >= GL_COLOR_ATTACHMENT0 && spec.attachment_point <= GL_COLOR_ATTACHMENT15)
-			attachment_points.push_back(spec.attachment_point);
+		int color_number = spec.attachment_point - GL_COLOR_ATTACHMENT0;
+		if(color_number >= 0 && color_number <= 15)
+		{
+			if(color_number > max_color)
+				max_color = color_number;
+			color_attachments.insert(spec.attachment_point);
+		}
 	}
 
 	check_gl_errors("Framebuffer::Framebuffer() 2");
 
-	glDrawBuffers(attachment_points.size(), attachment_points.data());
+	if(color_attachments.size())
+	{
+		/*
+			This stupid dance is necesary because lights have one color attachment, and 
+			it has to be GL_COLOR_ATTACHMENT3 to be compatible with the non-shadow 
+			versions of the fragment shaders. So we need to be able to make this happen:
+				glDrawBuffers(4, {GL_NONE, GL_NONE, GL_NONE, GL_COLOR_ATTACHMENT3})
+		*/
+		GLenum* colors = new GLenum[max_color + 1];
+		for(int i = 0; i <= max_color; i++)
+			colors[i] = color_attachments.count(GL_COLOR_ATTACHMENT0 + i) ? GL_COLOR_ATTACHMENT0 + i : GL_NONE;
+
+		printf("%s: %d color attachments:\n", display_name, max_color + 1);
+		for(int i = 0; i <= max_color; i++)
+			printf("\t%d\n", colors[i]);
+
+		glDrawBuffers(max_color + 1, colors);
+		delete[] colors;
+	}
+	else
+		glDrawBuffers(0, NULL);
 
 	for(auto extra : extra_attachments)
 		glNamedFramebufferTexture(name, extra.attachment_point, extra.tex_name, 0);
@@ -307,7 +334,7 @@ void init_framebuffers()
 			{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT1},
 			{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT2},
 			{GL_TEXTURE_2D, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_ATTACHMENT},
-			{GL_TEXTURE_2D, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_COLOR_ATTACHMENT3}
+			{GL_TEXTURE_2D, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_COLOR_ATTACHMENT3, GL_NEAREST, GL_NEAREST}
 		},
 		{}
 	);

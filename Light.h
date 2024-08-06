@@ -23,6 +23,7 @@ struct Light : public Camera
 	Light(Mat4& mat, Vec3& emission, Model* model, double near_clip = 0.001);
 
 	inline GLuint shadow_map() {return shadow_buffer->textures[0];}
+	inline GLuint index_map() {return shadow_buffer->textures[1];}
 
 	void set_mat(Mat4& new_mat)
 	{

@@ -14,7 +14,10 @@ Light::Light(Mat4& mat, Vec3& emission, Model* model, double near_clip)
 
 	shadow_buffer = new Framebuffer(
 		"Shadow Buffer",
-		{{GL_TEXTURE_CUBE_MAP, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_ATTACHMENT, GL_LINEAR, GL_LINEAR}},
+		{
+			{GL_TEXTURE_CUBE_MAP, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_ATTACHMENT, GL_LINEAR, GL_LINEAR},
+			{GL_TEXTURE_CUBE_MAP, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_COLOR_ATTACHMENT3, GL_NEAREST, GL_NEAREST}
+		},
 		{},
 		SHADOW_MAP_SIZE,
 		SHADOW_MAP_SIZE
@@ -23,7 +26,7 @@ Light::Light(Mat4& mat, Vec3& emission, Model* model, double near_clip)
 	check_gl_errors("Light::Light() 1");
 	
 	shadow_pass = new Pass(shadow_buffer);
-	shadow_pass->clear_mask = GL_DEPTH_BUFFER_BIT;
+	shadow_pass->clear_mask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
 	shadow_pass->is_shadow_pass = true;
 
 	check_gl_errors("Light::Light() 2");

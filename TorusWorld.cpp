@@ -29,10 +29,11 @@ enum Mode {
 	COPY_TEXTURES,
 	DUMP_LIGHT_MAP,
 	DUMP_LUT,
-	DUMP_INDEX_BUFFER,
 	DUMP_BLOOM_MAIN_COLOR,
 	DUMP_BLOOM_BRIGHT_COLOR,
-	DUMP_BLOOM_RESULT
+	DUMP_BLOOM_RESULT,
+	DUMP_INDEX_BUFFER,
+	DUMP_LIGHT_INDEX_MAP
 };
 
 bool bloom = true;
@@ -438,6 +439,23 @@ void display()
 			}
 			break;
 
+		case DUMP_LIGHT_INDEX_MAP:
+			{
+				ShaderProgram* dump_cube_program = ShaderProgram::get(
+					Shader::get(vert_screenspace, {}),
+					NULL,
+					Shader::get(frag_dump_cubemap, {DEFINE_INTEGER_TEX})
+				);
+				glClear(GL_COLOR_BUFFER_BIT);
+				dump_cube_program->use();
+				dump_cube_program->set_texture("tex", 0, lights[0]->index_map(), GL_TEXTURE_CUBE_MAP);
+				dump_cube_program->set_float("z_mult", 1);
+				draw_hsq(0);
+				dump_cube_program->set_float("z_mult", -1);
+				draw_hsq(1);
+			}
+			break;
+
 		default:
 			{
 				ShaderProgram* dump_program = ShaderProgram::get(
@@ -574,8 +592,11 @@ void special(int key, int x, int y)
 			bloom = !bloom;
 			break;
 		
-		case GLUT_KEY_F9:
+		case GLUT_KEY_F11:
 			mode = DUMP_INDEX_BUFFER;
+			break;
+		case GLUT_KEY_F12:
+			mode = DUMP_LIGHT_INDEX_MAP;
 			break;
 	}
 }

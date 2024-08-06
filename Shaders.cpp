@@ -591,9 +591,9 @@ void init_shaders()
 				layout (location = 0) out vec4 frag_albedo;
 				layout (location = 1) out vec4 frag_position;
 				layout (location = 2) out vec4 frag_normal;
-				#ifdef USE_PRIM_INDEX
-					layout (location = 3) out uint frag_index;
-				#endif
+			#endif
+			#ifdef USE_PRIM_INDEX
+				layout (location = 3) out uint frag_index;
 			#endif
 			layout (depth_any) out float gl_FragDepth;
 
@@ -622,16 +622,16 @@ void init_shaders()
 						frag_albedo = base_color;
 					#endif
 
-					#ifdef USE_PRIM_INDEX
-						frag_index = gf_primitive_index;
-					#endif
-
 					frag_normal = vec4(point_coord.x, point_coord.y, normal_z, 0);
 
 					frag_position = gf_r4pos + BASE_POINT_SIZE * frag_normal;
 				#endif
 				
 				gl_FragDepth = clamp((distance + BASE_POINT_SIZE * normal_z) / 6.283185, 0, 1);
+
+				#ifdef USE_PRIM_INDEX
+					frag_index = gf_primitive_index;
+				#endif
 			}
 		)",
 		NULL,
@@ -678,9 +678,9 @@ void init_shaders()
 				layout (location = 0) out vec4 frag_albedo;
 				layout (location = 1) out vec4 frag_position;
 				layout (location = 2) out vec4 frag_normal;
-				#ifdef USE_PRIM_INDEX
-					layout (location = 3) out uint frag_index;
-				#endif
+			#endif
+			#ifdef USE_PRIM_INDEX
+				layout (location = 3) out uint frag_index;
 			#endif
 			layout (depth_any) out float gl_FragDepth;
 
@@ -704,10 +704,6 @@ void init_shaders()
 					#endif
 
 					frag_position = true_position;
-
-					#ifdef USE_PRIM_INDEX
-						frag_index = gf_primitive_index;
-					#endif
 				#endif
 				
 				/*
@@ -732,6 +728,10 @@ void init_shaders()
 					true_distance_normalized = 1 - true_distance_normalized;
 
 				gl_FragDepth = clamp(true_distance_normalized, 0, 1);
+
+				#ifdef USE_PRIM_INDEX
+					frag_index = gf_primitive_index;
+				#endif
 			}
 		)",
 		[](ShaderProgram* program) {
@@ -1058,7 +1058,11 @@ void init_shaders()
 		"frag_dump_cubemap",
 		GL_FRAGMENT_SHADER,
 		R"(
-			uniform samplerCube tex;
+			#ifdef INTEGER_TEX
+				uniform usamplerCube tex;
+			#else
+				uniform samplerCube tex;
+			#endif
 			
 			uniform float z_mult;
 
@@ -1072,13 +1076,25 @@ void init_shaders()
 				if(temp < 0)
 					discard;
 				vec3 dir = vec3(coord.x, coord.y, z_mult * sqrt(temp));
-				frag_color = texture(tex, dir);
+				
+				#ifdef INTEGER_TEX
+					uint samp = texture(tex, dir).r;
+
+					frag_color.r = float(samp & 0xFF) / 255;
+					frag_color.g = float((samp >> 8) & 0xFF) / 255;
+					frag_color.b = float((samp >> 16) & 0xFF) / 255;
+					frag_color.a = 1;
+				#else
+					frag_color = texture(tex, dir);
+				#endif
 			}
 		)",
 		NULL,
 		NULL,
 		NULL,
-		{}
+		{
+			new ShaderOption(DEFINE_INTEGER_TEX)
+		}
 	);
 
 	frag_dump_texture1d = new ShaderCore(
