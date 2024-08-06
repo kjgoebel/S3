@@ -93,5 +93,5 @@ void check_gl_errors(const char* check_point_name)
 {
 	GLenum error = glGetError();
 	if(error != GL_NO_ERROR)
-		fprintf(stderr, "GL Error: %s: %s\n", check_point_name, gluErrorString(error));
+		fprintf(stderr, "GL Error %d: %s: %s\n", error, check_point_name, gluErrorString(error));
 }
