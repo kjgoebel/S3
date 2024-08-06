@@ -66,7 +66,7 @@ Mat4 torus_world_xform(double x, double y, double z, double yaw, double pitch, d
 
 	Vec4 down = INV_ROOT_2 * Vec4(-cx, -sx, cy, sy);
 	Vec4 right = Vec4(sx, -cx, 0, 0);
-
+	
 	return Mat4::from_columns(right, down, fwd, pos)
 				* Mat4::axial_rotation(_y, _w, z)
 				* Mat4::axial_rotation(_z, _x, yaw)
@@ -98,8 +98,6 @@ PlayerState player_state;
 
 void init()
 {
-	srand(clock());
-
 	check_gl_errors("init 0");
 	
 	glClearColor(0, 0, 0, 0);
@@ -108,6 +106,7 @@ void init()
 	glBlendFunc(GL_ONE, GL_ONE);
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
+	init_random();
 	init_luts();
 	init_shaders();
 	init_framebuffers();
@@ -197,7 +196,14 @@ void init()
 	//Note: Should make half as many dots but only on the right side of the torus.
 	Vec4* dots = new Vec4[NUM_DOTS];
 	for(int i = 0; i < NUM_DOTS; i++)
-		dots[i] = rand_s3();
+	{
+		double c, s;
+		do {
+			dots[i] = rand_s3();
+			s = sqrt(1 - dots[i].w * dots[i].w - dots[i].z * dots[i].z);
+			c = sqrt(1 - dots[i].y * dots[i].y - dots[i].x * dots[i].x);
+		} while(c > s);
+	}
 	dots_model = new Model(NUM_DOTS, dots);
 	delete[] dots;
 

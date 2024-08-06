@@ -3,8 +3,11 @@
 #include "Vector.h"
 
 
+void init_random();
+unsigned long long random();
 double frand();
 double fsrand();
+
 double current_time();
 
 Vec4 rand_s3();

@@ -9,9 +9,31 @@
 #pragma warning(disable : 4244)
 
 
+
+//RNG adapted from Numerical Recipes 3rd Edition (Generator A1).
+
+#define A1	(21)
+#define A2	(35)
+#define A3	(4)
+
+unsigned long long random_seed;
+
+void init_random()
+{
+	random_seed = clock();
+}
+
+unsigned long long random()
+{
+	random_seed ^= (random_seed >> A1);
+	random_seed ^= (random_seed << A2);
+	random_seed ^= (random_seed >> A3);
+	return random_seed;
+}
+
 double frand()
 {
-	return (double)rand() / RAND_MAX;
+	return 5.42101086242752217E-20 * random();
 }
 
 double fsrand()

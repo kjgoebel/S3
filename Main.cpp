@@ -12,7 +12,7 @@
 #include <time.h>
 
 
-//#define PRINT_FRAME_RATE
+#define PRINT_FRAME_RATE
 
 #define NUM_DOTS		(2000)
 
@@ -82,11 +82,10 @@ DrawFunc render_itc = NULL, render_dual_itc = NULL;
 
 void init()
 {
-	srand(clock());
-
 	glClearColor(0, 0, 0, 0);
 	//glEnable(GL_PROGRAM_POINT_SIZE);
 
+	init_random();
 	init_luts();
 	init_shaders();
 	init_framebuffers();
