@@ -56,14 +56,6 @@ public:
 	static Model* make_torus_arc(int longitudinal_segments, int transverse_segments, double length, double hole_ratio, bool use_quad_strips = true, bool make_normals = false);
 	static Model* make_bumpy_torus(int longitudinal_segments, int transverse_segments, double bump_height, bool use_quad_strips = false);
 	static std::shared_ptr<Vec4[]> s3ify(int count, double scale, const Vec3* vertices);		//Project a list of R3 vertices onto S3.
-	
-	/*
-		Creates buffers and raw_vertex_array. Called automatically as needed by 
-		draw and make_draw_func(). Exposed as public because for some #$&(@ 
-		reason it sometimes causes segfaults unless it's manually called 
-		earlier.
-	*/
-	void prepare_to_render();
 
 private:
 	int primitive;						//GL_POINTS, GL_TRIANGLES, etc.
@@ -73,11 +65,13 @@ private:
 	std::unique_ptr<Vec4[]> vertices;
 	std::unique_ptr<Vec4[]> vertex_colors;				//If this is NULL, the model will render with base color only.
 	std::unique_ptr<GLuint[]> elements;					//If this is NULL, use glDrawArrays() instead of glDrawElements().
-	std::unique_ptr<Vec4[]> normals;					//If this is NULL, lighting calculation will ignore effects of surface normal (only distance and shadow will be used).
+	std::unique_ptr<Vec4[]> normals;					//If this is NULL, normals will all be zero, so the model will catch no light.
 
 	GLuint vertex_buffer, vertex_color_buffer, element_buffer, normal_buffer;
 	
 	GLuint raw_vertex_array;
+
+	void prepare_to_render();
 
 	GLuint make_vertex_array();			//Creates a VAO and binds vertex, vertex color and element buffer objects to it as appropriate.
 
