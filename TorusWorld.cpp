@@ -241,6 +241,7 @@ void init()
 	Model* light_model = Model::make_icosahedron(0.02, 2, true);
 
 	//The Unlight
+	/*
 	lights.push_back(new Light(
 		Mat4::axial_rotation(_w, _x, TAU / 6),
 		-Vec3(0.6, 0.6, 0.6),
@@ -254,7 +255,8 @@ void init()
 			0.25 * Vec3(frand(), frand(), frand()),
 			light_model
 		));
-	
+	*/
+
 	check_gl_errors("init 5");
 	
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;

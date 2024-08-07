@@ -59,7 +59,7 @@ void Light::render(DrawFunc draw_scene)
 	ShaderProgram* light_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
 		NULL,
-		Shader::get(frag_point_light, {})
+		Shader::get(frag_point_light, {DEFINE_USE_PRIM_INDEX})
 	);
 
 	light_program->use();
@@ -67,8 +67,12 @@ void Light::render(DrawFunc draw_scene)
 	light_program->set_vector("light_pos", ~cam.get_mat() * mat.get_column(_w));
 	light_program->set_vector("light_emission", emission);
 	light_program->set_texture("light_map", 3, shadow_map(), GL_TEXTURE_CUBE_MAP);
+	light_program->set_texture("light_index_map", 6, index_map(), GL_TEXTURE_CUBE_MAP);
+	light_program->set_float("light_index_map_scale", 1.5 / SHADOW_MAP_SIZE);
 
+	check_gl_errors("Light::render() before draw_fsq()\n");
 	draw_fsq();
+	check_gl_errors("Light::render() after draw_fsq()\n");
 }
 
 

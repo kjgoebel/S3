@@ -313,14 +313,14 @@ void init_shaders()
 				gl_Position.w = 1;
 
 				#ifndef SHADOW
-					#ifdef INSTANCED_BASE_COLOR
-						vg_base_color = base_color;
-					#endif
 					#ifdef VERTEX_COLOR
 						vg_color = color;
 					#endif
 					#ifdef VERTEX_NORMAL
 						vg_normal = model_view_xform * normal;
+					#endif
+					#ifdef INSTANCED_BASE_COLOR
+						vg_base_color = base_color;
 					#endif
 				#endif
 			}
@@ -814,6 +814,23 @@ void init_shaders()
 			uniform sampler2D normal_tex;
 			uniform samplerCubeShadow light_map;
 
+			#ifdef USE_PRIM_INDEX
+				uniform usampler2D index_tex;
+				uniform usamplerCube light_index_map;
+
+				uniform float light_index_map_scale;
+				#define NUM_INDEX_SAMPLES 7
+				uniform vec3 index_sample_offsets[NUM_INDEX_SAMPLES] = {
+					{0, 0, 0},
+					{1, 0, 0},
+					{-1, 0, 0},
+					{0, 1, 0},
+					{0, -1, 0},
+					{0, 0, 1},
+					{0, 0, -1}
+				};
+			#endif
+
 			uniform mat4 light_xform;
 			uniform vec4 light_pos;
 			uniform vec3 light_emission;
@@ -855,26 +872,50 @@ void init_shaders()
 
 				//Alas, light_to_frag != -frag_to_light.
 				vec4 light_to_frag = light_xform * position;
-				//The correct light_to_frag.xyz would be normalized, but we're feeding it to a cube map.
 				light_to_frag.w = lut_data.x;		//normalized distance
+				//The correct light_to_frag.xyz would be normalized, but we're feeding it to a cube map.
 				if(short_dot < 0)			//If we're facing the far image of the light, check the complimentary distance in the opposite direction.
 					light_to_frag = vec4(0, 0, 0, 1) - light_to_frag;
-				light_to_frag.w -= max(0.003 * (1 - normal_factor), 0.0003);
-				float shadow_factor = 0.0;
-				#ifdef USE_PCF
-					for(int i = 0; i < 10; i++)
+				
+				#ifdef USE_PRIM_INDEX
+					uint frag_index = texelFetch(index_tex, pixel_coords, 0).r;
+					float shadow_factor = texture(light_map, light_to_frag);
+
+					/*
+						Unfortunately, OpenGL doesn't allow us to neatly sample the adjacent texels 
+						in a cube map, so we have to do this nonsense.
+					*/
+					light_to_frag.xyz = normalize(light_to_frag.xyz);
+					for(int i = 0; i < NUM_INDEX_SAMPLES; i++)
 					{
-						vec4 offset = 0.001 * vec4(
-							bnoise(pixel_coords + ivec2(0, 439 * i)),
-							bnoise(pixel_coords + ivec2(547 * i, 0)),
-							bnoise(pixel_coords + ivec2(0, 227 * i)),
-							0
-						);
-						shadow_factor += texture(light_map, light_to_frag + offset);
+						uint light_index = texture(
+							light_index_map,
+							light_to_frag.xyz + light_index_map_scale * index_sample_offsets[i]
+						).r;
+						if(light_index == frag_index)
+						{
+							shadow_factor = 1;
+							break;
+						}
 					}
-					shadow_factor *= 0.1;
 				#else
-					shadow_factor = texture(light_map, light_to_frag);
+					light_to_frag.w -= max(0.003 * (1 - normal_factor), 0.0003);
+					float shadow_factor = 0.0;
+					#ifdef USE_PCF
+						for(int i = 0; i < 10; i++)
+						{
+							vec4 offset = 0.001 * vec4(
+								bnoise(pixel_coords + ivec2(0, 439 * i)),
+								bnoise(pixel_coords + ivec2(547 * i, 0)),
+								bnoise(pixel_coords + ivec2(0, 227 * i)),
+								0
+							);
+							shadow_factor += texture(light_map, light_to_frag + offset);
+						}
+						shadow_factor *= 0.1;
+					#else
+						shadow_factor = texture(light_map, light_to_frag);
+					#endif
 				#endif
 
 				frag_color.rgb = shadow_factor * normal_factor * distance_factor * light_emission * albedo.rgb;
@@ -890,7 +931,16 @@ void init_shaders()
 			program->set_texture("position_tex", 1, s_gbuffer_position);
 			program->set_texture("normal_tex", 2, s_gbuffer_normal);
 		},
-		{}
+		{
+			new ShaderOption(
+				DEFINE_USE_PRIM_INDEX,
+				NULL,
+				NULL,
+				[](ShaderProgram* program) {
+					program->set_texture("index_tex", 5, s_gbuffer_index);
+				}
+			)
+		}
 	);
 
 	frag_bloom_separate = new ShaderCore(
