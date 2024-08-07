@@ -760,13 +760,17 @@ void init_shaders()
 			out vec4 frag_color;
 
 			#ifdef USE_PCF
-				float bnoise(ivec2 p) {
-					int temp = 
-						(p.x * p.y * 999999937) ^
-						(p.x * p.y * 999416681) ^
-						999319777;
-					return float(temp % 135977) / 135976;
-				}
+				#define NUM_PCF_SAMPLES 8
+				const vec4 pcf_sample_offsets[NUM_PCF_SAMPLES] = {
+					{1, 1, 1, 0},
+					{-1, 1, 1, 0},
+					{1, -1, 1, 0},
+					{1, 1, -1, 0},
+					{-1, -1, 1, 0},
+					{1, -1, -1, 0},
+					{-1, 1, -1, 0},
+					{-1, -1, -1, 0}
+				};
 			#endif
 
 			void main() {
@@ -793,25 +797,16 @@ void init_shaders()
 				float normal_factor = abs(short_dot);
 
 				//Alas, light_to_frag != -frag_to_light.
-				vec4 light_to_frag = light_xform * position;
-				//The correct light_to_frag.xyz would be normalized, but we're feeding it to a cube map.
+				vec4 light_to_frag = normalize(light_xform * position);		//This has to be normalized because we're going to add offsets of a particular size.
 				light_to_frag.w = lut_data.x;		//normalized distance
 				if(short_dot < 0)			//If we're facing the far image of the light, check the complimentary distance in the opposite direction.
 					light_to_frag = vec4(0, 0, 0, 1) - light_to_frag;
-				light_to_frag.w -= max(0.003 * (1 - normal_factor), 0.0003);
+				light_to_frag.w -= max(0.002 * (1 - normal_factor), 0.0002);
 				float shadow_factor = 0.0;
 				#ifdef USE_PCF
-					for(int i = 0; i < 10; i++)
-					{
-						vec4 offset = 0.001 * vec4(
-							bnoise(pixel_coords + ivec2(0, 439 * i)),
-							bnoise(pixel_coords + ivec2(547 * i, 0)),
-							bnoise(pixel_coords + ivec2(0, 227 * i)),
-							0
-						);
-						shadow_factor += texture(light_map, light_to_frag + offset);
-					}
-					shadow_factor *= 0.1;
+					for(int i = 0; i < NUM_PCF_SAMPLES; i++)
+						shadow_factor += texture(light_map, light_to_frag + 0.0005 * pcf_sample_offsets[i]);
+					shadow_factor /= NUM_PCF_SAMPLES;
 				#else
 					shadow_factor = texture(light_map, light_to_frag);
 				#endif
