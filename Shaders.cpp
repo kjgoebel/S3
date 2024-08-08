@@ -829,6 +829,8 @@ void init_shaders()
 					{0, 0, 1},
 					{0, 0, -1}
 				};
+
+				#define NORMAL_FUDGE_FACTOR (0.05)
 			#endif
 
 			uniform mat4 light_xform;
@@ -869,7 +871,7 @@ void init_shaders()
 					according to the magnitude of the dot product (if we're not in shadow).
 				*/
 				float short_dot = dot(normal, frag_to_light);
-				float normal_factor = clamp(abs(short_dot) * 1.15 - 0.15, 0, 1);
+				float normal_factor = clamp(abs(short_dot) * (1 + NORMAL_FUDGE_FACTOR) - NORMAL_FUDGE_FACTOR, 0, 1);
 
 				//Alas, light_to_frag != -frag_to_light.
 				vec4 light_to_frag = light_xform * position;

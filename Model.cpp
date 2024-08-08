@@ -731,3 +731,45 @@ std::shared_ptr<Vec4[]> Model::s3ify(int count, double scale, const Vec3* vertic
 
 	return ret;
 }
+
+
+void Model::triangulate()
+{
+	if(!elements)
+		error("Must call triangulate() before getting rid of elements array.\n");
+	if(vertex_buffer)
+		error("Must call triangulate() before setting up vertex array, buffers, etc.\n");
+
+	switch(primitive)
+	{
+		case GL_TRIANGLES:
+		case GL_TRIANGLE_STRIP:
+			error("This model is already triangles.\n");
+			break;
+		case GL_QUADS:
+			{
+				GLuint* new_elements = new GLuint[2 * num_primitives * 3];
+				for(int i = 0; i < num_primitives; i++)
+				{
+					new_elements[2 * 3 * i + 0] = elements[4 * i + 0];
+					new_elements[2 * 3 * i + 1] = elements[4 * i + 1];
+					new_elements[2 * 3 * i + 2] = elements[4 * i + 2];
+
+					new_elements[2 * 3 * i + 3] = elements[4 * i + 0];
+					new_elements[2 * 3 * i + 4] = elements[4 * i + 2];
+					new_elements[2 * 3 * i + 5] = elements[4 * i + 3];
+				}
+				elements.reset(new_elements);
+				num_primitives *= 2;
+				vertices_per_primitive = 3;
+				primitive = GL_TRIANGLES;
+			}
+			break;
+		case GL_QUAD_STRIP:
+			primitive = GL_TRIANGLE_STRIP;
+			break;
+		default:
+			error("I don't know how to triangulate primitive type %d\n", primitive);
+			break;
+	}
+}

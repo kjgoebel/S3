@@ -210,8 +210,9 @@ void init()
 	delete[] dots;
 
 	torus_model = Model::make_bumpy_torus(50, 50, 0.03);
-	torus_model->generate_normals();
+	torus_model->triangulate();
 	torus_model->generate_primitive_colors(0.7);
+	torus_model->generate_normals();
 
 	boulder_model =  Model::make_icosahedron(0.1, 1);
 	boulder_model->generate_primitive_colors(0.3);
