@@ -751,27 +751,19 @@ void init_shaders()
 			uniform sampler2D albedo_tex;
 			uniform sampler2D position_tex;
 			uniform sampler2D normal_tex;
-			uniform samplerCubeShadow light_map;
+			uniform samplerCube light_map;
 
 			uniform mat4 light_xform;
 			uniform vec4 light_pos;
 			uniform vec3 light_emission;
 
-			out vec4 frag_color;
+			#define NUM_SHADOW_SAMPLES 5
+			#define SHADOW_SAMPLE_EXTENT 0.001
+			float shadow_offset(int i) {
+				return -SHADOW_SAMPLE_EXTENT + i * 2 * SHADOW_SAMPLE_EXTENT / (NUM_SHADOW_SAMPLES - 1);
+			}
 
-			#ifdef USE_PCF
-				#define NUM_PCF_SAMPLES 8
-				const vec4 pcf_sample_offsets[NUM_PCF_SAMPLES] = {
-					{1, 1, 1, 0},
-					{-1, 1, 1, 0},
-					{1, -1, 1, 0},
-					{1, 1, -1, 0},
-					{-1, -1, 1, 0},
-					{1, -1, -1, 0},
-					{-1, 1, -1, 0},
-					{-1, -1, -1, 0}
-				};
-			#endif
+			out vec4 frag_color;
 
 			void main() {
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
@@ -797,19 +789,22 @@ void init_shaders()
 				float normal_factor = abs(short_dot);
 
 				//Alas, light_to_frag != -frag_to_light.
-				vec4 light_to_frag = normalize(light_xform * position);		//This has to be normalized because we're going to add offsets of a particular size.
-				light_to_frag.w = lut_data.x;		//normalized distance
+				vec3 light_to_frag = (light_xform * position).xyz;
+				vec3 lightspace_normal = (light_xform * normal).xyz;
+				//True light_to_frag would be normalized, but we're feeding this to a cube map.
 				if(short_dot < 0)			//If we're facing the far image of the light, check the complimentary distance in the opposite direction.
-					light_to_frag = vec4(0, 0, 0, 1) - light_to_frag;
-				light_to_frag.w -= max(0.002 * (1 - normal_factor), 0.0002);
+				{
+					light_to_frag = -light_to_frag;
+					lut_data.x = 1 - lut_data.x;		//normalized distance
+				}
+
 				float shadow_factor = 0.0;
-				#ifdef USE_PCF
-					for(int i = 0; i < NUM_PCF_SAMPLES; i++)
-						shadow_factor += texture(light_map, light_to_frag + 0.0005 * pcf_sample_offsets[i]);
-					shadow_factor /= NUM_PCF_SAMPLES;
-				#else
-					shadow_factor = texture(light_map, light_to_frag);
-				#endif
+				for(int i = 0; i < NUM_SHADOW_SAMPLES; i++)
+				{
+					float distance_delta = texture(light_map, light_to_frag + shadow_offset(i) * lightspace_normal.xyz).r - lut_data.x;
+					shadow_factor += smoothstep(-0.002, 0.0, distance_delta);
+				}
+				shadow_factor /= NUM_SHADOW_SAMPLES;
 
 				frag_color.rgb = shadow_factor * normal_factor * distance_factor * light_emission * albedo.rgb;
 				frag_color.a = 1;
