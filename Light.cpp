@@ -2,7 +2,7 @@
 #include "Utils.h"
 
 
-#define SHADOW_MAP_SIZE	(4096)
+#define SHADOW_MAP_SIZE	(2048)
 #define NUM_INDEX_LAYERS (8)
 
 

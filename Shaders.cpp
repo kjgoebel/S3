@@ -770,7 +770,7 @@ void init_shaders()
 				#ifdef USE_PRIM_INDEX
 					#ifdef SHADOW
 						ivec3 image_coords;
-						image_coords.xy = ivec2(gl_FragCoord.xy);
+						image_coords.xy = ivec2(gl_FragCoord.xy);		//Note that this only works because shadow map and index map are the same size.
 						image_coords.z = gl_Layer;
 						uint index_layer = imageAtomicAdd(index_count_map, image_coords, 1);
 						if(index_layer < imageSize(index_map).z)
@@ -920,7 +920,7 @@ void init_shaders()
 				
 				float shadow_factor = 0;
 				float distance_delta = texture(shadow_map, light_to_frag).r - lut_data.x;
-				if(distance_delta > -0.002)
+				if(distance_delta > -0.0003)
 				{
 					uint frag_index = texelFetch(index_tex, pixel_coords, 0).r;
 					uint num_indices_to_check = texture(light_index_count_map, light_to_frag).r;
