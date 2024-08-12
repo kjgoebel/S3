@@ -924,7 +924,6 @@ void init_shaders()
 				{
 					uint frag_index = texelFetch(index_tex, pixel_coords, 0).r;
 					uint num_indices_to_check = texture(light_index_count_map, light_to_frag).r;
-					shadow_factor = float(num_indices_to_check) / 8;
 					vec4 l2f_with_layer;
 					l2f_with_layer.xyz = light_to_frag.xyz;
 					for(uint i = 0; i < num_indices_to_check; i++)
