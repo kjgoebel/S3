@@ -1,11 +1,9 @@
 #include "Model.h"
 
 #include "MakeModel.h"
-#include <fcntl.h>
-#include <io.h>
-#include <stdint.h>
 #include <memory>
 #include "Utils.h"
+#include "Camera.h"
 
 /*
 	We use is_shadow_pass to choose automagically which shader program to use. I don't 

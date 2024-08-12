@@ -1,11 +1,8 @@
 #include "Shaders.h"
 
 #include "Camera.h"
-#include <stdio.h>
-#include <stdlib.h>
 #include "Utils.h"
 #include "Framebuffer.h"
-#include "Light.h"
 
 #pragma warning(disable : 4244)		//conversion from double to float
 #pragma warning(disable : 4996)		//VS doesn't like old-school string manipulation.
@@ -206,6 +203,12 @@ void ShaderProgram::set_lut(const char* name, int tex_unit, LookupTable* lut)
 	check_gl_errors("set_lut 1");
 }
 
+void ShaderProgram::set_image_texture(GLuint image_unit, GLuint texture, GLenum access, GLenum format)
+{
+	glBindImageTexture(image_unit, texture, 0, GL_TRUE, 0, access, format);
+	image_units_bound.push_back(image_unit);
+}
+
 void ShaderProgram::dump() const
 {
 	printf("Shader program id %d:\n", id);
@@ -242,11 +245,12 @@ void ShaderProgram::frame_all()
 }
 
 std::vector<ShaderProgram*> ShaderProgram::all_shader_programs;
+ShaderProgram* ShaderProgram::current_program = NULL;
 
 
 ShaderCore *vert, *geom_points, *geom_triangles, *frag_points, *frag;
 ShaderCore *vert_screenspace, *frag_fog, *frag_point_light, *frag_bloom, *frag_bloom_separate, *frag_final_color;
-ShaderCore *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_dump_texture1d;
+ShaderCore *frag_dump_texture, *frag_dump_cubemap, *frag_dump_image_cube_array, *frag_dump_texture1d;
 
 void init_shaders()
 {
@@ -593,7 +597,12 @@ void init_shaders()
 				layout (location = 2) out vec4 frag_normal;
 			#endif
 			#ifdef USE_PRIM_INDEX
-				layout (location = 3) out uint frag_index;
+				#ifdef SHADOW
+					layout (r32ui, binding = 0) uniform uimageCube index_count_map;
+					layout (binding = 1) writeonly uniform uimageCubeArray index_map;
+				#else
+					layout (location = 3) out uint frag_index;
+				#endif
 			#endif
 			layout (depth_any) out float gl_FragDepth;
 
@@ -630,7 +639,19 @@ void init_shaders()
 				gl_FragDepth = clamp((distance + BASE_POINT_SIZE * normal_z) / 6.283185, 0, 1);
 
 				#ifdef USE_PRIM_INDEX
-					frag_index = gf_primitive_index;
+					#ifdef SHADOW
+						ivec3 image_coords;
+						image_coords.xy = ivec2(gl_FragCoord.xy);
+						image_coords.z = gl_Layer;
+						uint index_layer = imageAtomicAdd(index_count_map, image_coords, 1);
+						if(index_layer < imageSize(index_map).z)
+						{
+							image_coords.z += int(6 * index_layer);
+							imageStore(index_map, image_coords, uvec4(gf_primitive_index, 0, 0, 0));
+						}
+					#else
+						frag_index = gf_primitive_index;
+					#endif
 				#endif
 			}
 		)",
@@ -641,7 +662,19 @@ void init_shaders()
 			new ShaderOption(DEFINE_VERTEX_COLOR),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
 			new ShaderOption(DEFINE_SHADOW),
-			new ShaderOption(DEFINE_USE_PRIM_INDEX)
+			new ShaderOption(
+				DEFINE_USE_PRIM_INDEX,
+				NULL,
+				NULL,
+				[](ShaderProgram* program)
+				{
+					if(s_curcam->get_index_map())
+					{
+						program->set_image_texture(0, s_curcam->get_index_count_map(), GL_READ_WRITE, GL_R32UI);
+						program->set_image_texture(1, s_curcam->get_index_map(), GL_WRITE_ONLY, GL_R32UI);
+					}
+				}
+			)
 		}
 	);
 
@@ -680,7 +713,12 @@ void init_shaders()
 				layout (location = 2) out vec4 frag_normal;
 			#endif
 			#ifdef USE_PRIM_INDEX
-				layout (location = 3) out uint frag_index;
+				#ifdef SHADOW
+					layout (r32ui, binding = 0) uniform uimageCube index_count_map;
+					layout (binding = 1) writeonly uniform uimageCubeArray index_map;
+				#else
+					layout (location = 3) out uint frag_index;
+				#endif
 			#endif
 			layout (depth_any) out float gl_FragDepth;
 
@@ -730,7 +768,19 @@ void init_shaders()
 				gl_FragDepth = clamp(true_distance_normalized, 0, 1);
 
 				#ifdef USE_PRIM_INDEX
-					frag_index = gf_primitive_index;
+					#ifdef SHADOW
+						ivec3 image_coords;
+						image_coords.xy = ivec2(gl_FragCoord.xy);
+						image_coords.z = gl_Layer;
+						uint index_layer = imageAtomicAdd(index_count_map, image_coords, 1);
+						if(index_layer < imageSize(index_map).z)
+						{
+							image_coords.z += int(6 * index_layer);
+							imageStore(index_map, image_coords, uvec4(gf_primitive_index, 0, 0, 0));
+						}
+					#else
+						frag_index = gf_primitive_index;
+					#endif
 				#endif
 			}
 		)",
@@ -744,7 +794,18 @@ void init_shaders()
 			new ShaderOption(DEFINE_VERTEX_NORMAL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
 			new ShaderOption(DEFINE_SHADOW),
-			new ShaderOption(DEFINE_USE_PRIM_INDEX)
+			new ShaderOption(
+				DEFINE_USE_PRIM_INDEX,
+				NULL,
+				NULL,
+				[](ShaderProgram* program) {
+					if(s_curcam->get_index_map())
+					{
+						program->set_image_texture(0, s_curcam->get_index_count_map(), GL_READ_WRITE, GL_R32UI);
+						program->set_image_texture(1, s_curcam->get_index_map(), GL_WRITE_ONLY, GL_R32UI);
+					}
+				}
+			)
 		}
 	);
 
@@ -812,42 +873,17 @@ void init_shaders()
 			uniform sampler2D albedo_tex;
 			uniform sampler2D position_tex;
 			uniform sampler2D normal_tex;
-			uniform samplerCubeShadow light_map;
 
-			#ifdef USE_PRIM_INDEX
-				uniform usampler2D index_tex;
-				uniform usamplerCube light_index_map;
-
-				uniform float light_index_map_scale;
-				#define NUM_INDEX_SAMPLES 7
-				uniform vec3 index_sample_offsets[NUM_INDEX_SAMPLES] = {
-					{0, 0, 0},
-					{1, 0, 0},
-					{-1, 0, 0},
-					{0, 1, 0},
-					{0, -1, 0},
-					{0, 0, 1},
-					{0, 0, -1}
-				};
-
-				#define NORMAL_FUDGE_FACTOR (0.05)
-			#endif
+			uniform samplerCube shadow_map;
+			uniform usampler2D index_tex;
+			uniform usamplerCube light_index_count_map;
+			uniform usamplerCubeArray light_index_map;
 
 			uniform mat4 light_xform;
 			uniform vec4 light_pos;
 			uniform vec3 light_emission;
 
 			out vec4 frag_color;
-
-			#ifdef USE_PCF
-				float bnoise(ivec2 p) {
-					int temp = 
-						(p.x * p.y * 999999937) ^
-						(p.x * p.y * 999416681) ^
-						999319777;
-					return float(temp % 135977) / 135976;
-				}
-			#endif
 
 			void main() {
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
@@ -871,55 +907,36 @@ void init_shaders()
 					according to the magnitude of the dot product (if we're not in shadow).
 				*/
 				float short_dot = dot(normal, frag_to_light);
-				float normal_factor = clamp(abs(short_dot) * (1 + NORMAL_FUDGE_FACTOR) - NORMAL_FUDGE_FACTOR, 0, 1);
+				float normal_factor = abs(short_dot);
 
 				//Alas, light_to_frag != -frag_to_light.
-				vec4 light_to_frag = light_xform * position;
-				light_to_frag.w = lut_data.x;		//normalized distance
+				vec3 light_to_frag = (light_xform * position).xyz;
 				//The correct light_to_frag.xyz would be normalized, but we're feeding it to a cube map.
 				if(short_dot < 0)			//If we're facing the far image of the light, check the complimentary distance in the opposite direction.
-					light_to_frag = vec4(0, 0, 0, 1) - light_to_frag;
+				{
+					light_to_frag = -light_to_frag;
+					lut_data.x = 1 - lut_data.x;		//normalized distance
+				}
 				
-				#ifdef USE_PRIM_INDEX
+				float shadow_factor = 0;
+				float distance_delta = texture(shadow_map, light_to_frag).r - lut_data.x;
+				if(distance_delta > -0.002)
+				{
 					uint frag_index = texelFetch(index_tex, pixel_coords, 0).r;
-					float shadow_factor = texture(light_map, light_to_frag);
-
-					/*
-						Unfortunately, OpenGL doesn't allow us to neatly sample the adjacent texels 
-						in a cube map, so we have to do this nonsense.
-					*/
-					light_to_frag.xyz = normalize(light_to_frag.xyz);
-					for(int i = 0; i < NUM_INDEX_SAMPLES; i++)
+					uint num_indices_to_check = texture(light_index_count_map, light_to_frag).r;
+					shadow_factor = float(num_indices_to_check) / 8;
+					vec4 l2f_with_layer;
+					l2f_with_layer.xyz = light_to_frag.xyz;
+					for(uint i = 0; i < num_indices_to_check; i++)
 					{
-						uint light_index = texture(
-							light_index_map,
-							light_to_frag.xyz + light_index_map_scale * index_sample_offsets[i]
-						).r;
-						if(light_index == frag_index)
+						l2f_with_layer.w = i;
+						if(texture(light_index_map, l2f_with_layer).r == frag_index)
 						{
 							shadow_factor = 1;
 							break;
 						}
 					}
-				#else
-					light_to_frag.w -= max(0.003 * (1 - normal_factor), 0.0003);
-					float shadow_factor = 0.0;
-					#ifdef USE_PCF
-						for(int i = 0; i < 10; i++)
-						{
-							vec4 offset = 0.001 * vec4(
-								bnoise(pixel_coords + ivec2(0, 439 * i)),
-								bnoise(pixel_coords + ivec2(547 * i, 0)),
-								bnoise(pixel_coords + ivec2(0, 227 * i)),
-								0
-							);
-							shadow_factor += texture(light_map, light_to_frag + offset);
-						}
-						shadow_factor *= 0.1;
-					#else
-						shadow_factor = texture(light_map, light_to_frag);
-					#endif
-				#endif
+				}
 
 				frag_color.rgb = shadow_factor * normal_factor * distance_factor * light_emission * albedo.rgb;
 				frag_color.a = 1;
@@ -1033,45 +1050,6 @@ void init_shaders()
 	);
 	
 	//Debugging Shaders
-	frag_copy_textures = new ShaderCore(
-		"frag_copy_textures",
-		GL_FRAGMENT_SHADER,
-		R"(
-			uniform sampler2D albedo_tex;
-			uniform sampler2D position_tex;
-			uniform sampler2D normal_tex;
-			uniform sampler2D depth_tex;
-			
-			out vec4 frag_color;
-
-			void main() {
-				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
-				float checker_x = float((pixel_coords.x >> 5) & 1), checker_y = float((pixel_coords.y >> 5) & 1);
-
-				if((pixel_coords.x & 0x100) != 0)
-					if((pixel_coords.y & 0x100) != 0)
-						frag_color = texelFetch(albedo_tex, pixel_coords, 0);
-					else
-						//This shows the whole range, but sqeezes it so much you can't see anything:
-						frag_color = texelFetch(position_tex, pixel_coords, 0) / (2 * 6.283185) + 0.5;
-				else
-					if((pixel_coords.y & 0x100) != 0)
-						frag_color = texelFetch(normal_tex, pixel_coords, 0) * 0.5 + 0.5;
-					else
-						frag_color = texelFetch(depth_tex, pixel_coords, 0);
-			}
-		)",
-		NULL,
-		NULL,
-		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
-			program->set_texture("position_tex", 1, s_gbuffer_position);
-			program->set_texture("normal_tex", 2, s_gbuffer_normal);
-			program->set_texture("depth_tex", 3, s_gbuffer_depth);
-		},
-		{}
-	);
-
 	frag_dump_texture = new ShaderCore(
 		"frag_dump_texture",
 		GL_FRAGMENT_SHADER,
@@ -1116,6 +1094,8 @@ void init_shaders()
 			#else
 				uniform samplerCube tex;
 			#endif
+
+			uniform float sample_mult = 1;
 			
 			uniform float z_mult;
 
@@ -1131,14 +1111,14 @@ void init_shaders()
 				vec3 dir = vec3(coord.x, coord.y, z_mult * sqrt(temp));
 				
 				#ifdef INTEGER_TEX
-					uint samp = texture(tex, dir).r;
+					uint samp = uint(texture(tex, dir).r * sample_mult);
 
 					frag_color.r = float(samp & 0xFF) / 255;
 					frag_color.g = float((samp >> 8) & 0xFF) / 255;
 					frag_color.b = float((samp >> 16) & 0xFF) / 255;
 					frag_color.a = 1;
 				#else
-					frag_color = texture(tex, dir);
+					frag_color = texture(tex, dir) * sample_mult;
 				#endif
 			}
 		)",
@@ -1148,6 +1128,36 @@ void init_shaders()
 		{
 			new ShaderOption(DEFINE_INTEGER_TEX)
 		}
+	);
+
+	frag_dump_image_cube_array = new ShaderCore(
+		"frag_dump_image_cube_array",
+		GL_FRAGMENT_SHADER,
+		R"(
+			layout (r32ui, binding = 0) uniform uimageCube tex;
+			uniform uint layer = 0;
+			uniform uint sample_mult;
+
+			in vec2 vf_tex_coord;
+
+			out vec4 frag_color;
+
+			void main() {
+				ivec3 texel_coords;
+				texel_coords.xy = ivec2(imageSize(tex).xy * vf_tex_coord);
+				texel_coords.z = int(layer);
+				uint samp = imageLoad(tex, texel_coords).r * sample_mult;
+
+				frag_color.r = float(samp & 0xFF) / 255;
+				frag_color.g = float((samp >> 8) & 0xFF) / 255;
+				frag_color.b = float((samp >> 16) & 0xFF) / 255;
+				frag_color.a = 1;
+			}
+		)",
+		NULL,
+		NULL,
+		NULL,
+		{}
 	);
 
 	frag_dump_texture1d = new ShaderCore(

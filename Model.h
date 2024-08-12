@@ -3,8 +3,6 @@
 #include "Vector.h"
 #include "GL/glew.h"
 #include "Shaders.h"
-#include "Camera.h"
-#include <stdio.h>
 #include <memory>
 
 

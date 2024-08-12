@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Vector.h"
+#include "GL/glew.h"
 
 /*
 	How does it work?
@@ -41,6 +42,10 @@ public:
 	const Mat4& get_mat() const {return mat;}
 	double get_aspect_ratio() const {return aspect_ratio;}
 	const Mat4& get_proj() const {return projection;}
+
+	//These will return non-zero for lights.
+	virtual GLuint get_index_count_map() const {return 0;}
+	virtual GLuint get_index_map() const {return 0;}
 };
 
 

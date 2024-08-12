@@ -3,9 +3,13 @@
 
 
 #define SHADOW_MAP_SIZE	(4096)
+#define NUM_INDEX_LAYERS (8)
 
 
 Screenbuffer* s_abuffer;
+TextureSpec Light::index_count_spec = {GL_TEXTURE_CUBE_MAP, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_NONE, GL_NEAREST, GL_NEAREST};
+TextureSpec Light::index_spec = {GL_TEXTURE_CUBE_MAP_ARRAY, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_NONE, GL_NEAREST, GL_NEAREST};
+
 
 Light::Light(Mat4& mat, Vec3& emission, Model* model, double near_clip)
 	: Camera(mat, 1, TAU / 4, near_clip), emission(emission), model(model)
@@ -14,10 +18,7 @@ Light::Light(Mat4& mat, Vec3& emission, Model* model, double near_clip)
 
 	shadow_buffer = new Framebuffer(
 		"Shadow Buffer",
-		{
-			{GL_TEXTURE_CUBE_MAP, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_ATTACHMENT, GL_LINEAR, GL_LINEAR},
-			{GL_TEXTURE_CUBE_MAP, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_COLOR_ATTACHMENT3, GL_NEAREST, GL_NEAREST}
-		},
+		{{GL_TEXTURE_CUBE_MAP, GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_ATTACHMENT, GL_LINEAR, GL_LINEAR}},
 		{},
 		SHADOW_MAP_SIZE,
 		SHADOW_MAP_SIZE
@@ -25,18 +26,23 @@ Light::Light(Mat4& mat, Vec3& emission, Model* model, double near_clip)
 
 	check_gl_errors("Light::Light() 1");
 	
+	index_count_map = index_count_spec.make_texture(0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+	index_map = index_spec.make_texture(0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, NUM_INDEX_LAYERS);
+
+	check_gl_errors("Light::Light() 2");
+
 	shadow_pass = new Pass(shadow_buffer);
 	shadow_pass->clear_mask = GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT;
 	shadow_pass->is_shadow_pass = true;
 
-	check_gl_errors("Light::Light() 2");
+	check_gl_errors("Light::Light() 3");
 
 	light_pass = new Pass(s_abuffer);
 	light_pass->clear_mask = 0;
 	light_pass->depth_test = light_pass->depth_mask = false;
 	light_pass->blend = true;		//specifically GL_FUNC_ADD and GL_ONE, GL_ONE
 	
-	check_gl_errors("Light::Light() 3");
+	check_gl_errors("Light::Light() 4");
 
 	shadow_map_dirty = true;
 }
@@ -48,8 +54,17 @@ void Light::render(DrawFunc draw_scene)
 		shadow_pass->start();
 
 		s_curcam = this;
+		glEnable(GL_CONSERVATIVE_RASTERIZATION_NV);
+		GLuint temp = 0;
+		check_gl_errors("Light::render() before clearing");
+		glClearTexImage(index_count_map, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &temp);
+		glClearTexImage(index_map, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, &temp);
+		check_gl_errors("Light::render() after clearing");
 		draw_scene();
+		glDisable(GL_CONSERVATIVE_RASTERIZATION_NV);
 		s_curcam = &cam;
+
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
 		shadow_map_dirty = false;
 	}
@@ -61,13 +76,16 @@ void Light::render(DrawFunc draw_scene)
 		NULL,
 		Shader::get(frag_point_light, {DEFINE_USE_PRIM_INDEX})
 	);
-
+	
+	check_gl_errors("Light::render() before use()\n");
 	light_program->use();
+	check_gl_errors("Light::render() after use()\n");
 	light_program->set_matrix("light_xform", ~mat * cam.get_mat());
 	light_program->set_vector("light_pos", ~cam.get_mat() * mat.get_column(_w));
 	light_program->set_vector("light_emission", emission);
-	light_program->set_texture("light_map", 3, shadow_map(), GL_TEXTURE_CUBE_MAP);
-	light_program->set_texture("light_index_map", 6, index_map(), GL_TEXTURE_CUBE_MAP);
+	light_program->set_texture("shadow_map", 3, shadow_map(), GL_TEXTURE_CUBE_MAP);
+	light_program->set_texture("light_index_count_map", 6, get_index_count_map(), GL_TEXTURE_CUBE_MAP);
+	light_program->set_texture("light_index_map", 7, get_index_map(), GL_TEXTURE_CUBE_MAP_ARRAY);
 	light_program->set_float("light_index_map_scale", 1.5 / SHADOW_MAP_SIZE);
 
 	check_gl_errors("Light::render() before draw_fsq()\n");

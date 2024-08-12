@@ -1,7 +1,6 @@
 #pragma once
 
 #include "GL/glew.h"
-#include "Utils.h"
 #include <vector>
 
 #pragma warning(disable : 4244)		//conversion from double to float
@@ -25,10 +24,10 @@ struct TextureSpec
 		GLenum wrap_mode = GL_CLAMP_TO_EDGE
 	);
 
-	GLuint make_texture(GLuint framebuffer, GLsizei width, GLsizei height);
+	GLuint make_texture(GLuint framebuffer, GLsizei width, GLsizei height, GLsizei depth = 0);
 	
 	//There really isn't a good name for this, 'cuz all it does is call glTexImage*(), and that's not a good name.
-	void tex_image(GLuint tex_name, GLsizei width, GLsizei height, void* data = NULL);
+	void tex_image(GLuint tex_name, GLsizei width, GLsizei height, GLsizei depth = 0, void* data = NULL);
 };
 
 struct ExtraAttachment

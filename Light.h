@@ -17,13 +17,16 @@ struct Light : public Camera
 	Model* model;
 
 	Framebuffer* shadow_buffer;
+	GLuint index_count_map, index_map;
 	Pass *shadow_pass, *light_pass;
 	bool shadow_map_dirty;
 
 	Light(Mat4& mat, Vec3& emission, Model* model, double near_clip = 0.001);
 
 	inline GLuint shadow_map() {return shadow_buffer->textures[0];}
-	inline GLuint index_map() {return shadow_buffer->textures[1];}
+
+	GLuint get_index_count_map() const {return index_count_map;}
+	GLuint get_index_map() const {return index_map;}
 
 	void set_mat(Mat4& new_mat)
 	{
@@ -54,4 +57,6 @@ struct Light : public Camera
 
 	void render(DrawFunc draw_scene);		//Render the light map with draw_scene(), and then draw the light's effect into abuffer.
 	void draw();							//Draw the light's model.
+
+	static TextureSpec index_count_spec, index_spec;
 };

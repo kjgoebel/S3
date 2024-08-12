@@ -22,13 +22,13 @@ TextureSpec::TextureSpec(GLenum target, GLenum internal_format, GLenum format, G
 	this->wrap_mode = wrap_mode;
 }
 
-GLuint TextureSpec::make_texture(GLuint framebuffer, GLsizei width, GLsizei height)
+GLuint TextureSpec::make_texture(GLuint framebuffer, GLsizei width, GLsizei height, GLsizei depth)
 {
 	check_gl_errors("TextureSpec::make_texture() 0");
 
 	GLuint ret;
 	glGenTextures(1, &ret);
-	tex_image(ret, width, height, NULL);
+	tex_image(ret, width, height, depth, NULL);
 	
 	check_gl_errors("TextureSpec::make_texture() 1");
 
@@ -43,18 +43,23 @@ GLuint TextureSpec::make_texture(GLuint framebuffer, GLsizei width, GLsizei heig
 
 	check_gl_errors("TextureSpec::make_texture() 2");
 
-	//framebuffer has to be bound as GL_FRAMEBUFFER, or glNamedFramebufferTexture() doesn't work (?!)
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-	glNamedFramebufferTexture(framebuffer, attachment_point, ret, 0);
+	if(framebuffer)
+	{
+		//framebuffer has to be bound as GL_FRAMEBUFFER, or glNamedFramebufferTexture() doesn't work (?!)
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glNamedFramebufferTexture(framebuffer, attachment_point, ret, 0);
+	}
 
 	check_gl_errors("TextureSpec::make_texture() 3");
 
 	return ret;
 }
 
-void TextureSpec::tex_image(GLuint tex_name, GLsizei width, GLsizei height, void* data)
+void TextureSpec::tex_image(GLuint tex_name, GLsizei width, GLsizei height, GLsizei depth, void* data)
 {
+	check_gl_errors("TextureSpec::tex_image(): 0");
 	glBindTexture(target, tex_name);
+	check_gl_errors("TextureSpec::tex_image(): 1");
 	switch(target)
 	{
 		case GL_TEXTURE_1D:
@@ -76,6 +81,22 @@ void TextureSpec::tex_image(GLuint tex_name, GLsizei width, GLsizei height, void
 					type,
 					data
 				);
+			break;
+		case GL_TEXTURE_CUBE_MAP_ARRAY:
+			check_gl_errors("TextureSpec::tex_image() before glTexImage3D()");
+			glTexImage3D(
+				GL_TEXTURE_CUBE_MAP_ARRAY,
+				0,
+				internal_format,
+				width,
+				height,
+				6 * depth,
+				0,
+				format,
+				type,
+				data
+			);
+			check_gl_errors("TextureSpec::tex_image() after glTexImage3D()");
 			break;
 		default:
 			error("Framebuffer textures of type %d are not implemented.", target);

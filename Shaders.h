@@ -2,7 +2,6 @@
 
 #include "GL/glew.h"
 #include "Vector.h"
-#include "Framebuffer.h"
 #include <vector>
 #include <functional>
 #include <map>
@@ -115,7 +114,7 @@ extern ShaderCore *vert, *geom_points, *geom_triangles, *frag_points, *frag;
 //Screenspace shaders:
 extern ShaderCore *vert_screenspace, *frag_fog, *frag_point_light, *frag_bloom_separate, *frag_bloom, *frag_final_color;
 //Debugging shaders:
-extern ShaderCore *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_dump_texture1d;
+extern ShaderCore *frag_dump_texture, *frag_dump_cubemap, *frag_dump_image_cube_array, *frag_dump_texture1d;
 
 void init_shaders();
 
@@ -127,11 +126,21 @@ public:
 	GLuint get_id() {return id;}
 	void use()
 	{
+		if(current_program)
+			current_program->unuse();
+		current_program = this;
 		glUseProgram(id);
 		vertex->use(this);
 		if(geometry)
 			geometry->use(this);
 		fragment->use(this);
+	}
+	void unuse()
+	{
+		for(auto unit : image_units_bound)
+			glBindImageTexture(unit, 0, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32UI);
+		image_units_bound.clear();
+		glUseProgram(0);
 	}
 	void init()
 	{
@@ -157,6 +166,7 @@ public:
 	void set_uint(const char* name, unsigned int i);
 	void set_texture(const char* name, int tex_unit, GLuint texture, GLenum target = GL_TEXTURE_2D);
 	void set_lut(const char* name, int tex_unit, LookupTable* lut);
+	void set_image_texture(GLuint image_unit, GLuint texture, GLenum access, GLenum format);
 
 	Shader* get_vertex() {return vertex;}
 	Shader* get_geometry() {return geometry;}
@@ -173,6 +183,8 @@ private:
 	Shader* geometry;
 	Shader* fragment;
 
+	std::vector<GLuint> texture_units_bound, image_units_bound;
+
 public:
 	static ShaderProgram* get(Shader* vert, Shader* geom, Shader* frag);
 
@@ -181,4 +193,5 @@ public:
 
 private:
 	static std::vector<ShaderProgram*> all_shader_programs;		//This should be a map.
+	static ShaderProgram* current_program;
 };
