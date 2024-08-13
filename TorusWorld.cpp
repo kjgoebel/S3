@@ -7,6 +7,7 @@
 #include "Utils.h"
 #include "Framebuffer.h"
 #include "Light.h"
+#include "TorusWorldShaders.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -109,6 +110,7 @@ void init()
 	init_random();
 	init_luts();
 	init_shaders();
+	init_torus_world_shaders();
 	init_framebuffers();
 
 	check_gl_errors("init 1");

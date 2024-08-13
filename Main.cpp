@@ -21,6 +21,35 @@
 
 #define FOG_INCREMENT		(0.5)
 
+ShaderCore* frag_fog = new ShaderCore(
+	"frag_fog",
+	GL_FRAGMENT_SHADER,
+	R"(
+		uniform sampler2D albedo_tex;
+		uniform sampler2D depth_tex;
+
+		uniform float fog_scale;
+			
+		out vec4 frag_color;
+
+		void main() {
+			ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
+			float distance = texelFetch(depth_tex, pixel_coords, 0).r;
+			vec4 color = texelFetch(albedo_tex, pixel_coords, 0);
+			frag_color = exp(-distance * fog_scale) * color;
+		}
+	)",
+	NULL,
+	[](ShaderProgram* program) {
+		program->set_float("fog_scale", s_fog_scale);
+	},
+	[](ShaderProgram* program) {
+		program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
+		program->set_texture("depth_tex", 1, s_gbuffer_depth);
+	},
+	{}
+);
+
 Pass* gpass = NULL;
 Pass* fog_pass = NULL;
 

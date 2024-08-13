@@ -111,9 +111,7 @@ private:
 //S3 shaders:
 extern ShaderCore *vert, *geom_points, *geom_triangles, *frag_points, *frag;
 //Screenspace shaders:
-extern ShaderCore *vert_screenspace, *frag_fog, *frag_point_light, *frag_bloom_separate, *frag_bloom, *frag_final_color;
-//Debugging shaders:
-extern ShaderCore *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_dump_texture1d;
+extern ShaderCore *vert_screenspace;
 
 void init_shaders();
 
