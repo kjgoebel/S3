@@ -52,10 +52,5 @@ extern double s_fog_scale;
 extern Camera* s_curcam;
 
 
-/*
-	These go in Camera.h so that Main.cpp / S3 don't have to include Light.h / Light.cpp.
-
-	Shaders.cpp feeds these to the geometry shaders (which don't accept them) even in 
-	S3, but I consider that a minor waste.
-*/
+//These go in Camera.h so that Main.cpp / S3 don't have to include Light.h / Light.cpp.
 extern const Mat4 s_cube_xforms[6];

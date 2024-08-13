@@ -420,9 +420,7 @@ void init_shaders()
 				#endif
 			}
 		)",
-		[](ShaderProgram* program) {
-			program->set_matrices("cube_xforms", s_cube_xforms, 6);
-		},
+		NULL,
 		NULL,
 		[](ShaderProgram* program) {
 			program->set_float("aspect_ratio", s_curcam->get_aspect_ratio());
@@ -431,7 +429,12 @@ void init_shaders()
 		{
 			new ShaderOption(DEFINE_VERTEX_COLOR),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
-			new ShaderOption(DEFINE_SHADOW)
+			new ShaderOption(
+				DEFINE_SHADOW,
+				[](ShaderProgram* program) {
+					program->set_matrices("cube_xforms", s_cube_xforms, 6);
+				}
+			)
 		}
 	);
 
@@ -511,9 +514,7 @@ void init_shaders()
 				#endif
 			}
 		)",
-		[](ShaderProgram* program) {
-			program->set_matrices("cube_xforms", s_cube_xforms, 6);
-		},
+		NULL,
 		NULL,
 		[](ShaderProgram* program) {
 			program->set_float("aspect_ratio", s_curcam->get_aspect_ratio());
@@ -523,7 +524,12 @@ void init_shaders()
 			new ShaderOption(DEFINE_VERTEX_COLOR),
 			new ShaderOption(DEFINE_VERTEX_NORMAL),
 			new ShaderOption(DEFINE_INSTANCED_BASE_COLOR),
-			new ShaderOption(DEFINE_SHADOW)
+			new ShaderOption(
+				DEFINE_SHADOW,
+				[](ShaderProgram* program) {
+					program->set_matrices("cube_xforms", s_cube_xforms, 6);
+				}
+			)
 		}
 	);
 
