@@ -6,10 +6,6 @@
 #include "Framebuffer.h"
 
 
-//To be created in TorusWorld.cpp:
-//I don't like this.
-extern Screenbuffer* s_abuffer;
-#define s_abuffer_color (s_abuffer->textures[0])
 
 struct Light : public Camera
 {

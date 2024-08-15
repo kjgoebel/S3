@@ -6,8 +6,6 @@ Camera cam;
 
 Camera *s_curcam = &cam;
 
-double s_fog_scale = 1.5;
-
 
 Camera::Camera(const Mat4& mat, double aspect_ratio, double vertical_field_of_view, double near)
 {

@@ -44,10 +44,11 @@ Model* boulder_model;
 DrawFunc render_boulders;
 ShaderProgram* final_program;
 ShaderProgram *bloom_separate_program, *bloom_program_h, *bloom_program_v;
+ShaderProgram* fog_program;
 Mode mode = NORMAL;
 
-Framebuffer *bloom_separate, *bloom_h, *bloom_v;
-Pass *gpass, *apass, *unlit_pass, *bloom_separate_pass, *bloom_h_pass, *bloom_v_pass, *final_pass;
+Framebuffer *fog, *bloom_separate, *bloom_h, *bloom_v;
+Pass *gpass, *apass, *unlit_pass, *fog_pass, *bloom_separate_pass, *bloom_h_pass, *bloom_v_pass, *final_pass;
 
 std::vector<Light*> lights;
 
@@ -110,12 +111,12 @@ void init()
 	init_random();
 	init_luts();
 	init_shaders();
-	init_torus_world_shaders();
 	init_framebuffers();
+	init_torus_world_shaders();
 
 	check_gl_errors("init 1");
 
-	s_abuffer = new Screenbuffer("A-Buffer", {{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT0}}, {{GL_DEPTH_ATTACHMENT, s_gbuffer_depth}});
+	fog = new Screenbuffer("Fog", {{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT0}}, {});
 	bloom_separate = new Screenbuffer(
 		"Bloom Separate",
 		{
@@ -151,11 +152,13 @@ void init()
 	unlit_pass->cull_face = GL_BACK;
 	unlit_pass->blend = false;
 
-	bloom_separate_pass = new Pass(bloom_separate);
-	bloom_separate_pass->clear_mask = 0;
-	bloom_separate_pass->depth_test = bloom_separate_pass->depth_mask = false;
-	bloom_separate_pass->cull_face = 0;
-	bloom_separate_pass->blend = false;
+	fog_pass = new Pass(fog);
+	fog_pass->clear_mask = 0;
+	fog_pass->depth_test = fog_pass->depth_mask = false;
+	fog_pass->cull_face = 0;
+	fog_pass->blend = false;
+
+	bloom_separate_pass = new Pass(bloom_separate, fog_pass);
 
 	bloom_h_pass = new Pass(bloom_h, bloom_separate_pass);
 
@@ -168,6 +171,12 @@ void init()
 	final_pass->blend = false;
 
 	check_gl_errors("init 2");
+
+	fog_program = ShaderProgram::get(
+		Shader::get(vert_screenspace, {}),
+		NULL,
+		Shader::get(frag_superfog, {})
+	);
 
 	bloom_separate_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
@@ -328,13 +337,23 @@ void display()
 		light->draw();
 
 	check_gl_errors("display 5");
+
+	fog_pass->start();
+	fog_program->use();
+	fog_program->set_texture("color_tex", 3, s_abuffer_color);
+	fog_program->set_matrix("light_xform", ~lights[0]->get_mat() * cam.get_mat());
+	fog_program->set_vector("light_pos", ~cam.get_mat() * lights[0]->get_mat().get_column(_w));
+	fog_program->set_texture("light_map", 4, lights[0]->shadow_map(), GL_TEXTURE_CUBE_MAP);
+	draw_fsq();
+
+	check_gl_errors("display 5.1");
 	
 	if(bloom)
 	{
 		//Bloom Passes
 		bloom_separate_pass->start();
 		bloom_separate_program->use();
-		bloom_separate_program->set_texture("color_tex", 0, s_abuffer_color);
+		bloom_separate_program->set_texture("color_tex", 0, fog->textures[0]);
 		draw_fsq();
 
 		bloom_h_pass->start();
@@ -494,15 +513,6 @@ void keyboard(unsigned char key, int x, int y)
 			break;
 		case 'd':
 			controls.right = true;
-			break;
-
-		case '[':
-			s_fog_scale -= FOG_INCREMENT;
-			if(s_fog_scale < 0.0)
-				s_fog_scale = 0.0;
-			break;
-		case ']':
-			s_fog_scale += FOG_INCREMENT;
 			break;
 	}
 }

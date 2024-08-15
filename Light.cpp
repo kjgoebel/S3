@@ -7,7 +7,6 @@
 #define SHADOW_MAP_SIZE	(4096)
 
 
-Screenbuffer* s_abuffer;
 
 Light::Light(Mat4& mat, Vec3& emission, Model* model, double near_clip)
 	: Camera(mat, 1, TAU / 4, near_clip), emission(emission), model(model)

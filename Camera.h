@@ -46,9 +46,6 @@ public:
 
 extern Camera cam;
 
-//TorusWorld doesn't use fog so this could be moved to Main.cpp. But TorusWorld might want to use fog....
-extern double s_fog_scale;
-
 extern Camera* s_curcam;
 
 

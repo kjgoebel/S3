@@ -21,6 +21,8 @@
 
 #define FOG_INCREMENT		(0.5)
 
+double s_fog_scale = 1.5;
+
 ShaderCore* frag_fog = new ShaderCore(
 	"frag_fog",
 	GL_FRAGMENT_SHADER,

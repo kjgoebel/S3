@@ -1,18 +1,20 @@
 #include "TorusWorldShaders.h"
 
 
-ShaderCore *frag_point_light, *frag_bloom, *frag_bloom_separate, *frag_final_color;
+ShaderCore *frag_point_light, *frag_superfog, *frag_bloom, *frag_bloom_separate, *frag_final_color;
 ShaderCore *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_dump_texture1d;
+
+Screenbuffer* s_abuffer;
 
 
 void init_torus_world_shaders()
 {
+	s_abuffer = new Screenbuffer("A-Buffer", {{GL_TEXTURE_2D, GL_RGBA32F, GL_RGBA, GL_FLOAT, GL_COLOR_ATTACHMENT0}}, {{GL_DEPTH_ATTACHMENT, s_gbuffer_depth}});
+
 	frag_point_light = new ShaderCore(
 		"frag_point_light",
 		GL_FRAGMENT_SHADER,
 		R"(
-			#define USE_PCF
-
 			uniform sampler1D chord2_lut;
 			uniform float chord2_lut_scale;
 			uniform float chord2_lut_offset;
@@ -152,6 +154,71 @@ void init_torus_world_shaders()
 		{
 			new ShaderOption(DEFINE_HORIZONTAL)
 		}
+	);
+
+	frag_superfog = new ShaderCore(
+		"frag_superfog",
+		GL_FRAGMENT_SHADER,
+		R"(
+			uniform sampler1D chord2_lut;
+			uniform float chord2_lut_scale;
+			uniform float chord2_lut_offset;
+
+			uniform sampler2D color_tex;
+			uniform sampler2D position_tex;
+			uniform sampler2D depth_tex;
+			uniform samplerCube light_map;
+
+			uniform float fog_density = 1;
+			uniform vec3 fog_color = vec3(1, 1, 1);
+
+			uniform mat4 light_xform;
+			uniform vec4 light_pos;
+
+			out vec4 frag_color;
+
+			#define NUM_STEPS (100)
+
+			void main() {
+				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
+				vec4 color = texelFetch(color_tex, pixel_coords, 0);
+				vec4 position = texelFetch(position_tex, pixel_coords, 0);
+				float distance = texelFetch(depth_tex, pixel_coords, 0).r * 6.283185;
+
+				vec4 ortho_position;
+				ortho_position.xyz = normalize(position.xyz);
+				ortho_position.w = 0;
+
+				float fog = 0;
+				for(int i = 1; i < NUM_STEPS; i++)
+				{
+					float theta = i * distance / NUM_STEPS;
+					vec4 curpos = cos(theta) * vec4(0, 0, 0, 1) + sin(theta) * ortho_position;
+					vec4 lightspace_delta = light_xform * curpos;
+					lightspace_delta.w -= 1;
+					float lightspace_distance = texture(chord2_lut, dot(lightspace_delta, lightspace_delta) * chord2_lut_scale + chord2_lut_offset).x;
+					if(lightspace_distance < texture(light_map, lightspace_delta.xyz).r)
+						fog += distance;
+					if(1 - lightspace_distance < texture(light_map, -lightspace_delta.xyz).r)
+						fog += distance;
+				}
+				fog /= NUM_STEPS;
+
+				float fog_factor = exp(-fog * fog_density);
+
+				frag_color.xyz = fog_factor * color.xyz + (1 - fog_factor) * fog_color;
+				frag_color.w = color.w;
+			}
+		)",
+		[](ShaderProgram* program) {
+			program->set_lut("chord2_lut", 0, s_chord2_lut);
+		},
+		NULL,
+		[](ShaderProgram* program) {
+			program->set_texture("position_tex", 1, s_gbuffer_position);
+			program->set_texture("depth_tex", 2, s_gbuffer_depth);
+		},
+		{}
 	);
 
 	frag_final_color = new ShaderCore(
