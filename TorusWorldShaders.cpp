@@ -101,9 +101,9 @@ void init_torus_world_shaders()
 						lightspace_delta.w -= 1;
 						float lightspace_distance = texture(chord2_lut, dot(lightspace_delta, lightspace_delta) * chord2_lut_scale + chord2_lut_offset).x;
 						if(lightspace_distance < texture(light_map, lightspace_delta.xyz).r)
-							fog += distance * fog_color;
+							fog += distance * fog_color * light_emission;
 						if(1 - lightspace_distance < texture(light_map, -lightspace_delta.xyz).r)
-							fog += distance * fog_color;
+							fog += distance * fog_color * light_emission;
 					}
 					fog /= NUM_FOG_STEPS;
 					
