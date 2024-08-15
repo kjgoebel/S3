@@ -15,8 +15,9 @@ struct Light : public Camera
 	Framebuffer* shadow_buffer;
 	Pass *shadow_pass, *light_pass;
 	bool shadow_map_dirty;
+	bool use_fog;
 
-	Light(Mat4& mat, Vec3& emission, Model* model, double near_clip = 0.001);
+	Light(Mat4& mat, Vec3& emission, Model* model, bool use_fog = false, double near_clip = 0.001);
 
 	inline GLuint shadow_map() {return shadow_buffer->textures[0];}
 

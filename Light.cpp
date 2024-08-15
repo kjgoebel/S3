@@ -8,8 +8,8 @@
 
 
 
-Light::Light(Mat4& mat, Vec3& emission, Model* model, double near_clip)
-	: Camera(mat, 1, TAU / 4, near_clip), emission(emission), model(model)
+Light::Light(Mat4& mat, Vec3& emission, Model* model, bool use_fog, double near_clip)
+	: Camera(mat, 1, TAU / 4, near_clip), emission(emission), model(model), use_fog(use_fog)
 {
 	check_gl_errors("Light::Light() 0");
 
@@ -54,17 +54,20 @@ void Light::render(DrawFunc draw_scene)
 
 	light_pass->start();
 
+	std::set<const char*> frag_options;
+	if(use_fog)
+		frag_options.insert(DEFINE_USE_FOG);
 	ShaderProgram* light_program = ShaderProgram::get(
 		Shader::get(vert_screenspace, {}),
 		NULL,
-		Shader::get(frag_point_light, {})
+		Shader::get(frag_point_light, frag_options)
 	);
 
 	light_program->use();
 	light_program->set_matrix("light_xform", ~mat * cam.get_mat());
 	light_program->set_vector("light_pos", ~cam.get_mat() * mat.get_column(_w));
 	light_program->set_vector("light_emission", emission);
-	light_program->set_texture("light_map", 3, shadow_map(), GL_TEXTURE_CUBE_MAP);
+	light_program->set_texture("light_map", 5, shadow_map(), GL_TEXTURE_CUBE_MAP);
 
 	draw_fsq();
 }
