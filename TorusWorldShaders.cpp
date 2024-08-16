@@ -36,8 +36,8 @@ void init_torus_world_shaders()
 			}
 
 			#ifdef USE_FOG
-				#define NUM_FOG_STEPS (50)
-				uniform float fog_density = 0.3;
+				#define NUM_FOG_STEPS (100)
+				uniform float fog_density = 0.03;
 				uniform vec3 fog_color = vec3(1, 1, 1);
 			#endif
 
@@ -54,7 +54,7 @@ void init_torus_world_shaders()
 
 				//DISTANCE:
 				vec4 lut_data = texture(chord2_lut, dot(lightspace_delta, lightspace_delta) * chord2_lut_scale + chord2_lut_offset);
-				float distance_factor = lut_data.y;		//1 / sin^2(distance)'
+				float distance_factor = lut_data.y;		//1 / sin^2(distance)
 
 				//NORMAL:
 				/*
@@ -88,7 +88,7 @@ void init_torus_world_shaders()
 					//FOG:
 					vec4 ortho_position;		//Position orthogonalized against the camera position.
 					ortho_position.xyz = normalize(position.xyz);
-					ortho_position.w = 1;
+					ortho_position.w = 0;
 					float distance = texelFetch(depth_tex, pixel_coords, 0).r * 6.283185;
 
 					vec3 fog = vec3(0);
@@ -96,14 +96,14 @@ void init_torus_world_shaders()
 					{
 						float theta = i * distance / NUM_FOG_STEPS;
 						vec4 curpos = cos(theta) * vec4(0, 0, 0, 1) + sin(theta) * ortho_position;
-						//Note: reusing variable from before. I don't like this.
-						lightspace_delta = light_xform * curpos;
-						lightspace_delta.w -= 1;
-						float lightspace_distance = texture(chord2_lut, dot(lightspace_delta, lightspace_delta) * chord2_lut_scale + chord2_lut_offset).x;
+						//Note: reusing variables from before. I don't like this.
+						lightspace_delta = light_xform * curpos - vec4(0, 0, 0, 1);
+						lut_data = texture(chord2_lut, dot(lightspace_delta, lightspace_delta) * chord2_lut_scale + chord2_lut_offset);
+						float lightspace_distance = lut_data.x;
 						if(lightspace_distance < texture(light_map, lightspace_delta.xyz).r)
-							fog += distance * fog_color * light_emission;
+							fog += distance * fog_color * light_emission * lut_data.y;
 						if(1 - lightspace_distance < texture(light_map, -lightspace_delta.xyz).r)
-							fog += distance * fog_color * light_emission;
+							fog += distance * fog_color * light_emission * lut_data.y;
 					}
 					fog /= NUM_FOG_STEPS;
 					
@@ -112,13 +112,13 @@ void init_torus_world_shaders()
 			}
 		)",
 		[](ShaderProgram* program) {
-			program->set_lut("chord2_lut", 4, s_chord2_lut);
+			program->set_lut("chord2_lut", 0, s_chord2_lut);
 		},
 		NULL,
 		[](ShaderProgram* program) {
-			program->set_texture("albedo_tex", 0, s_gbuffer_albedo);
-			program->set_texture("position_tex", 1, s_gbuffer_position);
-			program->set_texture("normal_tex", 2, s_gbuffer_normal);
+			program->set_texture("albedo_tex", 1, s_gbuffer_albedo);
+			program->set_texture("position_tex", 2, s_gbuffer_position);
+			program->set_texture("normal_tex", 3, s_gbuffer_normal);
 		},
 		{
 			new ShaderOption(
@@ -126,7 +126,7 @@ void init_torus_world_shaders()
 				NULL,
 				NULL,
 				[](ShaderProgram* program) {
-					program->set_texture("depth_tex", 3, s_gbuffer_depth);
+					program->set_texture("depth_tex", 4, s_gbuffer_depth);
 				}
 			)
 		}
