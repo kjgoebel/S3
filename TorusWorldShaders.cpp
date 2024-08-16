@@ -39,8 +39,8 @@ void init_torus_world_shaders()
 
 			#ifdef USE_FOG
 				#define NUM_FOG_STEPS (50)
-				uniform float fog_density = 0.3;
-				uniform vec3 fog_color = vec3(1, 1, 1);
+				uniform float fog_density;
+				uniform vec3 fog_color;
 			#endif
 
 			out vec4 frag_color;

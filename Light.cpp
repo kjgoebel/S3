@@ -8,7 +8,7 @@
 
 
 double s_fog_density = 0.1;
-Vec3 s_fog_color(0.5, 0.8, 1);
+Vec3 s_fog_color(1, 1, 1);
 
 
 Light::Light(Mat4& mat, Vec3& emission, Model* model, bool use_fog, double near_clip)
