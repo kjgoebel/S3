@@ -23,7 +23,7 @@
 #define WALK_SPEED		(TAU / 50)		//Note that this isn't on the same scale as distances on the Sphere.
 #define SUN_SPEED		(TAU / 60)
 
-#define FOG_INCREMENT	(0.5)
+#define FOG_INCREMENT	(0.1)
 
 enum Mode {
 	NORMAL,
@@ -494,6 +494,15 @@ void keyboard(unsigned char key, int x, int y)
 			break;
 		case 'd':
 			controls.right = true;
+			break;
+
+		case '[':
+			s_fog_density -= FOG_INCREMENT;
+			if(s_fog_density < 0.0)
+				s_fog_density = 0.0;
+			break;
+		case ']':
+			s_fog_density += FOG_INCREMENT;
 			break;
 	}
 }

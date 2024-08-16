@@ -1,5 +1,7 @@
 #include "TorusWorldShaders.h"
 
+#include "Light.h"
+
 
 ShaderCore *frag_point_light, *frag_bloom, *frag_bloom_separate, *frag_final_color;
 ShaderCore *frag_copy_textures, *frag_dump_texture, *frag_dump_cubemap, *frag_dump_texture1d;
@@ -109,6 +111,7 @@ void init_torus_world_shaders()
 					}
 					fog *= distance / NUM_FOG_STEPS;
 					
+					//This being strictly additive doesn't work with unlights.
 					frag_color.xyz += fog_density * fog * fog_color * light_emission;
 				#endif
 			}
@@ -128,6 +131,8 @@ void init_torus_world_shaders()
 				NULL,
 				NULL,
 				[](ShaderProgram* program) {
+					program->set_float("fog_density", s_fog_density);
+					program->set_vector("fog_color", s_fog_color);
 					program->set_texture("depth_tex", 4, s_gbuffer_depth);
 				}
 			)

@@ -6,6 +6,9 @@
 #include "Framebuffer.h"
 
 
+extern double s_fog_density;
+extern Vec3 s_fog_color;
+
 
 struct Light : public Camera
 {
