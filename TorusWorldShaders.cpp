@@ -36,8 +36,8 @@ void init_torus_world_shaders()
 			}
 
 			#ifdef USE_FOG
-				#define NUM_FOG_STEPS (100)
-				uniform float fog_density = 0.03;
+				#define NUM_FOG_STEPS (50)
+				uniform float fog_density = 0.3;
 				uniform vec3 fog_color = vec3(1, 1, 1);
 			#endif
 
@@ -90,8 +90,9 @@ void init_torus_world_shaders()
 					ortho_position.xyz = normalize(position.xyz);
 					ortho_position.w = 0;
 					float distance = texelFetch(depth_tex, pixel_coords, 0).r * 6.283185;
+					float half_step_width = 0.5 * distance / NUM_FOG_STEPS;
 
-					vec3 fog = vec3(0);
+					float fog = 0;
 					for(int i = 1; i < NUM_FOG_STEPS; i++)
 					{
 						float theta = i * distance / NUM_FOG_STEPS;
@@ -100,14 +101,15 @@ void init_torus_world_shaders()
 						lightspace_delta = light_xform * curpos - vec4(0, 0, 0, 1);
 						lut_data = texture(chord2_lut, dot(lightspace_delta, lightspace_delta) * chord2_lut_scale + chord2_lut_offset);
 						float lightspace_distance = lut_data.x;
-						if(lightspace_distance < texture(light_map, lightspace_delta.xyz).r)
-							fog += distance * fog_color * light_emission * lut_data.y;
-						if(1 - lightspace_distance < texture(light_map, -lightspace_delta.xyz).r)
-							fog += distance * fog_color * light_emission * lut_data.y;
+
+						float distance_delta = texture(light_map, lightspace_delta.xyz).r - lightspace_distance;
+						fog += smoothstep(-half_step_width, half_step_width, distance_delta) * lut_data.y;
+						distance_delta = texture(light_map, -lightspace_delta.xyz).r - 1 + lightspace_distance;
+						fog += smoothstep(-half_step_width, half_step_width, distance_delta) * lut_data.y;
 					}
-					fog /= NUM_FOG_STEPS;
+					fog *= distance / NUM_FOG_STEPS;
 					
-					frag_color.xyz += (1 - exp(-distance * fog_density)) * fog;
+					frag_color.xyz += fog_density * fog * fog_color * light_emission;
 				#endif
 			}
 		)",
