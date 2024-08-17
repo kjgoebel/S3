@@ -274,7 +274,7 @@ void init()
 	//Generic lights
 	for(int i = 0; i < 4; i++)
 		lights.push_back(new Light(
-			torus_world_xform(random_torus_pos(0.15, 0.3), 0, 0, 0),
+			torus_world_xform(random_torus_pos(0.15, 0.3)),
 			0.25 * Vec3(frand(), frand(), frand()),
 			light_model
 		));

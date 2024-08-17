@@ -55,6 +55,9 @@ void init_torus_world_shaders()
 			void main() {
 				ivec2 pixel_coords = ivec2(gl_FragCoord.xy);
 				vec4 albedo = texelFetch(albedo_tex, pixel_coords, 0);
+
+				//Note: must do something about the back of the player's head when albedo.w == 0.
+
 				vec4 position = texelFetch(position_tex, pixel_coords, 0);
 				vec4 normal = texelFetch(normal_tex, pixel_coords, 0);
 
