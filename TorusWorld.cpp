@@ -8,6 +8,7 @@
 #include "Framebuffer.h"
 #include "Light.h"
 #include "TorusWorldShaders.h"
+#include "TorusWorldTransforms.h"
 
 #include <stdio.h>
 #include <time.h>
@@ -58,86 +59,6 @@ double last_frame_time;
 Mat4 sun_xform()
 {
 	return Mat4::axial_rotation(_x, _y, SUN_SPEED * last_frame_time) * Mat4::axial_rotation(_w, _x, TAU / 4) * Mat4::axial_rotation(_z, _y, TAU / 4);
-}
-
-Mat4 torus_world_xform(double x, double y, double z, double yaw, double pitch, double roll)
-{
-	double cx = cos(x), sx = sin(x), cy = cos(y), sy = sin(y);
-	Vec4 pos = INV_ROOT_2 * Vec4(cx, -sx, cy, sy);
-	Vec4 fwd = Vec4(0, 0, -sy, cy);
-
-	Vec4 down = INV_ROOT_2 * Vec4(-cx, sx, cy, sy);
-	Vec4 right = Vec4(-sx, -cx, 0, 0);
-	
-	return Mat4::from_columns(right, down, fwd, pos)
-				* Mat4::axial_rotation(_y, _w, z)
-				* Mat4::axial_rotation(_z, _x, yaw)
-				* Mat4::axial_rotation(_y, _z, pitch)
-				* Mat4::axial_rotation(_x, _y, roll);
-}
-
-Mat4 torus_world_xform(Vec3 p, double yaw, double pitch, double roll)
-{
-	return torus_world_xform(p.x, p.y, p.z, yaw, pitch, roll);
-}
-
-
-Vec3 inverse_torus_world_xform(Vec4 p)
-{
-	Vec3 ret;
-	ret.x = atan2(-p.y, p.x);
-	ret.y = atan2(p.w, p.z);
-	double	sz = sqrt(1 - p.w * p.w - p.z * p.z),
-			cz = sqrt(1 - p.y * p.y - p.x * p.x);
-	ret.z = atan2(sz, cz) - TAU / 8;
-	return ret;
-}
-
-
-typedef std::function<double(double)> SearchableFunc;
-
-bool r_binary_search(SearchableFunc f, double x0, double x1, double f0, double f1, double tolerance, double& result)
-{
-	if(f0 > 0 == f1 > 0)
-		return false;
-	double xc = 0.5 * (x0 + x1), fc = f(xc);
-	if(x1 - x0 < tolerance)
-	{
-		result = xc;
-		return true;
-	}
-	if(fc > 0 == f1 > 0)
-		return r_binary_search(f, x0, xc, f0, fc, tolerance, result);
-	else
-		return r_binary_search(f, xc, x1, fc, f1, tolerance, result);
-}
-
-//Find intersection between the ray p, v and the Torus.
-//Dunno how to solve this exactly, so use binary search.
-bool cast_ray(Vec4 p, Vec4 v, Vec4& out_hit)
-{
-	double	c2 = p.x * p.x + p.y * p.y - p.z * p.z - p.w * p.w,
-			s2 = v.x * v.x + v.y * v.y - v.z * v.z - v.w * v.w,
-			sc = 2 * (p.x * v.x + p.y * v.y - p.z * v.z - p.w * v.w),
-			alpha;
-
-	SearchableFunc func = [c2, s2, sc] (double a) {
-		double c = cos(a), s = sin(a);
-		return c2 * c * c + s2 * s * s + sc * s * c;
-	};
-
-	#define NUM_RAY_SEGMENTS (5)
-	for(int i = 0; i < NUM_RAY_SEGMENTS; i++)
-	{
-		double start = TAU / NUM_RAY_SEGMENTS * i;
-		double end = start + TAU / NUM_RAY_SEGMENTS;
-		if(r_binary_search(func, start, end, func(start), func(end), 0.01, alpha))
-		{
-			out_hit = cos(alpha) * p + sin(alpha) * v;
-			return true;
-		}
-	}
-	return false;
 }
 
 
@@ -287,7 +208,7 @@ void init()
 
 	Mat4* boulders = new Mat4[NUM_BOULDERS];
 	for(int i = 0; i < NUM_BOULDERS; i++)
-		boulders[i] = torus_world_xform(frand() * TAU, frand() * TAU, 0.05, frand() * TAU, fsrand() * 0.5 * TAU, fsrand() * 0.5 * TAU);
+		boulders[i] = torus_world_xform(random_torus_pos(0.05, 0.05), frand() * TAU, fsrand() * 0.5 * TAU, fsrand() * 0.5 * TAU);
 	render_boulders = boulder_model->make_draw_func(NUM_BOULDERS, boulders, Vec4(0.7, 0.7, 0.7, 1));
 	delete[] boulders;
 
@@ -313,7 +234,7 @@ void init()
 	//Generic lights
 	for(int i = 0; i < 4; i++)
 		lights.push_back(new Light(
-			torus_world_xform(frand() * TAU, frand() * TAU, 0.15 + 0.15 * frand(), 0, 0, 0),
+			torus_world_xform(random_torus_pos(0.15, 0.3), 0, 0, 0),
 			0.25 * Vec3(frand(), frand(), frand()),
 			light_model
 		));

@@ -131,6 +131,7 @@
     <ClCompile Include="Shaders.cpp" />
     <ClCompile Include="TorusWorld.cpp" />
     <ClCompile Include="TorusWorldShaders.cpp" />
+    <ClCompile Include="TorusWorldTransforms.cpp" />
     <ClCompile Include="Utils.cpp" />
     <ClCompile Include="Vector.cpp" />
   </ItemGroup>
@@ -150,6 +151,7 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="Shaders.h" />
     <ClInclude Include="TorusWorldShaders.h" />
+    <ClInclude Include="TorusWorldTransforms.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="Vector.h" />
   </ItemGroup>

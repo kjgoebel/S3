@@ -51,6 +51,9 @@
     <ClCompile Include="TorusWorldShaders.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TorusWorldTransforms.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Vector.h">
@@ -102,6 +105,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="TorusWorldShaders.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TorusWorldTransforms.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
