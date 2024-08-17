@@ -38,9 +38,16 @@ void init_torus_world_shaders()
 			}
 
 			#ifdef USE_FOG
-				#define NUM_FOG_STEPS (50)
+				#define NUM_FOG_STEPS (15)
 				uniform float fog_density;
 				uniform vec3 fog_color;
+
+				float bnoise(ivec2 p) {
+					int temp =	(p.x * p.y * 999999937) ^
+								(p.x * p.y * 999416681) ^
+								999319777;
+					return float(temp % 135977) / 135976;
+				}
 			#endif
 
 			out vec4 frag_color;
@@ -92,22 +99,22 @@ void init_torus_world_shaders()
 					ortho_position.xyz = normalize(position.xyz);
 					ortho_position.w = 0;
 					float distance = texelFetch(depth_tex, pixel_coords, 0).r * 6.283185;
-					float half_step_width = 0.5 * distance / NUM_FOG_STEPS;
 
 					float fog = 0;
+					float theta_offset = bnoise(pixel_coords);
 					for(int i = 1; i < NUM_FOG_STEPS; i++)
 					{
-						float theta = i * distance / NUM_FOG_STEPS;
+						float theta = (i + theta_offset) * distance / NUM_FOG_STEPS;
 						vec4 curpos = cos(theta) * vec4(0, 0, 0, 1) + sin(theta) * ortho_position;
 						//Note: reusing variables from before. I don't like this.
 						lightspace_delta = light_xform * curpos - vec4(0, 0, 0, 1);
 						lut_data = texture(chord2_lut, dot(lightspace_delta, lightspace_delta) * chord2_lut_scale + chord2_lut_offset);
 						float lightspace_distance = lut_data.x;
 
-						float distance_delta = texture(light_map, lightspace_delta.xyz).r - lightspace_distance;
-						fog += smoothstep(-half_step_width, half_step_width, distance_delta) * lut_data.y;
-						distance_delta = texture(light_map, -lightspace_delta.xyz).r - 1 + lightspace_distance;
-						fog += smoothstep(-half_step_width, half_step_width, distance_delta) * lut_data.y;
+						if(lightspace_distance < texture(light_map, lightspace_delta.xyz).r)
+							fog += lut_data.y;
+						if(1 - lightspace_distance < texture(light_map, -lightspace_delta.xyz).r)
+							fog += lut_data.y;
 					}
 					fog *= distance / NUM_FOG_STEPS;
 					
