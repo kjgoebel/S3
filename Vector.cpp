@@ -39,6 +39,13 @@ void print_vector(const Vec4& v, FILE* fout)
 	fprintf(fout, "\n");
 }
 
+void print_vector(const Vec3& v, FILE* fout)
+{
+	for(int i = 0; i < 3; i++)
+		fprintf(fout, "% 0.4f ", v[i]);
+	fprintf(fout, "\n");
+}
+
 void print_matrix(const Mat4& m, FILE* fout)
 {
 	for(int i = 0; i < 4; i++)

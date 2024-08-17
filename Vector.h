@@ -374,4 +374,5 @@ struct Mat4
 Mat4 basis_around(Vec4 a, Vec4 b, double *chord = NULL);
 
 void print_vector(const Vec4& v, FILE* fout = stdout);
+void print_vector(const Vec3& v, FILE* fout = stdout);
 void print_matrix(const Mat4& m, FILE* fout = stdout);

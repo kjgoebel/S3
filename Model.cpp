@@ -6,12 +6,6 @@
 #include <stdint.h>
 #include <memory>
 #include "Utils.h"
-
-/*
-	We use is_shadow_pass to choose automagically which shader program to use. I don't 
-	like this, but the alternative is to clutter up Main with a whole bunch of false
-	values that don't need to be there.
-*/
 #include "Framebuffer.h"
 
 #pragma warning(disable : 4244)		//conversion from double to float

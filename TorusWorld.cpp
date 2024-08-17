@@ -23,7 +23,7 @@
 #define WALK_SPEED		(TAU / 50)		//Note that this isn't on the same scale as distances on the Sphere.
 #define SUN_SPEED		(TAU / 60)
 
-#define FOG_INCREMENT	(0.1)
+#define FOG_INCREMENT	(0.05)
 
 enum Mode {
 	NORMAL,
@@ -41,6 +41,7 @@ bool bloom = true;
 Model* dots_model;
 Model* torus_model;
 Model* boulder_model;
+Model* light_model;
 DrawFunc render_boulders;
 ShaderProgram* final_program;
 ShaderProgram *bloom_separate_program, *bloom_program_h, *bloom_program_v;
@@ -75,6 +76,70 @@ Mat4 torus_world_xform(double x, double y, double z, double yaw, double pitch, d
 				* Mat4::axial_rotation(_x, _y, roll);
 }
 
+Mat4 torus_world_xform(Vec3 p, double yaw, double pitch, double roll)
+{
+	return torus_world_xform(p.x, p.y, p.z, yaw, pitch, roll);
+}
+
+
+Vec3 inverse_torus_world_xform(Vec4 p)
+{
+	Vec3 ret;
+	ret.x = atan2(p.y, p.x);
+	ret.y = atan2(p.w, p.z);
+	double	s = sqrt(1 - p.w * p.w - p.z * p.z),
+			c = sqrt(1 - p.y * p.y - p.x * p.x);
+	ret.z = atan2(s, c) - TAU / 8;
+	return ret;
+}
+
+
+typedef std::function<double(double)> SearchableFunc;
+
+bool r_binary_search(SearchableFunc f, double x0, double x1, double f0, double f1, double tolerance, double& result)
+{
+	if(f0 > 0 == f1 > 0)
+		return false;
+	double xc = 0.5 * (x0 + x1), fc = f(xc);
+	if(x1 - x0 < tolerance)
+	{
+		result = xc;
+		return true;
+	}
+	if(fc > 0 == f1 > 0)
+		return r_binary_search(f, x0, xc, f0, fc, tolerance, result);
+	else
+		return r_binary_search(f, xc, x1, fc, f1, tolerance, result);
+}
+
+//Find intersection between the ray p, v and the Torus.
+//Dunno how to solve this exactly, so use binary search.
+bool cast_ray(Vec4 p, Vec4 v, Vec4& out_hit)
+{
+	double	c2 = p.x * p.x + p.y * p.y - p.z * p.z - p.w * p.w,
+			s2 = v.x * v.x + v.y * v.y - v.z * v.z - v.w * v.w,
+			sc = 2 * (p.x * v.x + p.y * v.y - p.z * v.z - p.w * v.w),
+			alpha;
+
+	SearchableFunc func = [c2, s2, sc] (double a) {
+		double c = cos(a), s = sin(a);
+		return c2 * c * c + s2 * s * s + sc * s * c;
+	};
+
+	#define NUM_RAY_SEGMENTS (5)
+	for(int i = 0; i < NUM_RAY_SEGMENTS; i++)
+	{
+		double start = TAU / NUM_RAY_SEGMENTS * i;
+		double end = start + TAU / NUM_RAY_SEGMENTS;
+		if(r_binary_search(func, start, end, func(start), func(end), 0.01, alpha))
+		{
+			out_hit = cos(alpha) * p + sin(alpha) * v;
+			return true;
+		}
+	}
+	return false;
+}
+
 
 struct Controls
 {
@@ -91,7 +156,6 @@ struct PlayerState
 	void set_cam() const
 	{
 		cam.set_mat(torus_world_xform(b, a, 0.03, yaw, pitch, 0));
-		double ca = cos(a), sa = sin(a), cb = cos(b), sb = sin(b);
 	}
 };
 PlayerState player_state;
@@ -194,7 +258,6 @@ void init()
 
 	check_gl_errors("init 3");
 
-	//Note: Should make half as many dots but only on the right side of the torus.
 	Vec4* dots = new Vec4[NUM_DOTS];
 	for(int i = 0; i < NUM_DOTS; i++)
 	{
@@ -232,7 +295,7 @@ void init()
 		true
 	));
 
-	Model* light_model = Model::make_icosahedron(0.02, 2, true);
+	light_model = Model::make_icosahedron(0.02, 2, true);
 
 	//The Unlight
 	lights.push_back(new Light(
@@ -248,7 +311,7 @@ void init()
 			0.25 * Vec3(frand(), frand(), frand()),
 			light_model
 		));
-	
+
 	check_gl_errors("init 5");
 	
 	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
@@ -297,6 +360,7 @@ void display()
 	#ifdef PRINT_FRAME_RATE
 		printf("%f\n", 1.0 / dt);
 		print_matrix(cam.get_mat());
+		print_vector(inverse_torus_world_xform(cam.get_mat().get_column(_w)));
 		printf("\n");
 	#endif
 
@@ -475,6 +539,25 @@ void mouse(int x, int y)
 		player_state.pitch = -TAU / 4;
 }
 
+void mouse_button(int button, int state, int x, int y)
+{
+	if(state == GLUT_DOWN)
+	{
+		Mat4 temp = cam.get_mat();
+		Vec4 point_hit;
+		if(cast_ray(temp.get_column(_w), temp.get_column(_z), point_hit))
+		{
+			Vec3 temp = inverse_torus_world_xform(point_hit);
+			temp.z = 0.1;
+			lights.push_back(new Light(
+				torus_world_xform(temp, 0, 0, 0),
+				Vec3(0.5, 0.5, 0.5),
+				light_model
+			));
+		}
+	}
+}
+
 void keyboard(unsigned char key, int x, int y)
 {
 	switch(key)
@@ -576,6 +659,7 @@ int main(int argc, char** argv)
 	glutSpecialFunc(special);
 	glutPassiveMotionFunc(mouse);
 	glutMotionFunc(mouse);
+	glutMouseFunc(mouse_button);
 
 	init();
 
