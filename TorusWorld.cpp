@@ -63,11 +63,11 @@ Mat4 sun_xform()
 Mat4 torus_world_xform(double x, double y, double z, double yaw, double pitch, double roll)
 {
 	double cx = cos(x), sx = sin(x), cy = cos(y), sy = sin(y);
-	Vec4 pos = INV_ROOT_2 * Vec4(cx, sx, cy, sy);
+	Vec4 pos = INV_ROOT_2 * Vec4(cx, -sx, cy, sy);
 	Vec4 fwd = Vec4(0, 0, -sy, cy);
 
-	Vec4 down = INV_ROOT_2 * Vec4(-cx, -sx, cy, sy);
-	Vec4 right = Vec4(sx, -cx, 0, 0);
+	Vec4 down = INV_ROOT_2 * Vec4(-cx, sx, cy, sy);
+	Vec4 right = Vec4(-sx, -cx, 0, 0);
 	
 	return Mat4::from_columns(right, down, fwd, pos)
 				* Mat4::axial_rotation(_y, _w, z)
@@ -85,11 +85,11 @@ Mat4 torus_world_xform(Vec3 p, double yaw, double pitch, double roll)
 Vec3 inverse_torus_world_xform(Vec4 p)
 {
 	Vec3 ret;
-	ret.x = atan2(p.y, p.x);
+	ret.x = atan2(-p.y, p.x);
 	ret.y = atan2(p.w, p.z);
-	double	s = sqrt(1 - p.w * p.w - p.z * p.z),
-			c = sqrt(1 - p.y * p.y - p.x * p.x);
-	ret.z = atan2(s, c) - TAU / 8;
+	double	sz = sqrt(1 - p.w * p.w - p.z * p.z),
+			cz = sqrt(1 - p.y * p.y - p.x * p.x);
+	ret.z = atan2(sz, cz) - TAU / 8;
 	return ret;
 }
 
@@ -150,12 +150,18 @@ Controls controls;
 
 struct PlayerState
 {
-	double a, b;
+	Vec3 pos;
 	double yaw, pitch;
+
+	PlayerState()
+	{
+		pos = Vec3(0, 0, 0.03);
+		yaw = pitch = 0;
+	}
 
 	void set_cam() const
 	{
-		cam.set_mat(torus_world_xform(b, a, 0.03, yaw, pitch, 0));
+		cam.set_mat(torus_world_xform(pos, yaw, pitch, 0));
 	}
 };
 PlayerState player_state;
@@ -314,7 +320,6 @@ void init()
 
 	check_gl_errors("init 5");
 	
-	player_state.a = player_state.b = player_state.yaw = player_state.pitch = 0;
 	player_state.set_cam();
 }
 
@@ -350,8 +355,8 @@ void display()
 			right = CONTROL_SPEED(controls.left, controls.right, WALK_SPEED),
 			cy = cos(player_state.yaw),
 			sy = sin(player_state.yaw);
-	player_state.a += fwd * cy + right * sy;
-	player_state.b += right * cy - fwd * sy;
+	player_state.pos.x += fwd * sy - right * cy;
+	player_state.pos.y += right * sy + fwd * cy;
 
 	player_state.set_cam();
 

@@ -17,10 +17,10 @@ std::shared_ptr<Vec4[]> make_torus_verts(int long_segments, int trans_segments, 
 			double phi = (double)j * TAU / trans_segments;
 
 			ret[i * trans_segments + j] = normalization_factor * Vec4(
-				hole_ratio * sin(phi),
 				hole_ratio * cos(phi),
-				sin(theta),
-				cos(theta)
+				hole_ratio * sin(phi),
+				cos(theta),
+				sin(theta)
 			);
 		}
 	}
@@ -39,10 +39,10 @@ std::shared_ptr<Vec4[]> make_torus_normals(int long_segments, int trans_segments
 			double phi = (double)j * TAU / trans_segments;
 
 			ret[i * trans_segments + j] = INV_ROOT_2 * Vec4(
-				sin(phi),
 				cos(phi),
-				-sin(theta),
-				-cos(theta)
+				sin(phi),
+				-cos(theta),
+				-sin(theta)
 			);
 		}
 	}
@@ -61,16 +61,16 @@ std::shared_ptr<Vec4[]> make_bumpy_torus_verts(int long_segments, int trans_segm
 			double phi = (double)j * TAU / trans_segments;
 
 			Vec4 pos(
-				sin(phi),
 				cos(phi),
-				sin(theta),
-				cos(theta)
+				sin(phi),
+				cos(theta),
+				sin(theta)
 			);
 			Vec4 up(
-				sin(phi),
 				cos(phi),
-				-sin(theta),
-				-cos(theta)
+				sin(phi),
+				-cos(theta),
+				-sin(theta)
 			);
 			ret[i * trans_segments + j] = (pos + fsrand() * bump_height * up).normalize();
 		}
