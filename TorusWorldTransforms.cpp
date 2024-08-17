@@ -4,12 +4,6 @@
 #include "Utils.h"
 
 
-Vec4 torus_world_xform(Vec3 p)
-{
-	double cx = cos(p.x), sx = sin(p.x), cy = cos(p.y), sy = sin(p.y);
-	return INV_ROOT_2 * Vec4(cx, -sx, cy, sy);
-}
-
 Mat4 torus_world_xform(Vec3 p, double yaw, double pitch, double roll)
 {
 	double cx = cos(p.x), sx = sin(p.x), cy = cos(p.y), sy = sin(p.y);
@@ -19,11 +13,14 @@ Mat4 torus_world_xform(Vec3 p, double yaw, double pitch, double roll)
 	Vec4 down = INV_ROOT_2 * Vec4(-cx, sx, cy, sy);
 	Vec4 right = Vec4(-sx, -cx, 0, 0);
 	
-	return Mat4::from_columns(right, down, fwd, pos)
-				* Mat4::axial_rotation(_y, _w, p.z)
-				* Mat4::axial_rotation(_z, _x, yaw)
-				* Mat4::axial_rotation(_y, _z, pitch)
-				* Mat4::axial_rotation(_x, _y, roll);
+	Mat4 ret = Mat4::from_columns(right, down, fwd, pos) * Mat4::axial_rotation(_y, _w, p.z);
+	if(yaw != 0)
+		ret = ret * Mat4::axial_rotation(_z, _x, yaw);
+	if(pitch != 0)
+		ret = ret * Mat4::axial_rotation(_y, _z, pitch);
+	if(roll != 0)
+		ret = ret * Mat4::axial_rotation(_x, _y, roll);
+	return ret;
 }
 
 

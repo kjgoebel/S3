@@ -4,8 +4,7 @@
 #include "Vector.h"
 
 
-Vec4 torus_world_xform(Vec3 p);
-Mat4 torus_world_xform(Vec3 p, double yaw, double pitch, double roll);
+Mat4 torus_world_xform(Vec3 p, double yaw = 0, double pitch = 0, double roll = 0);
 
 Vec3 inverse_torus_world_xform(Vec4 p);
 

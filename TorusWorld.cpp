@@ -26,6 +26,8 @@
 
 #define FOG_INCREMENT	(0.05)
 
+#define EYE_HEIGHT		(0.03)
+
 enum Mode {
 	NORMAL,
 	COPY_TEXTURES,
@@ -69,20 +71,58 @@ struct Controls
 };
 Controls controls;
 
+#define JUMP_SPEED (TAU / 16)
+
 struct PlayerState
 {
 	Vec3 pos;
 	double yaw, pitch;
 
+	bool jumping;
+	Vec4 jump_start, ortho_jump_end;
+	double jump_theta, jump_max_theta;
+
 	PlayerState()
 	{
-		pos = Vec3(0, 0, 0.03);
+		pos = Vec3(0, 0, EYE_HEIGHT);
 		yaw = pitch = 0;
+		jumping = false;
 	}
 
-	void set_cam() const
+	void update(double dt, double fwd, double right)
 	{
-		cam.set_mat(torus_world_xform(pos, yaw, pitch, 0));
+		if(jumping)
+		{
+			if(jump_theta > jump_max_theta)
+			{
+				pos.z = EYE_HEIGHT;		//Fix any height problem as a result of overshooting jump_max_theta.
+				jumping = false;
+			}
+			else
+			{
+				Vec4 r4pos = cos(jump_theta) * jump_start + sin(jump_theta) * ortho_jump_end;
+				pos = inverse_torus_world_xform(r4pos);
+			}
+			jump_theta += dt * JUMP_SPEED;
+		}
+		else
+		{
+			double	cy = cos(yaw),
+					sy = sin(yaw);
+			pos.x += fwd * sy - right * cy;
+			pos.y += right * sy + fwd * cy;
+		}
+
+		cam.set_mat(torus_world_xform(pos, yaw, pitch));
+	}
+
+	void start_jump(Vec4 destination)
+	{
+		jumping = true;
+		jump_start = torus_world_xform(pos).get_column(_w);
+		ortho_jump_end = (destination - jump_start * (jump_start * destination)).normalize();
+		jump_theta = 0;
+		jump_max_theta = 2 * asin(0.5 * (destination - jump_start).mag());
 	}
 };
 PlayerState player_state;
@@ -240,8 +280,6 @@ void init()
 		));
 
 	check_gl_errors("init 5");
-	
-	player_state.set_cam();
 }
 
 void reshape(int w, int h)
@@ -271,22 +309,15 @@ void display()
 		(positive && !negative) ? speed * dt : \
 			(negative && !positive) ? -speed * dt : 0\
 	)
-	
 	double	fwd = CONTROL_SPEED(controls.fwd, controls.back, WALK_SPEED),
-			right = CONTROL_SPEED(controls.left, controls.right, WALK_SPEED),
-			cy = cos(player_state.yaw),
-			sy = sin(player_state.yaw);
-	player_state.pos.x += fwd * sy - right * cy;
-	player_state.pos.y += right * sy + fwd * cy;
-
-	player_state.set_cam();
+			right = CONTROL_SPEED(controls.left, controls.right, WALK_SPEED);
+	player_state.update(dt, fwd, right);
 
 	last_frame_time += dt;
 
 	#ifdef PRINT_FRAME_RATE
 		printf("%f\n", 1.0 / dt);
 		print_matrix(cam.get_mat());
-		print_vector(inverse_torus_world_xform(cam.get_mat().get_column(_w)));
 		printf("\n");
 	#endif
 
@@ -473,6 +504,7 @@ void mouse_button(int button, int state, int x, int y)
 		Vec4 point_hit;
 		if(cast_ray(temp.get_column(_w), temp.get_column(_z), point_hit))
 		{
+			/*
 			Vec3 temp = inverse_torus_world_xform(point_hit);
 			temp.z = 0.1;
 			lights.push_back(new Light(
@@ -480,6 +512,11 @@ void mouse_button(int button, int state, int x, int y)
 				Vec3(0.5, 0.5, 0.5),
 				light_model
 			));
+			*/
+
+			Vec3 temp = inverse_torus_world_xform(point_hit);
+			temp.z = EYE_HEIGHT;
+			player_state.start_jump(torus_world_xform(temp).get_column(_w));
 		}
 	}
 }
