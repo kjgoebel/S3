@@ -32,7 +32,7 @@ struct Light : public Camera
 
 	void set_perspective(double new_aspect_ratio, double vertical_field_of_view, double near = 0.001)
 	{
-		error("The aspect ratio and field of view for a camera must always be 1 and TAU / 4, respectively.");
+		error("The aspect ratio and field of view for a light must always be 1 and TAU / 4, respectively.");
 	}
 
 	void set_perspective(double near_clip)
