@@ -228,12 +228,12 @@ void init()
 	Vec4* dots = new Vec4[NUM_DOTS];
 	for(int i = 0; i < NUM_DOTS; i++)
 	{
-		double c, s;
+		double c2, s2;
 		do {
 			dots[i] = rand_s3();
-			s = sqrt(1 - dots[i].w * dots[i].w - dots[i].z * dots[i].z);
-			c = sqrt(1 - dots[i].y * dots[i].y - dots[i].x * dots[i].x);
-		} while(c > s);
+			s2 = 1 - dots[i].w * dots[i].w - dots[i].z * dots[i].z;
+			c2 = 1 - dots[i].y * dots[i].y - dots[i].x * dots[i].x;
+		} while(c2 > s2);
 	}
 	dots_model = new Model(NUM_DOTS, dots);
 	delete[] dots;
