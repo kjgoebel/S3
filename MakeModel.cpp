@@ -152,7 +152,7 @@ void TriangleModel::subdivide(bool normalize)
 		for(int e = 0; e < 3 * new_num_tris; e++)
 			new_elems[e] = random_raw() % new_num_verts;
 	#else
-		for(int v = 0; v < num_vertices; v++)
+		for(GLuint v = 0; v < num_vertices; v++)
 		{
 			new_verts[v] = vertices[v];
 			if(normalize)
