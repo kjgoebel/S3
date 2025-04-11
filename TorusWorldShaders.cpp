@@ -109,6 +109,11 @@ void init_torus_world_shaders()
 					{
 						float theta = (i + theta_offset) * distance / NUM_FOG_STEPS;
 						vec4 curpos = cos(theta) * vec4(0, 0, 0, 1) + sin(theta) * ortho_position;
+						/*
+							Note: Could this be a 3D LUT? Given two parameters for initial and final 
+						position, could that determine a value for lightspace_distance at each sample 
+						position? Or, for that matter, lightspace_delta?
+						*/
 						//Note: reusing variables from before. I don't like this.
 						lightspace_delta = light_xform * curpos - vec4(0, 0, 0, 1);
 						lut_data = texture(chord2_lut, dot(lightspace_delta, lightspace_delta) * chord2_lut_scale + chord2_lut_offset);
