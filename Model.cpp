@@ -697,12 +697,7 @@ std::shared_ptr<Vec4[]> Model::s3ify(int count, double scale, const Vec3* vertic
 			get the magnitude and take its secant to preserve distance from the origin.
 		*/
 		const Vec3& temp = vertices[i];
-		ret[i] = Vec4(
-			temp.x * scale,
-			temp.y * scale,
-			temp.z * scale,
-			1
-		).normalize();
+		ret[i] = Vec4(temp * scale, 1).normalize();
 	}
 
 	return ret;
