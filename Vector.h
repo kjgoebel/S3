@@ -105,6 +105,9 @@ struct Vec3
 		y *= temp;
 		z *= temp;
 	}
+
+	inline Vec3 normalize_to_one() const
+		{return (*this) / fmax(x, fmax(y, z));}
 };
 
 
@@ -189,6 +192,9 @@ struct Vec4
 		z *= temp;
 		w *= temp;
 	}
+
+	inline Vec4 normalize_to_one() const
+		{return (*this) / fmax(fmax(x, y), fmax(z, w));}
 };
 
 
