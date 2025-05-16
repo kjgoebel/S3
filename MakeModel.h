@@ -47,5 +47,5 @@ public:
 	void subdivide(bool normalize);
 };
 
-extern const Vec3 icosahedron_verts[20];
+extern const Vec3 icosahedron_verts[12];
 extern const GLuint icosahedron_elements[3 * 20];

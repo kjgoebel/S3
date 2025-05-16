@@ -230,7 +230,7 @@ void TriangleModel::subdivide(bool normalize)
 #define A	(0.525731112119133606)
 #define B	(0.850650808352039932)
 
-const Vec3 icosahedron_verts[20] = {
+const Vec3 icosahedron_verts[12] = {
 	{-A, 0, B},
 	{A, 0, B},
 	{-A, 0, -B},
